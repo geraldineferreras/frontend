@@ -17,7 +17,7 @@
 */
 import React, { useState, useEffect } from "react";
 import Header from "components/Headers/Header.js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ApiService from '../../services/api';
 // reactstrap components
 import {
@@ -54,6 +54,11 @@ import {
 } from "reactstrap";
 import classnames from "classnames";
 import userDefault from "../../assets/img/theme/user-default.svg";
+import scmsLogo from "../../assets/img/brand/logo-scms.png";
+
+// Import jsPDF for PDF export
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const defaultCoverPhotoSvg =
   "data:image/svg+xml;utf8,<svg width='600' height='240' viewBox='0 0 600 240' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='600' height='240' fill='%23f7f7f7'/><path d='M0 180 Q150 120 300 180 T600 180 V240 H0 Z' fill='%23e3eafc'/><path d='M0 200 Q200 140 400 200 T600 200 V240 H0 Z' fill='%23cfd8dc' opacity='0.7'/></svg>";
@@ -132,13 +137,20 @@ const UserManagement = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
   const [users, setUsers] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [deleteUserName, setDeleteUserName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showExportSuccess, setShowExportSuccess] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
   const [viewMode, setViewMode] = useState("table");
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -155,69 +167,209 @@ const UserManagement = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  useEffect(() => {
+  // Function to fetch users and sections
+  const fetchUsersAndSections = async () => {
     setLoading(true);
     setError(null);
     
-    const fetchUsersAndSections = async () => {
-      try {
-        const data = await ApiService.getUsersByRole(activeTab);
-        
-        let usersArr = [];
-        if (Array.isArray(data)) {
-          usersArr = data;
-        } else if (Array.isArray(data.users)) {
-          usersArr = data.users;
-        } else if (Array.isArray(data.data)) {
-          usersArr = data.data;
-        }
-        
-        // Normalize user fields for consistent frontend usage
-        usersArr = usersArr.map(user => {
-          return {
-            ...user,
-            id: user.id || user.user_id || user.userId || '', // Add ID normalization
-            full_name: user.full_name || user.name || '',
-            program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
-            course_year_section: user.course_year_section || user.section || '',
-            last_login: user.last_login || user.lastLogin || '',
-            profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
-            cover_pic: user.cover_pic || user.coverPhotoUrl || '',
-            student_num: user.student_num || user.studentNumber || '',
-          };
-        });
-        
-        // If we're fetching students, also fetch section information
-        if (activeTab === 'student') {
-          const sectionIds = [...new Set(usersArr.map(user => user.section_id).filter(Boolean))];
-          const sectionsData = {};
-          
-          for (const sectionId of sectionIds) {
-            try {
-              const sectionData = await ApiService.getSectionById(sectionId);
-              if (sectionData && sectionData.data) {
-                sectionsData[sectionId] = sectionData.data;
-              }
-            } catch (error) {
-              console.error(`Failed to fetch section ${sectionId}:`, error);
-              sectionsData[sectionId] = { name: `Section ${sectionId}`, id: sectionId };
-            }
-          }
-          
-          setSections(sectionsData);
-        }
-        
-        setUsers(usersArr);
-        setLoading(false);
-      } catch (err) {
-        setUsers([]); // fallback to empty array on error
-        setError(err.message);
-        setLoading(false);
+    try {
+      // Fetch users for the active tab
+      const data = await ApiService.getUsersByRole(activeTab);
+      
+      let usersArr = [];
+      if (Array.isArray(data)) {
+        usersArr = data;
+      } else if (Array.isArray(data.users)) {
+        usersArr = data.users;
+      } else if (Array.isArray(data.data)) {
+        usersArr = data.data;
       }
-    };
-    
+      
+      // Normalize user fields for consistent frontend usage
+      usersArr = usersArr.map(user => {
+        const normalizedUser = {
+          ...user,
+          id: user.id || user.user_id || user.userId || '', // Add ID normalization
+          full_name: user.full_name || user.name || '',
+          program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+          course_year_section: user.course_year_section || user.section || '',
+          last_login: user.last_login || user.lastLogin || '',
+          profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+          cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+          student_num: user.student_num || user.studentNumber || '',
+        };
+        
+        // Log image paths for debugging
+        if (normalizedUser.profile_pic || normalizedUser.cover_pic) {
+          console.log(`User ${normalizedUser.full_name} (${normalizedUser.id}):`, {
+            profile_pic: normalizedUser.profile_pic,
+            cover_pic: normalizedUser.cover_pic
+          });
+        }
+        
+        return normalizedUser;
+      });
+      
+      // Update the appropriate state based on active tab
+      if (activeTab === 'admin') {
+        setAdmins(usersArr);
+      } else if (activeTab === 'teacher') {
+        setTeachers(usersArr);
+      } else if (activeTab === 'student') {
+        setStudents(usersArr);
+      }
+      
+      // If we're fetching students, also fetch section information
+      if (activeTab === 'student') {
+        const sectionIds = [...new Set(usersArr.map(user => user.section_id).filter(Boolean))];
+        const sectionsData = {};
+        
+        for (const sectionId of sectionIds) {
+          try {
+            const sectionData = await ApiService.getSectionById(sectionId);
+            if (sectionData && sectionData.data) {
+              sectionsData[sectionId] = sectionData.data;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch section ${sectionId}:`, error);
+            sectionsData[sectionId] = { name: `Section ${sectionId}`, id: sectionId };
+          }
+        }
+        
+        setSections(sectionsData);
+      }
+      
+      setUsers(usersArr);
+      setLoading(false);
+    } catch (err) {
+      setUsers([]); // fallback to empty array on error
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch when component mounts or activeTab changes
+  useEffect(() => {
     fetchUsersAndSections();
   }, [activeTab]);
+
+  // Refresh data when component receives focus (e.g., when navigating back from CreateUser)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchUsersAndSections();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    
+    // Also refresh when the component becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUsersAndSections();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeTab]);
+
+  // Check for refresh parameter in URL and trigger refresh
+  useEffect(() => {
+    const refreshParam = searchParams.get('refresh');
+    if (refreshParam === 'true') {
+      fetchUsersAndSections();
+      // Remove the refresh parameter from URL
+      const newSearchParams = new URLSearchParams(location.search);
+      newSearchParams.delete('refresh');
+      navigate(`${location.pathname}?${newSearchParams.toString()}`, { replace: true });
+    }
+  }, [location.search]);
+
+  // Function to fetch all user types for export
+  const fetchAllUsers = async () => {
+    try {
+      const [adminData, teacherData, studentData] = await Promise.all([
+        ApiService.getUsersByRole('admin'),
+        ApiService.getUsersByRole('teacher'),
+        ApiService.getUsersByRole('student')
+      ]);
+
+      // Normalize and set admin users
+      let adminUsers = [];
+      if (Array.isArray(adminData)) {
+        adminUsers = adminData;
+      } else if (Array.isArray(adminData.users)) {
+        adminUsers = adminData.users;
+      } else if (Array.isArray(adminData.data)) {
+        adminUsers = adminData.data;
+      }
+      adminUsers = adminUsers.map(user => ({
+        ...user,
+        id: user.id || user.user_id || user.userId || '',
+        full_name: user.full_name || user.name || '',
+        program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+        course_year_section: user.course_year_section || user.section || '',
+        last_login: user.last_login || user.lastLogin || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+        student_num: user.student_num || user.studentNumber || '',
+      }));
+      setAdmins(adminUsers);
+
+      // Normalize and set teacher users
+      let teacherUsers = [];
+      if (Array.isArray(teacherData)) {
+        teacherUsers = teacherData;
+      } else if (Array.isArray(teacherData.users)) {
+        teacherUsers = teacherData.users;
+      } else if (Array.isArray(teacherData.data)) {
+        teacherUsers = teacherData.data;
+      }
+      teacherUsers = teacherUsers.map(user => ({
+        ...user,
+        id: user.id || user.user_id || user.userId || '',
+        full_name: user.full_name || user.name || '',
+        program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+        course_year_section: user.course_year_section || user.section || '',
+        last_login: user.last_login || user.lastLogin || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+        student_num: user.student_num || user.studentNumber || '',
+      }));
+      setTeachers(teacherUsers);
+
+      // Normalize and set student users
+      let studentUsers = [];
+      if (Array.isArray(studentData)) {
+        studentUsers = studentData;
+      } else if (Array.isArray(studentData.users)) {
+        studentUsers = studentData.users;
+      } else if (Array.isArray(studentData.data)) {
+        studentUsers = studentData.data;
+      }
+      studentUsers = studentUsers.map(user => ({
+        ...user,
+        id: user.id || user.user_id || user.userId || '',
+        full_name: user.full_name || user.name || '',
+        program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+        course_year_section: user.course_year_section || user.section || '',
+        last_login: user.last_login || user.lastLogin || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+        student_num: user.student_num || user.studentNumber || '',
+      }));
+      setStudents(studentUsers);
+
+      return { admins: adminUsers, teachers: teacherUsers, students: studentUsers };
+
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      return { admins: [], teachers: [], students: [] };
+    }
+  };
 
   // Filter users based on search term
   const filteredUsers = users.filter(user => {
@@ -377,31 +529,79 @@ const UserManagement = () => {
     }
   };
 
-  const getRandomAvatar = (userId) => {
-    // Generate a consistent avatar based on user ID
+  const getInitialsAvatar = (fullName) => {
+    // Generate initials from the full name
+    const names = fullName.trim().split(' ');
+    let initials = '';
+    
+    if (names.length >= 2) {
+      // Take first letter of first name and first letter of last name
+      initials = (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+    } else if (names.length === 1) {
+      // If only one name, take first two letters
+      initials = names[0].substring(0, 2).toUpperCase();
+    } else {
+      initials = 'U';
+    }
+    
+    // Generate a consistent color based on the name
     const colors = ['#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#a8edea', '#fed6e3'];
-    const color = colors[userId.toString().length % colors.length];
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(userId)}&background=${color.substring(1)}&color=fff&size=128&bold=true`;
+    const color = colors[fullName.length % colors.length];
+    
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${color.substring(1)}&color=fff&size=128&bold=true`;
   };
 
   const getAvatarForUser = (user) => {
     if (user.profile_pic) {
+      let imageUrl;
+      
       // If it's a relative path, construct the full URL
       if (user.profile_pic.startsWith('uploads/')) {
-        return `http://localhost/scms_new/${user.profile_pic}`;
+        imageUrl = `http://localhost/scms_new_backup/${user.profile_pic}`;
       }
-      return user.profile_pic;
+      // If it's already a full URL, return as is
+      else if (user.profile_pic.startsWith('http://') || user.profile_pic.startsWith('https://')) {
+        imageUrl = user.profile_pic;
+      }
+      // If it's a base64 data URL, return as is
+      else if (user.profile_pic.startsWith('data:')) {
+        imageUrl = user.profile_pic;
+      }
+      // For other cases, try to construct the full URL
+      else {
+        imageUrl = `http://localhost/scms_new_backup/uploads/profile/${user.profile_pic}`;
+      }
+      
+      console.log(`Avatar URL for ${user.full_name}: ${imageUrl}`);
+      return imageUrl;
     }
-    return getRandomAvatar(user.id || user.full_name || 'User');
+    // Use initials avatar when no profile picture is available
+    return getInitialsAvatar(user.full_name || 'User');
   };
 
   const getCoverPhotoForUser = (user) => {
     if (user.cover_pic) {
+      let imageUrl;
+      
       // If it's a relative path, construct the full URL
       if (user.cover_pic.startsWith('uploads/')) {
-        return `http://localhost/scms_new/${user.cover_pic}`;
+        imageUrl = `http://localhost/scms_new_backup/${user.cover_pic}`;
       }
-      return user.cover_pic;
+      // If it's already a full URL, return as is
+      else if (user.cover_pic.startsWith('http://') || user.cover_pic.startsWith('https://')) {
+        imageUrl = user.cover_pic;
+      }
+      // If it's a base64 data URL, return as is
+      else if (user.cover_pic.startsWith('data:')) {
+        imageUrl = user.cover_pic;
+      }
+      // For other cases, try to construct the full URL
+      else {
+        imageUrl = `http://localhost/scms_new_backup/uploads/cover/${user.cover_pic}`;
+      }
+      
+      console.log(`Cover URL for ${user.full_name}: ${imageUrl}`);
+      return imageUrl;
     }
     return defaultCoverPhotoSvg;
   };
@@ -509,6 +709,271 @@ const UserManagement = () => {
     return activeTab === "student" ? "Course/Year/Section" : "Program";
   };
 
+  // Export functions
+  const exportToCSV = (exportType = 'current', allUsersData = null) => {
+    let usersToExport = [];
+    let fileName = '';
+    
+    if (exportType === 'all') {
+      // Use passed data if available, otherwise fall back to state
+      if (allUsersData) {
+        usersToExport = [...allUsersData.admins, ...allUsersData.teachers, ...allUsersData.students];
+      } else {
+        usersToExport = [...admins, ...teachers, ...students];
+      }
+      fileName = `SCMS_all_users_${new Date().toISOString().split('T')[0]}.csv`;
+    } else {
+      usersToExport = sortedUsers;
+      fileName = `SCMS_${activeTab}_users_${new Date().toISOString().split('T')[0]}.csv`;
+    }
+
+    // Add header with SCMS branding
+    const csvHeader = [
+      'SCMS - Student Course Management System',
+      `Generated on: ${new Date().toLocaleDateString()}`,
+      `Total Users: ${usersToExport.length}`,
+      `Active Users: ${usersToExport.filter(u => u.status === 'active').length}`,
+      `Inactive Users: ${usersToExport.filter(u => u.status === 'inactive').length}`,
+      '', // Empty line for spacing
+      'Name,Email,Role,Course/Year/Section/Program,Status,Last Login,Contact Number,Address'
+    ];
+
+    // Define headers for CSV export
+    const headers = [
+      'Name',
+      'Email', 
+      'Role',
+      'Course/Year/Section/Program',
+      'Status',
+      'Last Login',
+      'Contact Number',
+      'Address'
+    ];
+
+    const csvData = usersToExport.map(user => [
+      user.full_name || '',
+      user.email || '',
+      user.role || '',
+      getCourseAndSectionDisplay(user),
+      user.status || '',
+      user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
+      user.contact_num || '',
+      user.address || ''
+    ]);
+
+    // Calculate optimal column widths for CSV
+    const calculateCSVColumnWidths = () => {
+      const maxWidths = headers.map((header, index) => {
+        const maxContentLength = Math.max(
+          header.length,
+          ...csvData.map(row => (row[index] || '').toString().length)
+        );
+        return Math.max(maxContentLength, 10); // Minimum width of 10
+      });
+      return maxWidths;
+    };
+
+    const columnWidths = calculateCSVColumnWidths();
+    
+    // Format CSV with proper spacing and column alignment
+    const formatCSVRow = (row) => {
+      return row.map((cell, index) => {
+        const cellStr = (cell || '').toString();
+        // Escape quotes and wrap in quotes
+        const escapedCell = cellStr.replace(/"/g, '""');
+        return `"${escapedCell}"`;
+      }).join(',');
+    };
+
+    const csvContent = [
+      ...csvHeader,
+      ...csvData.map(row => formatCSVRow(row))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = (exportType = 'current', allUsersData = null) => {
+    const doc = new jsPDF();
+    
+    let usersToExport = [];
+    let title = '';
+    let fileName = '';
+    
+    if (exportType === 'all') {
+      // Use passed data if available, otherwise fall back to state
+      if (allUsersData) {
+        usersToExport = [...allUsersData.admins, ...allUsersData.teachers, ...allUsersData.students];
+      } else {
+        usersToExport = [...admins, ...teachers, ...students];
+      }
+      title = 'All Users Report';
+      fileName = `SCMS_all_users_${new Date().toISOString().split('T')[0]}.pdf`;
+    } else {
+      usersToExport = sortedUsers;
+      title = `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Users Report`;
+      fileName = `SCMS_${activeTab}_users_${new Date().toISOString().split('T')[0]}.pdf`;
+    }
+    
+    // Add logo to PDF
+    try {
+      // Try to add the logo directly first
+      doc.addImage(scmsLogo, 'PNG', 14, 10, 30, 15);
+    } catch (error) {
+      console.log('Direct logo addition failed, trying alternative method');
+      try {
+        // Alternative: Create a simple text-based logo
+        doc.setFontSize(16);
+        doc.setTextColor(94, 114, 228); // Blue color
+        doc.text('SCMS', 14, 20);
+        doc.setFontSize(8);
+        doc.text('Logo', 14, 25);
+      } catch (innerError) {
+        console.log('Logo not available, proceeding without logo');
+      }
+    }
+    
+    // Add SCMS branding
+    doc.setFontSize(20);
+    doc.setTextColor(94, 114, 228); // Blue color
+    doc.text('SCMS', 50, 20);
+    
+    // Add subtitle
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Student Course Management System', 50, 28);
+    
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.text(title, 14, 45);
+    
+    // Add date
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 55);
+    
+    // Add summary
+    doc.setFontSize(9);
+    doc.text(`Total Users: ${usersToExport.length}`, 14, 65);
+    doc.text(`Active Users: ${usersToExport.filter(u => u.status === 'active').length}`, 14, 71);
+    doc.text(`Inactive Users: ${usersToExport.filter(u => u.status === 'inactive').length}`, 14, 77);
+
+    // Prepare table data
+    const headers = [
+      'Name',
+      'Email', 
+      'Role',
+      'Course/Year/Section/Program',
+      'Status',
+      'Last Login'
+    ];
+
+    const tableData = usersToExport.map(user => [
+      user.full_name || '',
+      user.email || '',
+      user.role || '',
+      getCourseAndSectionDisplay(user),
+      user.status || '',
+      user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'
+    ]);
+
+    // Calculate column widths based on content
+    const calculateColumnWidths = () => {
+      const pageWidth = doc.internal.pageSize.width - 28; // 14 margin on each side
+      const minWidth = 20;
+      const maxWidth = 50;
+      
+      // Calculate content widths
+      const contentWidths = headers.map((header, index) => {
+        const maxContentLength = Math.max(
+          header.length,
+          ...tableData.map(row => (row[index] || '').toString().length)
+        );
+        return Math.min(Math.max(maxContentLength * 2, minWidth), maxWidth);
+      });
+      
+      // Normalize to fit page width
+      const totalWidth = contentWidths.reduce((sum, width) => sum + width, 0);
+      const scale = pageWidth / totalWidth;
+      
+      return contentWidths.map(width => width * scale);
+    };
+
+    const columnWidths = calculateColumnWidths();
+
+    // Add table using autoTable with automatic column sizing
+    autoTable(doc, {
+      head: [headers],
+      body: tableData,
+      startY: 90,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2
+      },
+      headStyles: {
+        fillColor: [94, 114, 228],
+        textColor: 255
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      margin: { top: 90 },
+      columnStyles: {
+        0: { cellWidth: columnWidths[0] }, // Name
+        1: { cellWidth: columnWidths[1] }, // Email
+        2: { cellWidth: columnWidths[2] }, // Role
+        3: { cellWidth: columnWidths[3] }, // Course/Year/Section/Program
+        4: { cellWidth: columnWidths[4] }, // Status
+        5: { cellWidth: columnWidths[5] }  // Last Login
+      }
+    });
+
+    // Save the PDF
+    doc.save(fileName);
+  };
+
+  const handleExport = async (format, exportType = 'current') => {
+    try {
+      let allUsersData = null;
+      
+      // If exporting all users, fetch all user types first
+      if (exportType === 'all') {
+        allUsersData = await fetchAllUsers();
+      }
+      
+      if (format === 'csv') {
+        exportToCSV(exportType, allUsersData);
+        setExportMessage(`${exportType === 'all' ? 'All users' : 'Current tab users'} CSV file exported successfully!`);
+      } else if (format === 'pdf') {
+        exportToPDF(exportType, allUsersData);
+        setExportMessage(`${exportType === 'all' ? 'All users' : 'Current tab users'} PDF file exported successfully!`);
+      }
+      setShowExportSuccess(true);
+      setTimeout(() => {
+        setShowExportSuccess(false);
+        setExportMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportMessage('Export failed. Please try again.');
+      setShowExportSuccess(true);
+      setTimeout(() => {
+        setShowExportSuccess(false);
+        setExportMessage("");
+      }, 3000);
+    }
+  };
+
   const renderUserTable = (users, title, color) => {
     return (
       <Card className="shadow">
@@ -541,7 +1006,21 @@ const UserManagement = () => {
                               alt="..."
                               src={getAvatarForUser(user)}
                               onError={(e) => {
-                                e.target.src = userDefault;
+                                // Try alternative URL patterns if the first one fails
+                                const currentSrc = e.target.src;
+                                if (currentSrc.includes('uploads/profile/')) {
+                                  // Try without the profile subdirectory
+                                  e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                                } else if (currentSrc.includes('/uploads/')) {
+                                  // Try with profile subdirectory
+                                  e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                                } else {
+                                  // Fallback to default avatar
+                                  e.target.src = userDefault;
+                                }
+                              }}
+                              onLoad={() => {
+                                // Image loaded successfully
                               }}
                             />
                           </a>
@@ -624,6 +1103,20 @@ const UserManagement = () => {
                   className="card-img-top"
                   alt="Cover"
                   style={{ height: '120px', objectFit: 'cover' }}
+                  onError={(e) => {
+                    // Try alternative URL patterns if the first one fails
+                    const currentSrc = e.target.src;
+                    if (currentSrc.includes('uploads/cover/')) {
+                      // Try without the cover subdirectory
+                      e.target.src = currentSrc.replace('/uploads/cover/', '/uploads/');
+                    } else if (currentSrc.includes('/uploads/')) {
+                      // Try with cover subdirectory
+                      e.target.src = currentSrc.replace('/uploads/', '/uploads/cover/');
+                    } else {
+                      // Fallback to default cover
+                      e.target.src = defaultCoverPhotoSvg;
+                    }
+                  }}
                 />
                 <div className="position-absolute" style={{ top: '80px', left: '20px' }}>
                   <img
@@ -632,7 +1125,18 @@ const UserManagement = () => {
                     alt="Profile"
                     style={{ width: '60px', height: '60px', objectFit: 'cover' }}
                     onError={(e) => {
-                      e.target.src = userDefault;
+                      // Try alternative URL patterns if the first one fails
+                      const currentSrc = e.target.src;
+                      if (currentSrc.includes('uploads/profile/')) {
+                        // Try without the profile subdirectory
+                        e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                      } else if (currentSrc.includes('/uploads/')) {
+                        // Try with profile subdirectory
+                        e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                      } else {
+                        // Fallback to default avatar
+                        e.target.src = userDefault;
+                      }
                     }}
                   />
                 </div>
@@ -789,6 +1293,8 @@ const UserManagement = () => {
                       color="light"
                       size="sm"
                       className="mr-3"
+                      onClick={fetchUsersAndSections}
+                      disabled={loading}
                       style={{ 
                         backgroundColor: 'white',
                         border: '1px solid #5e72e4', 
@@ -798,9 +1304,66 @@ const UserManagement = () => {
                         padding: '8px 16px'
                       }}
                     >
-                      <i className="fas fa-chart-bar mr-2" />
-                      Export
+                      <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'} mr-2`} />
+                      {loading ? 'Refreshing...' : 'Refresh'}
                     </Button>
+                                         <UncontrolledDropdown>
+                       <DropdownToggle
+                         color="light"
+                         size="sm"
+                         className="mr-3"
+                         style={{ 
+                           backgroundColor: 'white',
+                           border: '1px solid #5e72e4', 
+                           color: '#5e72e4',
+                           borderRadius: '8px',
+                           fontWeight: '500',
+                           padding: '8px 16px'
+                         }}
+                       >
+                         <i className="fas fa-download mr-2" />
+                         Export
+                       </DropdownToggle>
+                       <DropdownMenu right>
+                         <DropdownItem header style={{ color: 'black' }}>
+                           <i className="fas fa-users mr-2" style={{ color: 'black' }} />
+                           Current Tab
+                         </DropdownItem>
+                         <DropdownItem
+                           onClick={() => handleExport('pdf', 'current')}
+                           className="d-flex align-items-center"
+                         >
+                           <i className="fas fa-file-pdf mr-2 text-danger" />
+                           Export to PDF
+                         </DropdownItem>
+                         <DropdownItem
+                           onClick={() => handleExport('csv', 'current')}
+                           className="d-flex align-items-center"
+                         >
+                           <i className="fas fa-file-csv mr-2 text-success" />
+                           Export to CSV
+                         </DropdownItem>
+                         <DropdownItem divider />
+                         <DropdownItem header style={{ color: 'black' }}>
+                           <i className="fas fa-globe mr-2" style={{ color: 'black' }} />
+                           All Users
+                         </DropdownItem>
+                         <DropdownItem
+                           onClick={() => handleExport('pdf', 'all')}
+                           className="d-flex align-items-center"
+                         >
+                           <i className="fas fa-file-pdf mr-2 text-danger" />
+                           Export All to PDF
+                         </DropdownItem>
+                         <DropdownItem
+                           onClick={() => handleExport('csv', 'all')}
+                           className="d-flex align-items-center"
+                         >
+                           <i className="fas fa-file-csv mr-2 text-success" />
+                           Export All to CSV
+                         </DropdownItem>
+                       </DropdownMenu>
+                     </UncontrolledDropdown>
                     <Button
                       color="primary"
                       size="sm"
@@ -1008,28 +1571,60 @@ const UserManagement = () => {
         <ModalBody className="text-center">
           {selectedUser && (
             <div>
-              <div className="position-relative mb-4">
-                <img
-                  src={getCoverPhotoForUser(selectedUser)}
-                  alt="Cover"
-                  className="img-fluid rounded"
-                  style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                />
-                <div className="position-absolute" style={{ top: '150px', left: '50%', transform: 'translateX(-50%)' }}>
-                  <img
-                    src={getAvatarForUser(selectedUser)}
-                    alt="Profile"
-                    className="rounded-circle border border-4 border-white"
-                    style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.target.src = userDefault;
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <h3 className="mb-2">{selectedUser.full_name}</h3>
-              <p className="text-muted mb-3">{selectedUser.email}</p>
+                             <div className="position-relative mb-4">
+                 <img
+                   src={getCoverPhotoForUser(selectedUser)}
+                   alt="Cover"
+                   className="img-fluid rounded"
+                   style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                   onError={(e) => {
+                     // Try alternative URL patterns if the first one fails
+                     const currentSrc = e.target.src;
+                     if (currentSrc.includes('uploads/cover/')) {
+                       // Try without the cover subdirectory
+                       e.target.src = currentSrc.replace('/uploads/cover/', '/uploads/');
+                     } else if (currentSrc.includes('/uploads/')) {
+                       // Try with cover subdirectory
+                       e.target.src = currentSrc.replace('/uploads/', '/uploads/cover/');
+                     } else {
+                       // Fallback to default cover
+                       e.target.src = defaultCoverPhotoSvg;
+                     }
+                   }}
+                 />
+                 <div className="position-absolute" style={{ top: '150px', left: '50%', transform: 'translateX(-50%)' }}>
+                   <img
+                     src={getAvatarForUser(selectedUser)}
+                     alt="Profile"
+                     className="rounded-circle border border-4"
+                     style={{ 
+                       width: '100px', 
+                       height: '100px', 
+                       objectFit: 'cover',
+                       borderColor: '#343a40'
+                     }}
+                     onError={(e) => {
+                       // Try alternative URL patterns if the first one fails
+                       const currentSrc = e.target.src;
+                       if (currentSrc.includes('uploads/profile/')) {
+                         // Try without the profile subdirectory
+                         e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                       } else if (currentSrc.includes('/uploads/')) {
+                         // Try with profile subdirectory
+                         e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                       } else {
+                         // Fallback to default avatar
+                         e.target.src = userDefault;
+                       }
+                     }}
+                   />
+                 </div>
+               </div>
+               
+               <div style={{ marginTop: '60px' }}>
+                 <h3 className="mb-2">{selectedUser.full_name}</h3>
+                 <p className="text-muted mb-3">{selectedUser.email}</p>
+               </div>
               
               <div className="row text-left">
                 <div className="col-md-6">
@@ -1092,15 +1687,25 @@ const UserManagement = () => {
         </ModalFooter>
       </Modal>
 
-      {/* Delete Success Alert */}
-      {showDeleteSuccess && (
-        <div className="position-fixed" style={{ top: '20px', right: '20px', zIndex: 9999 }}>
-          <Alert color="success" className="mb-0">
-            <i className="fas fa-check-circle mr-2" />
-            User deleted successfully!
-          </Alert>
-        </div>
-      )}
+             {/* Delete Success Alert */}
+       {showDeleteSuccess && (
+         <div className="position-fixed" style={{ top: '20px', right: '20px', zIndex: 9999 }}>
+           <Alert color="success" className="mb-0">
+             <i className="fas fa-check-circle mr-2" />
+             User deleted successfully!
+           </Alert>
+         </div>
+       )}
+
+       {/* Export Success Alert */}
+       {showExportSuccess && (
+         <div className="position-fixed" style={{ top: '20px', right: '20px', zIndex: 9999 }}>
+           <Alert color="success" className="mb-0">
+             <i className="fas fa-download mr-2" />
+             {exportMessage}
+           </Alert>
+         </div>
+       )}
     </>
   );
 };

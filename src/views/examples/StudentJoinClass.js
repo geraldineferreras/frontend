@@ -227,23 +227,7 @@ export default function StudentJoinClass() {
     <div className="container mt-5 mb-5" style={{ maxWidth: 480 }}>
       <h3 className="mb-4" style={{ fontWeight: 600, fontSize: 20 }}>Join class</h3>
       
-      {/* User Info Card */}
-      <Card className="mb-4" style={{ borderRadius: 12, border: '1px solid #e0e0e0' }}>
-        <CardBody className="d-flex align-items-center" style={{ padding: 24 }}>
-          <img
-            src={userAvatar}
-            alt="avatar"
-            style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", marginRight: 20, border: '1px solid #e0e0e0' }}
-          />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>{userName}</div>
-            <div style={{ color: '#666', fontSize: 13 }}>{userEmail}</div>
-          </div>
-          <Button color="secondary" outline style={{ borderRadius: 24, fontWeight: 500, fontSize: 13, padding: '6px 18px' }} onClick={() => window.location.href = '/auth/login'}>
-            Switch account
-          </Button>
-        </CardBody>
-      </Card>
+
 
       {/* Join Method Selection */}
       <Card className="mb-4" style={{ borderRadius: 12, border: '1px solid #e0e0e0' }}>

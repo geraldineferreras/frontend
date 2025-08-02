@@ -1444,7 +1444,7 @@ useEffect(() => {
 
     try {
       await axios.post(
-        `http://localhost/scms_new/index.php/api/teacher/classroom/${code}/stream`,
+        `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
         formData,
         {
           headers: {

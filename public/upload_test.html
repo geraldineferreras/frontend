@@ -108,9 +108,9 @@
         
                  <div class="result info">
              <strong>Backend Endpoints:</strong>
-             - Profile Upload: POST http://localhost/scms_new/index.php/api/upload/profile
-             - Cover Upload: POST http://localhost/scms_new/index.php/api/upload/cover
-             - Test Endpoint: GET http://localhost/scms_new/index.php/api/test/upload
+             - Profile Upload: POST http://localhost/scms_new_backup/index.php/api/upload/profile
+- Cover Upload: POST http://localhost/scms_new_backup/index.php/api/upload/cover
+- Test Endpoint: GET http://localhost/scms_new_backup/index.php/api/test/upload
          </div>
 
         <h2>1. Test Upload Endpoints</h2>
@@ -186,7 +186,7 @@
                 const formData = new FormData();
                 formData.append('image', file);
 
-                                 const response = await fetch('http://localhost/scms_new/index.php/api/upload/profile', {
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/upload/profile', {
                      method: 'POST',
                      body: formData
                  });
@@ -216,7 +216,7 @@
                 const formData = new FormData();
                 formData.append('image', file);
 
-                                 const response = await fetch('http://localhost/scms_new/index.php/api/upload/cover', {
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/upload/cover', {
                      method: 'POST',
                      body: formData
                  });
@@ -263,7 +263,7 @@
             };
 
             try {
-                                 const response = await fetch('http://localhost/scms_new/index.php/api/register', {
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/register', {
                      method: 'POST',
                      headers: {
                          'Content-Type': 'application/json'
@@ -285,7 +285,7 @@
 
         async function testEndpoint() {
             try {
-                                 const response = await fetch('http://localhost/scms_new/index.php/api/test/upload');
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/test/upload');
                 const result = await response.json();
                 
                 if (response.ok) {

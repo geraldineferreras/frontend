@@ -390,14 +390,14 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
       setShowSuccessModal(true);
       
       // Hide success modal after 1.5 seconds and navigate (faster response)
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        if (editMode && onEditDone) {
-          onEditDone();
-        } else {
-          navigate(`/admin/user-management?tab=${tab}&view=${view}`);
-        }
-      }, 1500);
+              setTimeout(() => {
+          setShowSuccessModal(false);
+          if (editMode && onEditDone) {
+            onEditDone();
+          } else {
+            navigate(`/admin/user-management?tab=${tab}&view=${view}&refresh=true`);
+          }
+        }, 1500);
       
     } catch (error) {
       setShowLoadingModal(false);

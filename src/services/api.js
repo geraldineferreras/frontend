@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new/index.php/api';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
 
 class ApiService {
   // Helper method to validate token presence
@@ -72,6 +72,31 @@ class ApiService {
       }
       throw new Error(message);
     }
+  }
+
+  // Generic HTTP methods
+  async get(endpoint, requireAuth = true) {
+    return this.makeRequest(endpoint, { method: 'GET', requireAuth });
+  }
+
+  async post(endpoint, data, requireAuth = true) {
+    return this.makeRequest(endpoint, { 
+      method: 'POST', 
+      body: typeof data === 'string' ? data : JSON.stringify(data), 
+      requireAuth 
+    });
+  }
+
+  async put(endpoint, data, requireAuth = true) {
+    return this.makeRequest(endpoint, { 
+      method: 'PUT', 
+      body: typeof data === 'string' ? data : JSON.stringify(data), 
+      requireAuth 
+    });
+  }
+
+  async delete(endpoint, requireAuth = true) {
+    return this.makeRequest(endpoint, { method: 'DELETE', requireAuth });
   }
 
   // Authentication methods
@@ -1048,6 +1073,322 @@ class ApiService {
     return this.makeRequest('/student/join-class', {
       method: 'POST',
       body: JSON.stringify({ class_code: classCode }),
+      requireAuth: true,
+    });
+  }
+
+  // Attendance Management Methods
+  async getTeacherAssignments() {
+    return this.makeRequest('/attendance/teacher-assignments', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getTeacherClasses() {
+    return this.makeRequest('/admin/classes', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentsByClass(classId) {
+    return this.makeRequest(`/attendance/students/${classId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentsBySubjectAndSection(subjectId, sectionName) {
+    return this.makeRequest(`/teacher/subject/${subjectId}/section/${sectionName}/students`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async recordAttendance(attendanceData) {
+    return this.makeRequest('/attendance/record', {
+      method: 'POST',
+      body: JSON.stringify(attendanceData),
+      requireAuth: true,
+    });
+  }
+
+  async recordAttendanceQR(qrData) {
+    return this.makeRequest('/attendance/record-qr', {
+      method: 'POST',
+      body: JSON.stringify(qrData),
+      requireAuth: true,
+    });
+  }
+
+  async updateAttendanceRecord(attendanceId, updateData) {
+    return this.makeRequest(`/attendance/update/${attendanceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+      requireAuth: true,
+    });
+  }
+
+  async getAttendanceRecords(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.classId) queryParams.append('class_id', filters.classId);
+    if (filters.subjectId) queryParams.append('subject_id', filters.subjectId);
+    if (filters.sectionName) queryParams.append('section_name', filters.sectionName);
+    if (filters.date) queryParams.append('date', filters.date);
+    if (filters.status) queryParams.append('status', filters.status);
+    if (filters.studentId) queryParams.append('student_id', filters.studentId);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+
+    const endpoint = `/attendance/records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAllAttendance(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.classId) queryParams.append('class_id', filters.classId);
+    if (filters.date) queryParams.append('date', filters.date);
+    if (filters.status) queryParams.append('status', filters.status);
+    if (filters.studentId) queryParams.append('student_id', filters.studentId);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+
+    const endpoint = `/attendance/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAllAttendanceRecords() {
+    return this.makeRequest('/attendance/all', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAttendanceRecordsByClassId(classId) {
+    return this.makeRequest(`/attendance/all?class_id=${classId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async updateAttendanceStatus(attendanceId, status, notes = '') {
+    return this.makeRequest(`/attendance/${attendanceId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, notes }),
+      requireAuth: true,
+    });
+  }
+
+  async bulkUpdateAttendance(updates) {
+    return this.makeRequest('/attendance/bulk-update', {
+      method: 'PUT',
+      body: JSON.stringify({ updates }),
+      requireAuth: true,
+    });
+  }
+
+  async getAttendanceSummary(subjectId, sectionName, date) {
+    const queryParams = new URLSearchParams();
+    if (subjectId) queryParams.append('subject_id', subjectId);
+    if (sectionName) queryParams.append('section_name', sectionName);
+    if (date) queryParams.append('date', date);
+
+    const endpoint = `/attendance/summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async exportAttendance(filters = {}, format = 'csv') {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.classId) queryParams.append('class_id', filters.classId);
+    if (filters.subjectId) queryParams.append('subject_id', filters.subjectId);
+    if (filters.sectionName) queryParams.append('section_name', filters.sectionName);
+    if (filters.date) queryParams.append('date', filters.date);
+    if (filters.status) queryParams.append('status', filters.status);
+    if (filters.studentId) queryParams.append('student_id', filters.studentId);
+    queryParams.append('format', format);
+
+    const endpoint = `/attendance/export?${queryParams.toString()}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async deleteAttendanceRecord(attendanceId) {
+    return this.makeRequest(`/attendance/${attendanceId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  }
+
+  async getAttendanceStatistics(subjectId, sectionName, dateRange = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (subjectId) queryParams.append('subject_id', subjectId);
+    if (sectionName) queryParams.append('section_name', sectionName);
+    if (dateRange.startDate) queryParams.append('start_date', dateRange.startDate);
+    if (dateRange.endDate) queryParams.append('end_date', dateRange.endDate);
+
+    const endpoint = `/attendance/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentAttendance(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.subjectId) queryParams.append('subject_id', filters.subjectId);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+
+    const endpoint = `/attendance/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Excuse Letter methods
+  async submitExcuseLetter(excuseData) {
+    return this.makeRequest('/excuse-letters/submit', {
+      method: 'POST',
+      body: JSON.stringify(excuseData),
+      requireAuth: true,
+    });
+  }
+
+  async submitExcuseLetterWithAttachment(formData) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      const response = await axios.post(`${API_BASE}/excuse-letters/submit`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData, let browser set it with boundary
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'API Error';
+      console.error('API Error (submitExcuseLetterWithAttachment):', message);
+      throw new Error(message);
+    }
+  }
+
+  async getStudentExcuseLetters(filters = {}) {
+    const queryParams = new URLSearchParams();
+    if (filters.classId) queryParams.append('class_id', filters.classId);
+    if (filters.status) queryParams.append('status', filters.status);
+    const endpoint = `/excuse-letters/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async deleteExcuseLetter(letterId) {
+    return this.makeRequest(`/excuse-letters/delete/${letterId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher excuse letter methods
+  async getTeacherExcuseLetters() {
+    return this.makeRequest('/excuse-letters/teacher', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async updateExcuseLetterStatus(letterId, statusData) {
+    return this.makeRequest(`/excuse-letters/update/${letterId}`, {
+      method: 'PUT',
+      body: JSON.stringify(statusData),
+      requireAuth: true,
+    });
+  }
+
+  // Audit Log API methods
+  async getAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+    if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
+    if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
+
+    const endpoint = `/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAuditLogById(logId) {
+    return this.makeRequest(`/admin/audit-logs/${logId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAuditLogModules() {
+    return this.makeRequest('/admin/audit-logs/modules', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAuditLogRoles() {
+    return this.makeRequest('/admin/audit-logs/roles', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async exportAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+
+    const endpoint = `/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
       requireAuth: true,
     });
   }

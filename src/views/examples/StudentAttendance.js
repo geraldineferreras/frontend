@@ -1,118 +1,397 @@
-import React, { useState } from "react";
-// If Chart.js or Recharts is not available, use a placeholder for the donut chart
-// For dropdown and date picker, use simple HTML elements for now
-
-const mockSubjects = ["Web Dev", "Data Structures"];
-const mockRecords = [
-  { date: "2025-07-06", subject: "Web Dev", timeIn: "09:05 AM", status: "Present" },
-  { date: "2025-07-03", subject: "Data Structures", timeIn: "09:20 AM", status: "Late" },
-  { date: "2025-07-01", subject: "Web Dev", timeIn: "—", status: "Absent" },
-  { date: "2025-06-28", subject: "Web Dev", timeIn: "09:00 AM", status: "Present" },
-  { date: "2025-06-25", subject: "Data Structures", timeIn: "09:10 AM", status: "Present" },
-];
-const summary = { present: 40, late: 3, absent: 2, total: 45 };
-
-function AttendanceSummary({ present, late, absent }) {
-  // Placeholder donut chart
-  const total = present + late + absent;
-  const percent = v => (v / total) * 100;
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap', marginBottom: 32 }}>
-      <svg width="110" height="110" viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r="16" fill="#f4f6fa" />
-        <circle cx="18" cy="18" r="16" fill="none" stroke="#4caf50" strokeWidth="4" strokeDasharray={`${percent(present)} 100`} strokeDashoffset="0" />
-        <circle cx="18" cy="18" r="16" fill="none" stroke="#ffc107" strokeWidth="4" strokeDasharray={`${percent(late)} 100`} strokeDashoffset={`-${percent(present)}`} />
-        <circle cx="18" cy="18" r="16" fill="none" stroke="#f44336" strokeWidth="4" strokeDasharray={`${percent(absent)} 100`} strokeDashoffset={`-${percent(present) + percent(late)}`} />
-        <text x="18" y="21" textAnchor="middle" fontSize="8" fill="#222" fontWeight="bold">{total}</text>
-      </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>Total Attendance: {total} sessions</div>
-        <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, background: '#4caf50', borderRadius: '50%', display: 'inline-block' }} /> Present: {present}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, background: '#ffc107', borderRadius: '50%', display: 'inline-block' }} /> Late: {late}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, background: '#f44336', borderRadius: '50%', display: 'inline-block' }} /> Absent: {absent}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusChip({ status }) {
-  const color = status === "Present" ? "#4caf50" : status === "Late" ? "#ffc107" : "#f44336";
-  const icon = status === "Present" ? "✅" : status === "Late" ? "⚠️" : "❌";
-  return (
-    <span style={{ background: color + '22', color, fontWeight: 600, borderRadius: 8, padding: '2px 10px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {icon} {status}
-    </span>
-  );
-}
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardHeader,
+  CardBody,
+  Container,
+  Row,
+  Col,
+  FormGroup,
+  Input,
+  Table,
+  Badge,
+  Alert,
+  Spinner,
+  UncontrolledDropdown,
+  DropdownToggle,
+  DropdownMenu,
+  DropdownItem,
+} from "reactstrap";
+import Dropdown from 'react-bootstrap/Dropdown';
+import { FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaUser } from "react-icons/fa";
+import apiService from "../../services/api";
 
 const StudentAttendance = () => {
-  const [subject, setSubject] = useState('');
-  const [dateRange, setDateRange] = useState({ from: '', to: '' });
-  // Filter logic (not implemented)
+  // State for API data
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [summary, setSummary] = useState({ present: 0, late: 0, absent: 0, excused: 0, total: 0 });
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // State for filters
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+
+  // Clear error messages
+  const clearMessages = () => {
+    setError(null);
+  };
+
+  // Load student attendance data on component mount
+  useEffect(() => {
+    loadStudentAttendance();
+  }, [selectedSubject, dateRange]);
+
+  const loadStudentAttendance = async () => {
+    try {
+      setLoading(true);
+      clearMessages();
+
+      const filters = {};
+      if (selectedSubject) filters.subjectId = selectedSubject;
+      if (dateRange.from) filters.dateFrom = dateRange.from;
+      if (dateRange.to) filters.dateTo = dateRange.to;
+
+      const response = await apiService.getStudentAttendance(filters);
+
+      if (response.status && response.data) {
+        setAttendanceRecords(response.data.attendance_records || []);
+        setSummary(response.data.summary || { present: 0, late: 0, absent: 0, excused: 0, total: 0 });
+        setAvailableSubjects(response.data.available_subjects || []);
+      } else {
+        setError("Failed to load attendance records");
+      }
+    } catch (error) {
+      console.error("Error loading student attendance:", error);
+      setError(error.message || "Failed to load attendance records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to get status badge
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      'Present': 'success',
+      'Late': 'warning',
+      'Absent': 'danger',
+      'Excused': 'info'
+    };
+    
+    const statusIcons = {
+      'Present': <FaCheckCircle />,
+      'Late': <FaExclamationTriangle />,
+      'Absent': <FaTimesCircle />,
+      'Excused': <FaUser />
+    };
+    
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontWeight: 700, fontSize: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span role="img" aria-label="calendar">📅</span> My Attendance
+      <Badge color={statusColors[status] || 'secondary'} className="font-weight-bold">
+        {statusIcons[status]} {status}
+      </Badge>
+    );
+  };
+
+  // Function to format time
+  const formatTime = (timeString) => {
+    if (!timeString || timeString === 'N/A') return '—';
+    
+    try {
+      const [hours, minutes, seconds] = timeString.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds));
+      
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return timeString;
+    }
+  };
+
+  // Calculate attendance percentage for the donut chart
+  const calculateAttendancePercentage = () => {
+    const total = summary.total || 1;
+    
+    // Calculate percentages
+    const presentPercent = total > 0 ? (summary.present / total) * 100 : 0;
+    const latePercent = total > 0 ? (summary.late / total) * 100 : 0;
+    const absentPercent = total > 0 ? (summary.absent / total) * 100 : 0;
+    
+    // Ensure percentages don't exceed 100%
+    const totalPercent = presentPercent + latePercent + absentPercent;
+    if (totalPercent > 100) {
+      const scale = 100 / totalPercent;
+      return {
+        presentPercent: presentPercent * scale,
+        latePercent: latePercent * scale,
+        absentPercent: absentPercent * scale
+      };
+    }
+    
+    return { presentPercent, latePercent, absentPercent };
+  };
+
+  const { presentPercent, latePercent, absentPercent } = calculateAttendancePercentage();
+
+  return (
+    <Container className="mt-4" fluid>
+      {/* Error Alert */}
+      {error && (
+        <Alert color="danger" className="mb-4">
+          <i className="fas fa-exclamation-triangle mr-2" />
+          {error}
+        </Alert>
+      )}
+
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="text-center mb-4">
+          <Spinner color="primary" />
+          <span className="ml-2">Loading attendance records...</span>
         </div>
-        <div style={{ color: '#666', fontSize: 14, marginTop: 2 }}>View your attendance records per subject and session.</div>
+      )}
+
+      
+
+      {/* Attendance Summary */}
+      <Row className="mb-4">
+        <Col>
+          <Card className="shadow border-0">
+            <CardBody>
+              <Row className="align-items-center">
+                <Col xs={12} md={4} className="text-center mb-3 mb-md-0">
+                  {/* Donut Chart */}
+                  <div className="position-relative" style={{ width: '120px', height: '120px', margin: '0 auto' }}>
+                    <svg width="120" height="120" viewBox="0 0 36 36">
+                      {/* Background circle */}
+                      <circle cx="18" cy="18" r="16" fill="#f8f9fa" />
+                      
+                      {/* Present segment */}
+                      <circle 
+                        cx="18" cy="18" r="16" 
+                        fill="none" 
+                        stroke="#28a745" 
+                        strokeWidth="3" 
+                        strokeDasharray={`${presentPercent} 100`} 
+                        strokeDashoffset="0"
+                        transform="rotate(-90 18 18)"
+                      />
+                      
+                      {/* Late segment */}
+                      <circle 
+                        cx="18" cy="18" r="16" 
+                        fill="none" 
+                        stroke="#ffc107" 
+                        strokeWidth="3" 
+                        strokeDasharray={`${latePercent} 100`} 
+                        strokeDashoffset={`-${presentPercent}`}
+                        transform="rotate(-90 18 18)"
+                      />
+                      
+                      {/* Absent segment */}
+                      <circle 
+                        cx="18" cy="18" r="16" 
+                        fill="none" 
+                        stroke="#dc3545" 
+                        strokeWidth="3" 
+                        strokeDasharray={`${absentPercent} 100`} 
+                        strokeDashoffset={`-${presentPercent + latePercent}`}
+                        transform="rotate(-90 18 18)"
+                      />
+                    </svg>
+                    <div className="position-absolute" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                      <h4 className="mb-0 font-weight-bold text-dark">{summary.total}</h4>
+                      <small className="text-muted">Total</small>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} md={8}>
+                  <h5 className="mb-3">Total Attendance: {summary.total} sessions</h5>
+                  <Row>
+                    <Col xs={4} className="text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="bg-success rounded-circle mr-2" style={{ width: '12px', height: '12px' }}></div>
+                        <span className="font-weight-bold">{summary.present}</span>
+                      </div>
+                      <small className="text-muted">Present</small>
+                    </Col>
+                    <Col xs={4} className="text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="bg-warning rounded-circle mr-2" style={{ width: '12px', height: '12px' }}></div>
+                        <span className="font-weight-bold">{summary.late}</span>
       </div>
-      {/* Summary */}
-      <AttendanceSummary present={summary.present} late={summary.late} absent={summary.absent} />
-      {/* Filter Section */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-        <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #bbb', fontSize: 14 }}>
-          <option value=''>All Subjects</option>
-          {mockSubjects.map(s => <option key={s}>{s}</option>)}
-        </select>
-        <input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #bbb', fontSize: 14 }} />
-        <span style={{ alignSelf: 'center', color: '#888' }}>to</span>
-        <input type="date" value={dateRange.to} onChange={e => setDateRange({ ...dateRange, to: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #bbb', fontSize: 14 }} />
+                      <small className="text-muted">Late</small>
+                    </Col>
+                    <Col xs={4} className="text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="bg-danger rounded-circle mr-2" style={{ width: '12px', height: '12px' }}></div>
+                        <span className="font-weight-bold">{summary.absent}</span>
       </div>
-      {/* Records Table/List */}
-      <div style={{ width: '100%', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0001' }}>
-          <thead>
-            <tr style={{ background: '#f7fafd' }}>
-              <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 13, color: '#888', fontWeight: 700 }}>Date</th>
-              <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 13, color: '#888', fontWeight: 700 }}>Subject</th>
-              <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 13, color: '#888', fontWeight: 700 }}>Time In</th>
-              <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: 13, color: '#888', fontWeight: 700 }}>Status</th>
+                      <small className="text-muted">Absent</small>
+                    </Col>
+                  </Row>
+                </Col>
+              </Row>
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Filters */}
+      <Row className="mb-4">
+        <Col>
+          <Card className="shadow border-0">
+            <CardBody>
+                                                           <Row className="align-items-end">
+                                     <Col xs={12} md={4} className="mb-3 mb-md-0">
+                     <FormGroup>
+                       <label className="form-control-label mb-2"></label>
+                                               <Dropdown>
+                          <Dropdown.Toggle 
+                            variant="secondary" 
+                            id="dropdown-basic"
+                            style={{ minWidth: "350px", width: "350px", textAlign: "left" }}
+                          >
+                           {selectedSubject ? 
+                             availableSubjects.find(s => s.id === selectedSubject)?.subject_name || "All Subjects" 
+                             : "All Subjects"}
+                         </Dropdown.Toggle>
+
+                         <Dropdown.Menu>
+                           <Dropdown.Item 
+                             href="#" 
+                             onClick={(e) => { e.preventDefault(); setSelectedSubject(""); }}
+                           >
+                             All Subjects
+                           </Dropdown.Item>
+                           {availableSubjects.map((subject) => (
+                             <Dropdown.Item 
+                               key={subject.id}
+                               href="#" 
+                               onClick={(e) => { 
+                                 e.preventDefault(); 
+                                 setSelectedSubject(subject.id); 
+                               }}
+                             >
+                               {subject.subject_name} ({subject.subject_code})
+                             </Dropdown.Item>
+                           ))}
+                         </Dropdown.Menu>
+                       </Dropdown>
+                     </FormGroup>
+                   </Col>
+                  <Col xs={12} md={4} className="mb-3 mb-md-0">
+                    <FormGroup>
+                      <label className="form-control-label mb-2">Date From</label>
+                      <Input
+                        type="date"
+                        value={dateRange.from}
+                        onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+                        className="form-control-alternative"
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col xs={12} md={4} className="mb-3 mb-md-0">
+                    <FormGroup>
+                      <label className="form-control-label mb-2">Date To</label>
+                      <Input
+                        type="date"
+                        value={dateRange.to}
+                        onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+                        className="form-control-alternative"
+                      />
+                    </FormGroup>
+                  </Col>
+                </Row>
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Attendance Records Table */}
+      <Row>
+        <Col>
+          <Card className="shadow border-0">
+            <CardHeader>
+              <h3 className="mb-0">Attendance Records</h3>
+            </CardHeader>
+            <CardBody>
+              {attendanceRecords.length === 0 ? (
+                <Alert color="info" className="text-center">
+                  <i className="fas fa-info-circle mr-2" />
+                  No attendance records found for the selected criteria.
+                </Alert>
+              ) : (
+                <div className="table-responsive">
+                  <Table className="align-items-center table-flush">
+                    <thead className="thead-light">
+                      <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Subject</th>
+                        <th scope="col">Section</th>
+                        <th scope="col">Time In</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Teacher</th>
+                        <th scope="col">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {mockRecords.map((rec, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={{ padding: '10px 8px', fontSize: 14 }}>{rec.date}</td>
-                <td style={{ padding: '10px 8px', fontSize: 14 }}>{rec.subject}</td>
-                <td style={{ padding: '10px 8px', fontSize: 14 }}>{rec.timeIn}</td>
-                <td style={{ padding: '10px 8px', fontSize: 14 }}><StatusChip status={rec.status} /></td>
+                      {attendanceRecords.map((record) => (
+                        <tr key={record.attendance_id}>
+                          <td>
+                            <span className="text-sm font-weight-bold">
+                              {new Date(record.date).toLocaleDateString()}
+                            </span>
+                          </td>
+                          <td>
+                            <div>
+                              <span className="font-weight-bold text-sm">
+                                {record.subject_name}
+                              </span>
+                              <br />
+                              <small className="text-muted">
+                                {record.subject_code}
+                              </small>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="text-sm">
+                              {record.section_name}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="text-sm">
+                              {formatTime(record.time_in)}
+                            </span>
+                          </td>
+                          <td>
+                            {getStatusBadge(record.status)}
+                          </td>
+                          <td>
+                            <span className="text-sm">
+                              {record.teacher_name}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="text-sm text-muted">
+                              {record.notes || '—'}
+                            </span>
+                          </td>
               </tr>
             ))}
           </tbody>
-        </table>
+                  </Table>
       </div>
-      {/* Mobile stacked cards */}
-      <div style={{ display: 'none', flexDirection: 'column', gap: 12, marginTop: 18 }} className="attendance-mobile-list">
-        {mockRecords.map((rec, idx) => (
-          <div key={idx} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 8px #0001', padding: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>{rec.subject}</div>
-            <div style={{ color: '#888', fontSize: 13 }}>{rec.date}</div>
-            <div style={{ color: '#888', fontSize: 13 }}>Time In: {rec.timeIn}</div>
-            <div><StatusChip status={rec.status} /></div>
-          </div>
-        ))}
-      </div>
-      <style>{`
-        @media (max-width: 600px) {
-          table { display: none; }
-          .attendance-mobile-list { display: flex !important; }
-        }
-      `}</style>
-    </div>
+              )}
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

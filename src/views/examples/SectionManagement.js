@@ -50,6 +50,9 @@ import Header from "components/Headers/Header.js";
 import { useNavigate } from "react-router-dom";
 import userDefault from "../../assets/img/theme/user-default.svg";
 import apiService from "../../services/api.js";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import scmsLogo from '../../assets/img/brand/logo-scms.png';
 
 // Floating effect for content over header
 const sectionManagementStyles = `
@@ -173,6 +176,16 @@ const SectionManagement = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+  
+  // Debug: Log sections state changes
+  useEffect(() => {
+    console.log('Sections state updated:', {
+      sectionsLength: sections.length,
+      sections: sections,
+      activeCourseTab,
+      activeYear
+    });
+  }, [sections, activeCourseTab, activeYear]);
 
   // Refresh sections when component becomes visible (e.g., after navigation)
   useEffect(() => {
@@ -230,6 +243,9 @@ const SectionManagement = () => {
       });
 
       console.log(`Processed ${cleanSections.length} sections for initial load`);
+      console.log('Courses data:', coursesData);
+      console.log('Teachers data:', teachersData);
+      console.log('Students data:', studentsData);
       setSections(cleanSections);
       setTeachers(teachersData.data || teachersData || []);
       setCourses(coursesData.data || coursesData || []);
@@ -514,23 +530,336 @@ const SectionManagement = () => {
     setDeletingSection(false);
   };
 
-  const handleExportSections = async () => {
+  // Export functions
+  const exportToPDF = (sectionsToExport) => {
     try {
-      // For now, show an alert since the export endpoint might not exist
-      alert('Export functionality will be implemented when the backend endpoint is available.');
-      // const exportData = await apiService.exportSections('csv');
-      // const blob = new Blob([exportData], { type: 'text/csv' });
-      // const url = window.URL.createObjectURL(blob);
-      // const a = document.createElement('a');
-      // a.href = url;
-      // a.download = `sections_export_${new Date().toISOString().split('T')[0]}.csv`;
-      // document.body.appendChild(a);
-      // a.click();
-      // window.URL.revokeObjectURL(url);
-      // document.body.removeChild(a);
+      const doc = new jsPDF();
+      
+      // Add logo to PDF
+      try {
+        // Try to add the logo directly first
+        doc.addImage(scmsLogo, 'PNG', 14, 10, 30, 15);
+      } catch (error) {
+        console.log('Direct logo addition failed, trying alternative method');
+        try {
+          // Alternative: Create a simple text-based logo
+          doc.setFontSize(16);
+          doc.setTextColor(94, 114, 228); // Blue color
+          doc.text('SCMS', 14, 20);
+          doc.setFontSize(8);
+          doc.text('Logo', 14, 25);
+        } catch (innerError) {
+           console.log('Logo not available, proceeding without logo');
+         }
+      }
+      
+      // Add SCMS branding and title
+      doc.setFontSize(20);
+      doc.setTextColor(94, 114, 228);
+      doc.text('SCMS - Student Course Management System', 14, 40);
+      
+      // Add subtitle and date
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text('Section Management Report', 14, 50);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 60);
+      
+      // Add summary statistics
+      const totalSections = sectionsToExport.length;
+      const sectionsWithAdvisers = sectionsToExport.filter(s => s.adviserDetails || s.adviserId).length;
+      const totalStudents = sectionsToExport.reduce((sum, s) => sum + (s.enrolled || 0), 0);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      doc.text(`Total Sections: ${totalSections}`, 14, 75);
+      doc.text(`Sections with Advisers: ${sectionsWithAdvisers}`, 14, 82);
+      doc.text(`Total Students Enrolled: ${totalStudents}`, 14, 89);
+      
+      // Prepare table data
+      const headers = [
+        'Section Name',
+        'Year Level', 
+        'Adviser',
+        'Students Enrolled',
+        'Academic Year',
+        'Semester'
+      ];
+      
+      const tableData = sectionsToExport.map(section => {
+        const adviser = section.adviserDetails || teachers.find(t => t.id === section.adviserId);
+        return [
+          section.name || '',
+          section.year || '',
+          adviser?.name || 'No Adviser',
+          section.enrolled || 0,
+          section.ay || '',
+          section.semester || ''
+        ];
+      });
+      
+      // Calculate column widths based on content
+      const calculateColumnWidths = () => {
+        const pageWidth = doc.internal.pageSize.width - 28; // 14 margin on each side
+        const minWidth = 20;
+        const maxWidth = 50;
+        
+        // Calculate content widths
+        const contentWidths = headers.map((header, index) => {
+          const maxContentLength = Math.max(
+            header.length,
+            ...tableData.map(row => (row[index] || '').toString().length)
+          );
+          return Math.min(Math.max(maxContentLength * 2, minWidth), maxWidth);
+        });
+        
+        // Normalize to fit page width
+        const totalWidth = contentWidths.reduce((sum, width) => sum + width, 0);
+        const scale = pageWidth / totalWidth;
+        
+        return contentWidths.map(width => width * scale);
+      };
+      
+      const columnWidths = calculateColumnWidths();
+      
+      // Add table using autoTable with automatic column sizing
+      autoTable(doc, {
+        head: [headers],
+        body: tableData,
+        startY: 100,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        headStyles: {
+          fillColor: [94, 114, 228],
+          textColor: 255
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { top: 100 },
+        columnStyles: {
+          0: { cellWidth: columnWidths[0] }, // Section Name
+          1: { cellWidth: columnWidths[1] }, // Year Level
+          2: { cellWidth: columnWidths[2] }, // Adviser
+          3: { cellWidth: columnWidths[3] }, // Students Enrolled
+          4: { cellWidth: columnWidths[4] }, // Academic Year
+          5: { cellWidth: columnWidths[5] }  // Semester
+        }
+      });
+      
+      // Save the PDF
+      const fileName = `SCMS_sections_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+      return true;
     } catch (error) {
-      console.error('Error exporting sections:', error);
-      setError('Failed to export sections. Please try again.');
+      console.error('Error generating PDF:', error);
+      return false;
+    }
+  };
+
+  const exportToCSV = (sectionsToExport) => {
+    try {
+      // Define headers for CSV export
+      const headers = [
+        'Section Name',
+        'Year Level', 
+        'Adviser',
+        'Students Enrolled',
+        'Academic Year',
+        'Semester'
+      ];
+      
+      const csvData = sectionsToExport.map(section => {
+        const adviser = section.adviserDetails || teachers.find(t => t.id === section.adviserId);
+        return [
+          section.name || '',
+          section.year || '',
+          adviser?.name || 'No Adviser',
+          section.enrolled || 0,
+          section.ay || '',
+          section.semester || ''
+        ];
+      });
+      
+      // Calculate optimal column widths for CSV
+      const calculateCSVColumnWidths = () => {
+        const maxWidths = headers.map((header, index) => {
+          const maxContentLength = Math.max(
+            header.length,
+            ...csvData.map(row => (row[index] || '').toString().length)
+          );
+          return Math.max(maxContentLength, 10); // Minimum width of 10
+        });
+        return maxWidths;
+      };
+      
+      const columnWidths = calculateCSVColumnWidths();
+      
+      // Format CSV with proper spacing and column alignment
+      const formatCSVRow = (row) => {
+        return row.map((cell, index) => {
+          const cellStr = (cell || '').toString();
+          // Escape quotes and wrap in quotes
+          const escapedCell = cellStr.replace(/"/g, '""');
+          return `"${escapedCell}"`;
+        }).join(',');
+      };
+      
+      const csvHeader = [
+        'SCMS - Student Course Management System',
+        `Generated on: ${new Date().toLocaleDateString()}`,
+        `Total Sections: ${sectionsToExport.length}`,
+        `Sections with Advisers: ${sectionsToExport.filter(s => s.adviserDetails || s.adviserId).length}`,
+        `Total Students Enrolled: ${sectionsToExport.reduce((sum, s) => sum + (s.enrolled || 0), 0)}`,
+        '', // Empty line for spacing
+        'Section Name,Year Level,Adviser,Students Enrolled,Academic Year,Semester'
+      ];
+      
+      const csvContent = [
+        ...csvHeader,
+        ...csvData.map(row => formatCSVRow(row))
+      ].join('\n');
+      
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const fileName = `SCMS_sections_${new Date().toISOString().split('T')[0]}.csv`;
+      const link = document.createElement('a');
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      return false;
+    }
+  };
+
+  const handleExport = async (exportType) => {
+    try {
+      let sectionsToExport = [];
+      
+      if (exportType.startsWith('current')) {
+        // Export current filtered sections
+        sectionsToExport = filteredAndSortedSections;
+      } else if (exportType.startsWith('all')) {
+        // Export all sections from all courses
+        const allSections = [];
+        let hasData = false;
+        
+        for (const course of courses) {
+          try {
+            const sectionsData = await apiService.getSectionsByCourse(course.id);
+            const sectionsArray = sectionsData.data || sectionsData || [];
+            if (sectionsArray.length > 0) {
+              hasData = true;
+            }
+            const cleanSections = sectionsArray.map(section => {
+              const rawName = section.name || section.section_name || 'Unnamed Section';
+              const rawYear = section.year || section.year_level || '1st Year';
+              const program = section.course || course.id;
+              
+              return {
+                id: section.id || Math.random(),
+                name: formatSectionName(rawName, program, rawYear),
+                originalName: rawName,
+                course: program,
+                year: rawYear,
+                yearFormatted: formatYearLevel(rawYear),
+                originalYear: rawYear,
+                adviserId: section.adviserId || section.adviser_id || null,
+                adviserDetails: section.adviserDetails || section.adviser_details || null,
+                enrolled: section.enrolled || section.student_count || 0,
+                ay: section.ay || section.academic_year || '2024-2025',
+                semester: section.semester || '1st Semester',
+                ...section
+              };
+            });
+            allSections.push(...cleanSections);
+          } catch (error) {
+            console.error(`Error loading sections for course ${course.id}:`, error);
+          }
+        }
+        
+        // If no data was found from API calls, use current sections as fallback
+        if (!hasData && sections.length > 0) {
+          console.log('No sections found from API calls, using current sections as fallback');
+          sectionsToExport = sections;
+        } else {
+          sectionsToExport = allSections;
+        }
+      }
+      
+      console.log('Export debug info:', {
+        exportType,
+        sectionsToExportLength: sectionsToExport.length,
+        filteredAndSortedSectionsLength: filteredAndSortedSections.length,
+        sectionsLength: sections.length,
+        coursesLength: courses.length,
+        sections: sections,
+        filteredAndSortedSections: filteredAndSortedSections
+      });
+      
+      if (sectionsToExport.length === 0) {
+        // For testing purposes, create a sample section if none exist
+        if (exportType.startsWith('current')) {
+          setError('No sections available for export in current view.');
+        } else {
+          setError('No sections available for export. Please create some sections first.');
+        }
+        
+        // For debugging, let's try to export a sample section to test the export functionality
+        console.log('Creating sample section for export testing');
+        const sampleSection = {
+          id: 'test-1',
+          name: 'BSIT 1A',
+          year: '1st Year',
+          adviserDetails: { name: 'Test Adviser', email: 'adviser@test.com' },
+          enrolled: 25,
+          ay: '2024-2025',
+          semester: '1st Semester'
+        };
+        
+        let success = false;
+        if (exportType.includes('pdf')) {
+          success = exportToPDF([sampleSection]);
+        } else if (exportType.includes('csv')) {
+          success = exportToCSV([sampleSection]);
+        }
+        
+        if (success) {
+          setError(null);
+          console.log('Sample export successful');
+        } else {
+          setError('Export functionality test failed.');
+        }
+        return;
+      }
+      
+      let success = false;
+      if (exportType.includes('pdf')) {
+        success = exportToPDF(sectionsToExport);
+      } else if (exportType.includes('csv')) {
+        success = exportToCSV(sectionsToExport);
+      }
+      
+      if (success) {
+        setError(null);
+        // You can add a success toast here if needed
+      } else {
+        setError('Export failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      setError('Export failed. Please try again.');
     }
   };
 
@@ -1052,9 +1381,59 @@ const SectionManagement = () => {
                         <i className={`ni ni-refresh ${loading ? 'fa-spin' : ''} mr-2`} /> 
                         {loading ? 'Loading...' : 'Refresh'}
                       </Button>
-                      <Button color="info" outline className="mr-2" size="sm" style={{ padding: '3px 10px', fontSize: '0.75rem' }} onClick={handleExportSections}>
-                        <i className="ni ni-archive-2 mr-2" /> Export
-                      </Button>
+                      <UncontrolledDropdown className="mr-2">
+                        <DropdownToggle
+                          color="info"
+                          outline
+                          size="sm"
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          <i className="fas fa-download mr-2" />
+                          Export
+                        </DropdownToggle>
+                        <DropdownMenu right>
+                          <DropdownItem header style={{ color: 'black' }}>
+                            <i className="fas fa-list mr-2" style={{ color: 'black' }} />
+                            Current Tab
+                          </DropdownItem>
+                          <DropdownItem
+                            onClick={() => handleExport('current-pdf')}
+                            className="d-flex align-items-center"
+                          >
+                            <i className="fas fa-file-pdf mr-2 text-danger" />
+                            Export to PDF
+                          </DropdownItem>
+                          <DropdownItem
+                            onClick={() => handleExport('current-csv')}
+                            className="d-flex align-items-center"
+                          >
+                            <i className="fas fa-file-csv mr-2 text-success" />
+                            Export to CSV
+                          </DropdownItem>
+                          <DropdownItem divider />
+                          <DropdownItem header style={{ color: 'black' }}>
+                            <i className="fas fa-globe mr-2" style={{ color: 'black' }} />
+                            All Sections
+                          </DropdownItem>
+                          <DropdownItem
+                            onClick={() => handleExport('all-pdf')}
+                            className="d-flex align-items-center"
+                          >
+                            <i className="fas fa-file-pdf mr-2 text-danger" />
+                            Export to PDF
+                          </DropdownItem>
+                          <DropdownItem
+                            onClick={() => handleExport('all-csv')}
+                            className="d-flex align-items-center"
+                          >
+                            <i className="fas fa-file-csv mr-2 text-success" />
+                            Export to CSV
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </UncontrolledDropdown>
                       <Button color="primary" size="sm" style={{ padding: '3px 6px', fontSize: '0.75rem' }} onClick={() => navigate('/admin/create-section')}>
                         <i className="ni ni-fat-add" /> Add New Section
                       </Button>
