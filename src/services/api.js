@@ -1347,7 +1347,7 @@ class ApiService {
     if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
 
-    const endpoint = `/api/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1356,21 +1356,21 @@ class ApiService {
   }
 
   async getAuditLogById(logId) {
-    return this.makeRequest(`/api/admin/audit-logs/${logId}`, {
+    return this.makeRequest(`/admin/audit-logs/${logId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAuditLogModules() {
-    return this.makeRequest('/api/admin/audit-logs/modules', {
+    return this.makeRequest('/admin/audit-logs/modules', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAuditLogRoles() {
-    return this.makeRequest('/api/admin/audit-logs/roles', {
+    return this.makeRequest('/admin/audit-logs/roles', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1385,7 +1385,7 @@ class ApiService {
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
     if (filters.search) queryParams.append('search', filters.search);
 
-    const endpoint = `/api/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
