@@ -1355,6 +1355,70 @@ class ApiService {
     });
   }
 
+  // Role-specific audit log methods
+  async getAdminAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+    if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
+    if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
+
+    const endpoint = `/admin/audit-logs/admin${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getTeacherAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+    if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
+    if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
+
+    const endpoint = `/admin/audit-logs/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    if (filters.offset) queryParams.append('offset', filters.offset);
+    if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
+    if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
+
+    const endpoint = `/admin/audit-logs/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async getAuditLogById(logId) {
     return this.makeRequest(`/admin/audit-logs/${logId}`, {
       method: 'GET',
@@ -1386,6 +1450,58 @@ class ApiService {
     if (filters.search) queryParams.append('search', filters.search);
 
     const endpoint = `/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Role-specific export methods
+  async exportAdminAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+
+    const endpoint = `/admin/audit-logs/admin/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async exportTeacherAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+
+    const endpoint = `/admin/audit-logs/teacher/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async exportStudentAuditLogs(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.module) queryParams.append('module', filters.module);
+    if (filters.role) queryParams.append('role', filters.role);
+    if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
+    if (filters.search) queryParams.append('search', filters.search);
+
+    const endpoint = `/admin/audit-logs/student/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',

@@ -27,6 +27,10 @@ import {
   NavLink,
   Dropdown,
   Alert,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from "reactstrap";
 import Header from "components/Headers/Header.js";
 import classnames from "classnames";
@@ -40,7 +44,6 @@ const AuditLog = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedModule, setSelectedModule] = useState("");
-  const [selectedRole, setSelectedRole] = useState("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -49,11 +52,13 @@ const AuditLog = () => {
   const [activeCourseTab, setActiveCourseTab] = useState("bsit");
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false);
   const [availableModules, setAvailableModules] = useState([]);
-  const [availableRoles, setAvailableRoles] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [userProfiles, setUserProfiles] = useState({}); // Store user profile data
   const [profileLoading, setProfileLoading] = useState(true); // Track profile loading state
+  const [selectedAuditLog, setSelectedAuditLog] = useState(null); // Selected audit log for modal
+  const [isModalOpen, setIsModalOpen] = useState(false); // Modal open state
+  const [selectedRoleTab, setSelectedRoleTab] = useState("all"); // New state for role-specific tabs
 
   // Fetch user profile data
   const fetchUserProfile = async (userId, role) => {
@@ -156,7 +161,21 @@ const AuditLog = () => {
         sortOrder: sortDirection,
       };
 
-      const response = await api.getAuditLogs(apiFilters);
+      let response;
+      switch (selectedRoleTab) {
+        case "admin":
+          response = await api.getAdminAuditLogs(apiFilters);
+          break;
+        case "teacher":
+          response = await api.getTeacherAuditLogs(apiFilters);
+          break;
+        case "student":
+          response = await api.getStudentAuditLogs(apiFilters);
+          break;
+        default:
+          response = await api.getAuditLogs(apiFilters);
+          break;
+      }
       
       console.log('API Response:', response); // Debug log
       
@@ -302,13 +321,9 @@ const AuditLog = () => {
   // Fetch available modules and roles
   const fetchFilterOptions = async () => {
     try {
-      const [modulesResponse, rolesResponse] = await Promise.all([
-        api.getAuditLogModules(),
-        api.getAuditLogRoles()
-      ]);
+      const modulesResponse = await api.getAuditLogModules();
 
       console.log('Modules Response:', modulesResponse); // Debug log
-      console.log('Roles Response:', rolesResponse); // Debug log
 
       // Transform modules data
       let modules = [];
@@ -342,33 +357,6 @@ const AuditLog = () => {
         "Reports & Logs",
         "Authentication",
       ]);
-
-      // Transform roles data
-      let roles = [];
-      if (rolesResponse) {
-        let rolesData = [];
-        
-        // Handle different response structures for roles
-        if (Array.isArray(rolesResponse.data)) {
-          rolesData = rolesResponse.data;
-        } else if (Array.isArray(rolesResponse)) {
-          rolesData = rolesResponse;
-        } else if (rolesResponse.data && typeof rolesResponse.data === 'object') {
-          if (rolesResponse.data.roles && Array.isArray(rolesResponse.data.roles)) {
-            rolesData = rolesResponse.data.roles;
-          } else if (rolesResponse.data.items && Array.isArray(rolesResponse.data.items)) {
-            rolesData = rolesResponse.data.items;
-          } else {
-            rolesData = [];
-          }
-        }
-        
-        roles = rolesData.map(role => 
-          typeof role === 'object' ? role.name || role.user_role || 'Unknown' : role
-        );
-      }
-      
-      setAvailableRoles(roles.length > 0 ? roles : ["Admin", "Teacher", "Student"]);
     } catch (err) {
       console.error('Error fetching filter options:', err);
       // Use default values if API fails
@@ -379,7 +367,6 @@ const AuditLog = () => {
         "Reports & Logs",
         "Authentication",
       ]);
-      setAvailableRoles(["Admin", "Teacher", "Student"]);
     }
   };
 
@@ -455,13 +442,12 @@ const AuditLog = () => {
   useEffect(() => {
     const filters = {};
     if (selectedModule) filters.module = selectedModule;
-    if (selectedRole) filters.role = selectedRole;
     if (dateRange.start) filters.dateFrom = dateRange.start;
     if (dateRange.end) filters.dateTo = dateRange.end;
     if (searchTerm) filters.search = searchTerm;
 
     fetchAuditLogs(filters);
-  }, [selectedModule, selectedRole, dateRange, searchTerm, currentPage, itemsPerPage, sortKey, sortDirection]);
+  }, [selectedModule, selectedRoleTab, dateRange, searchTerm, currentPage, itemsPerPage, sortKey, sortDirection]);
 
   const filterData = () => {
     // This function is now handled by the API, but we keep it for client-side search if needed
@@ -507,7 +493,7 @@ const AuditLog = () => {
       case "accessed logs":
       case "export":
       case "access":
-        return <Badge color="primary">{action}</Badge>;
+        return <Badge color="primary" style={{ color: '#ffffff' }}>{action}</Badge>;
       default:
         return <Badge color="secondary">{action}</Badge>;
     }
@@ -518,7 +504,7 @@ const AuditLog = () => {
     
     switch (module.toLowerCase()) {
       case 'user management':
-        return <Badge color="primary" outline="true">{module}</Badge>;
+        return <Badge color="primary" outline="true" style={{ color: '#5e72e4' }}>{module}</Badge>;
       case 'section management':
         return <Badge color="success" outline="true">{module}</Badge>;
       case 'attendance':
@@ -568,12 +554,25 @@ const AuditLog = () => {
     try {
       const filters = {};
       if (selectedModule) filters.module = selectedModule;
-      if (selectedRole) filters.role = selectedRole;
       if (dateRange.start) filters.dateFrom = dateRange.start;
       if (dateRange.end) filters.dateTo = dateRange.end;
       if (searchTerm) filters.search = searchTerm;
 
-      const response = await api.exportAuditLogs(filters);
+      let response;
+      switch (selectedRoleTab) {
+        case "admin":
+          response = await api.exportAdminAuditLogs(filters);
+          break;
+        case "teacher":
+          response = await api.exportTeacherAuditLogs(filters);
+          break;
+        case "student":
+          response = await api.exportStudentAuditLogs(filters);
+          break;
+        default:
+          response = await api.exportAuditLogs(filters);
+          break;
+      }
       
       if (response && response.data) {
         // Transform the export data to handle object responses
@@ -674,6 +673,37 @@ const AuditLog = () => {
     alert("PDF export functionality would be implemented here");
   };
 
+  // Handle modal operations
+  const openModal = (auditLog) => {
+    setSelectedAuditLog(auditLog);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setSelectedAuditLog(null);
+    setIsModalOpen(false);
+  };
+
+  // Format details for modal display
+  const formatDetailsForModal = (details) => {
+    if (!details || details === 'No details available') {
+      return 'No details available';
+    }
+
+    // Try to parse JSON and format it nicely
+    try {
+      if (details.startsWith('{') && details.includes('}')) {
+        const jsonData = JSON.parse(details);
+        return JSON.stringify(jsonData, null, 2);
+      }
+    } catch (error) {
+      // If JSON parsing fails, return the original string
+      console.log('Failed to parse details JSON for modal:', error);
+    }
+
+    return details;
+  };
+
   if (loading && auditData.length === 0) {
     return (
       <div className="text-center py-5">
@@ -717,9 +747,9 @@ const AuditLog = () => {
           <Col md="12">
             {/* Filter Section OUTSIDE the table card */}
             <Card className="mb-4" style={{ border: '1px solid #e1e5e9', borderRadius: '8px' }}>
-              <CardBody style={{ padding: '1.5rem' }}>
+              <CardBody style={{ padding: '1rem 1.5rem' }}>
                 <Row>
-                  <Col md={3}>
+                  <Col xs={12} sm={12} md={6} lg={4}>
                     <FormGroup>
                       <Label style={{ fontWeight: 600, color: '#32325d', marginBottom: '0.5rem' }}>Module</Label>
                       <Dropdown isOpen={moduleDropdownOpen} toggle={() => setModuleDropdownOpen(!moduleDropdownOpen)} style={{ width: '100%' }}>
@@ -777,7 +807,7 @@ const AuditLog = () => {
                       </Dropdown>
                     </FormGroup>
                   </Col>
-                  <Col md={3}>
+                  <Col xs={12} sm={6} md={3} lg={4}>
                     <FormGroup>
                       <Label style={{ fontWeight: 600, color: '#32325d', marginBottom: '0.5rem' }}>Date From</Label>
                       <Input
@@ -788,7 +818,7 @@ const AuditLog = () => {
                       />
                     </FormGroup>
                   </Col>
-                  <Col md={3}>
+                  <Col xs={12} sm={6} md={3} lg={4}>
                     <FormGroup>
                       <Label style={{ fontWeight: 600, color: '#32325d', marginBottom: '0.5rem' }}>Date To</Label>
                       <Input
@@ -799,37 +829,9 @@ const AuditLog = () => {
                       />
                     </FormGroup>
                   </Col>
-                  <Col md={3}>
-                    <FormGroup>
-                      <Label style={{ fontWeight: 600, color: '#32325d', marginBottom: '0.5rem' }}>Role</Label>
-                      <Input
-                        type="select"
-                        value={selectedRole}
-                        onChange={(e) => setSelectedRole(e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: '#fff',
-                          color: selectedRole ? '#32325d' : '#8898aa',
-                          border: '1px solid #e1e5e9',
-                          borderRadius: '6px',
-                          fontWeight: 400,
-                          fontSize: '1rem',
-                          height: '48px',
-                          padding: '0 16px',
-                          boxShadow: 'none',
-                          outline: 'none',
-                        }}
-                      >
-                        <option value="">All Roles</option>
-                        {availableRoles.map(role => (
-                          <option key={role} value={role}>{role}</option>
-                        ))}
-                      </Input>
-                    </FormGroup>
-                  </Col>
                 </Row>
                 <Row className="mt-3">
-                  <Col md={12} className="d-flex justify-content-end">
+                  <Col xs={12} className="d-flex justify-content-center justify-content-sm-end">
                     <Button
                       color="secondary"
                       outline
@@ -837,15 +839,111 @@ const AuditLog = () => {
                         setSearchTerm("");
                         setSelectedModule("");
                         setDateRange({ start: "", end: "" });
-                        setSelectedRole("");
+                        setSelectedRoleTab("all");
                       }}
-                      style={{ borderRadius: '6px', fontWeight: 600 }}
+                      style={{ borderRadius: '6px', fontWeight: 600, minWidth: '120px' }}
                     >
-                      <i className="ni ni-refresh mr-2" />
-                      Clear Filters
+                      <i className="ni ni-refresh mr-1 mr-sm-2" />
+                      <span className="d-none d-sm-inline">Clear Filters</span>
+                      <span className="d-sm-none">Clear</span>
                     </Button>
                   </Col>
                 </Row>
+              </CardBody>
+            </Card>
+          </Col>
+        </Row>
+        {/* Role-specific tabs */}
+        <Row>
+          <Col md="12">
+            <Card className="shadow mb-3">
+              <CardBody style={{ padding: '0.75rem 1rem' }}>
+                <Nav tabs className="flex-column flex-sm-row">
+                  <NavItem className="flex-fill">
+                    <NavLink
+                      className={classnames({ active: selectedRoleTab === "all" })}
+                      onClick={() => setSelectedRoleTab("all")}
+                      style={{
+                        cursor: 'pointer',
+                        color: selectedRoleTab === "all" ? '#ffffff' : '#8898aa',
+                        backgroundColor: selectedRoleTab === "all" ? '#5e72e4' : 'transparent',
+                        fontWeight: selectedRoleTab === "all" ? 600 : 400,
+                        borderBottom: selectedRoleTab === "all" ? '2px solid #5e72e4' : 'none',
+                        textAlign: 'center',
+                        padding: '0.75rem 0.5rem',
+                        fontSize: '0.875rem',
+                        borderRadius: selectedRoleTab === "all" ? '6px 6px 0 0' : '0'
+                      }}
+                    >
+                      <i className="ni ni-chart-bar-32 mr-1 mr-sm-2" />
+                      <span className="d-none d-sm-inline">All Roles</span>
+                      <span className="d-sm-none">All</span>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem className="flex-fill">
+                    <NavLink
+                      className={classnames({ active: selectedRoleTab === "admin" })}
+                      onClick={() => setSelectedRoleTab("admin")}
+                      style={{
+                        cursor: 'pointer',
+                        color: selectedRoleTab === "admin" ? '#ffffff' : '#8898aa',
+                        backgroundColor: selectedRoleTab === "admin" ? '#5e72e4' : 'transparent',
+                        fontWeight: selectedRoleTab === "admin" ? 600 : 400,
+                        borderBottom: selectedRoleTab === "admin" ? '2px solid #5e72e4' : 'none',
+                        textAlign: 'center',
+                        padding: '0.75rem 0.5rem',
+                        fontSize: '0.875rem',
+                        borderRadius: selectedRoleTab === "admin" ? '6px 6px 0 0' : '0'
+                      }}
+                    >
+                      <i className="ni ni-single-02 mr-1 mr-sm-2" />
+                      <span className="d-none d-sm-inline">Admin</span>
+                      <span className="d-sm-none">Admin</span>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem className="flex-fill">
+                    <NavLink
+                      className={classnames({ active: selectedRoleTab === "teacher" })}
+                      onClick={() => setSelectedRoleTab("teacher")}
+                      style={{
+                        cursor: 'pointer',
+                        color: selectedRoleTab === "teacher" ? '#ffffff' : '#8898aa',
+                        backgroundColor: selectedRoleTab === "teacher" ? '#5e72e4' : 'transparent',
+                        fontWeight: selectedRoleTab === "teacher" ? 600 : 400,
+                        borderBottom: selectedRoleTab === "teacher" ? '2px solid #5e72e4' : 'none',
+                        textAlign: 'center',
+                        padding: '0.75rem 0.5rem',
+                        fontSize: '0.875rem',
+                        borderRadius: selectedRoleTab === "teacher" ? '6px 6px 0 0' : '0'
+                      }}
+                    >
+                      <i className="ni ni-hat-3 mr-1 mr-sm-2" />
+                      <span className="d-none d-sm-inline">Teacher</span>
+                      <span className="d-sm-none">Teacher</span>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem className="flex-fill">
+                    <NavLink
+                      className={classnames({ active: selectedRoleTab === "student" })}
+                      onClick={() => setSelectedRoleTab("student")}
+                      style={{
+                        cursor: 'pointer',
+                        color: selectedRoleTab === "student" ? '#ffffff' : '#8898aa',
+                        backgroundColor: selectedRoleTab === "student" ? '#5e72e4' : 'transparent',
+                        fontWeight: selectedRoleTab === "student" ? 600 : 400,
+                        borderBottom: selectedRoleTab === "student" ? '2px solid #5e72e4' : 'none',
+                        textAlign: 'center',
+                        padding: '0.75rem 0.5rem',
+                        fontSize: '0.875rem',
+                        borderRadius: selectedRoleTab === "student" ? '6px 6px 0 0' : '0'
+                      }}
+                    >
+                      <i className="ni ni-badge mr-1 mr-sm-2" />
+                      <span className="d-none d-sm-inline">Student</span>
+                      <span className="d-sm-none">Student</span>
+                    </NavLink>
+                  </NavItem>
+                </Nav>
               </CardBody>
             </Card>
           </Col>
@@ -857,7 +955,7 @@ const AuditLog = () => {
               <CardBody style={{ background: '#fff', borderRadius: '0 0 12px 12px', padding: 0 }}>
                 {/* Search bar above the Audit Log title */}
                 <Row style={{ marginLeft: 0, marginRight: 0 }}>
-                  <Col md="12" className="pl-3 pr-3">
+                  <Col xs={12} className="px-3">
                     <div className="d-flex align-items-center mb-2" style={{ width: '100%', margin: 0, padding: 0, marginTop: '20px' }}>
                       <InputGroup className={isSearchFocused ? 'focused' : ''} style={{ width: '100%', marginBottom: '6px' }}>
                         <InputGroupAddon addonType="prepend">
@@ -879,16 +977,19 @@ const AuditLog = () => {
                 </Row>
                 {/* Header with count and action buttons */}
                 <Row>
-                  <Col md="12" className="pl-3 pr-3">
-                    <div className="w-100 d-flex justify-content-between align-items-center" style={{ marginTop: '20px', marginBottom: '16px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#32325d', marginLeft: '1.25rem' }}>
-                        Audit Log ({totalItems})
+                  <Col xs={12} className="px-3">
+                    <div className="w-100 d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center" style={{ marginTop: '20px', marginBottom: '16px', gap: '10px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '1rem', color: '#32325d' }}>
+                        <span className="d-none d-sm-inline">Audit Log</span>
+                        <span className="d-sm-none">Log</span> ({totalItems})
                         {loading && <Spinner size="sm" className="ml-2" />}
                       </div>
-                      <div className="d-flex align-items-center" style={{ gap: 12 }}>
-                        <UncontrolledDropdown className="d-inline-block mr-2">
-                          <DropdownToggle color="info" outline="true" size="sm" style={{ padding: '3px 10px', fontSize: '0.75rem' }}>
-                            <i className="ni ni-archive-2 mr-2" /> Export
+                      <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                        <UncontrolledDropdown className="d-inline-block">
+                          <DropdownToggle color="info" outline="true" size="sm" style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#5e72e4' }}>
+                            <i className="ni ni-archive-2 mr-1 mr-sm-2" />
+                            <span className="d-none d-sm-inline">Export</span>
+                            <span className="d-sm-none">Export</span>
                           </DropdownToggle>
                           <DropdownMenu>
                             <DropdownItem 
@@ -921,95 +1022,121 @@ const AuditLog = () => {
                     <thead className="thead-light">
                       <tr>
                         <th scope="col" onClick={() => handleSort('user')} style={{ cursor: 'pointer', width: '15%' }}>
-                          USER{getSortIndicator('user')}
+                          <span className="d-none d-sm-inline">USER</span>
+                          <span className="d-sm-none">USER</span>
+                          {getSortIndicator('user')}
                         </th>
                         <th scope="col" onClick={() => handleSort('role')} style={{ cursor: 'pointer', width: '10%' }}>
-                          ROLE{getSortIndicator('role')}
+                          <span className="d-none d-sm-inline">ROLE</span>
+                          <span className="d-sm-none">ROLE</span>
+                          {getSortIndicator('role')}
                         </th>
                         <th scope="col" onClick={() => handleSort('action')} style={{ cursor: 'pointer', width: '15%' }}>
-                          ACTION{getSortIndicator('action')}
+                          <span className="d-none d-sm-inline">ACTION</span>
+                          <span className="d-sm-none">ACTION</span>
+                          {getSortIndicator('action')}
                         </th>
                         <th scope="col" onClick={() => handleSort('module')} style={{ cursor: 'pointer', width: '15%' }}>
-                          MODULE{getSortIndicator('module')}
+                          <span className="d-none d-sm-inline">MODULE</span>
+                          <span className="d-sm-none">MODULE</span>
+                          {getSortIndicator('module')}
                         </th>
-                        <th scope="col" style={{ width: '20%' }}>DETAILS</th>
+                        <th scope="col" style={{ width: '20%' }}>
+                          <span className="d-none d-sm-inline">DETAILS</span>
+                          <span className="d-sm-none">DETAILS</span>
+                        </th>
                         <th scope="col" onClick={() => handleSort('timestamp')} style={{ cursor: 'pointer', width: '25%' }}>
-                          TIMESTAMP{getSortIndicator('timestamp')}
+                          <span className="d-none d-sm-inline">TIMESTAMP</span>
+                          <span className="d-sm-none">TIME</span>
+                          {getSortIndicator('timestamp')}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredData.length > 0 ? (
-                        filteredData.map((item) => (
-                          <tr key={item.id}>
-                            <td style={{ width: '15%' }}>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
-                                  style={{ width: 32, height: 32, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid #e9ecef' }}
-                                >
-                                  {!profileLoading && userProfiles[item.user] && userProfiles[item.user].profile_pic ? (
-                                    <img 
-                                      src={getProfilePictureUrl(userProfiles[item.user])} 
-                                      alt={item.user || 'User'} 
-                                      style={{ width: 32, height: 32, objectFit: 'cover' }} 
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        e.target.nextSibling.style.display = 'flex';
-                                      }}
-                                    />
-                                  ) : null}
-                                  <div 
-                                    style={{ 
-                                      width: 32, 
-                                      height: 32, 
-                                      borderRadius: '50%', 
-                                      backgroundColor: '#5e72e4', 
-                                      color: 'white', 
-                                      display: (!profileLoading && userProfiles[item.user] && userProfiles[item.user].profile_pic) ? 'none' : 'flex',
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      fontSize: '12px', 
-                                      fontWeight: 'bold' 
-                                    }}
-                                  >
-                                    {getUserInitials(item.user)}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.user || 'Unknown User'}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td style={{ width: '10%' }}>
-                              <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.role || 'Unknown'}</div>
-                            </td>
-                            <td style={{ width: '15%' }}>{getActionBadge(item.action)}</td>
-                            <td style={{ width: '15%' }}>{getModuleBadge(item.module)}</td>
-                            <td style={{ width: '20%' }}>
-                              <div 
-                                className="text-muted" 
-                                style={{ 
-                                  maxWidth: "200px", 
-                                  fontSize: '0.875rem',
-                                  lineHeight: '1.2',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  display: 'block'
-                                }}
-                                title={item.details || 'No details available'}
-                              >
-                                {item.details || 'No details available'}
-                              </div>
-                            </td>
-                            <td style={{ width: '25%' }}>
-                              <div className="text-muted" style={{ fontSize: '0.875rem' }}>
-                                {formatTimestamp(item.timestamp)}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                                             {filteredData.length > 0 ? (
+                         filteredData.map((item) => (
+                           <tr 
+                             key={item.id}
+                             onClick={() => openModal(item)}
+                             style={{ 
+                               cursor: 'pointer',
+                               transition: 'background-color 0.2s ease'
+                             }}
+                             onMouseEnter={(e) => {
+                               e.currentTarget.style.backgroundColor = '#f8f9fa';
+                             }}
+                             onMouseLeave={(e) => {
+                               e.currentTarget.style.backgroundColor = '';
+                             }}
+                             title="Click to view full details"
+                           >
+                             <td style={{ width: '15%' }}>
+                               <div className="d-flex align-items-center">
+                                 <div
+                                   className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
+                                   style={{ width: 32, height: 32, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid #e9ecef', color: '#ffffff' }}
+                                 >
+                                   {!profileLoading && userProfiles[item.user] && userProfiles[item.user].profile_pic ? (
+                                     <img 
+                                       src={getProfilePictureUrl(userProfiles[item.user])} 
+                                       alt={item.user || 'User'} 
+                                       style={{ width: 32, height: 32, objectFit: 'cover' }} 
+                                       onError={(e) => {
+                                         e.target.style.display = 'none';
+                                         e.target.nextSibling.style.display = 'flex';
+                                       }}
+                                     />
+                                   ) : null}
+                                   <div 
+                                     style={{ 
+                                       width: 32, 
+                                       height: 32, 
+                                       borderRadius: '50%', 
+                                       backgroundColor: '#5e72e4', 
+                                       color: 'white', 
+                                       display: (!profileLoading && userProfiles[item.user] && userProfiles[item.user].profile_pic) ? 'none' : 'flex',
+                                       alignItems: 'center', 
+                                       justifyContent: 'center', 
+                                       fontSize: '12px', 
+                                       fontWeight: 'bold' 
+                                     }}
+                                   >
+                                     {getUserInitials(item.user)}
+                                   </div>
+                                 </div>
+                                 <div>
+                                   <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.user || 'Unknown User'}</div>
+                                 </div>
+                               </div>
+                             </td>
+                             <td style={{ width: '10%' }}>
+                               <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.role || 'Unknown'}</div>
+                             </td>
+                             <td style={{ width: '15%' }}>{getActionBadge(item.action)}</td>
+                             <td style={{ width: '15%' }}>{getModuleBadge(item.module)}</td>
+                             <td style={{ width: '20%' }}>
+                               <div 
+                                 className="text-muted" 
+                                 style={{ 
+                                   maxWidth: "200px", 
+                                   fontSize: '0.875rem',
+                                   lineHeight: '1.2',
+                                   whiteSpace: 'nowrap',
+                                   overflow: 'hidden',
+                                   textOverflow: 'ellipsis',
+                                   display: 'block'
+                                 }}
+                               >
+                                 {item.details || 'No details available'}
+                               </div>
+                             </td>
+                             <td style={{ width: '25%' }}>
+                               <div className="text-muted" style={{ fontSize: '0.875rem' }}>
+                                 {formatTimestamp(item.timestamp)}
+                               </div>
+                             </td>
+                           </tr>
+                         ))
                       ) : (
                         <tr>
                           <td colSpan="6" className="text-center py-4">
@@ -1090,10 +1217,264 @@ const AuditLog = () => {
               </CardBody>
             </Card>
           </Col>
-        </Row>
-      </Container>
-    </>
-  );
-};
+                 </Row>
+       </Container>
+
+               {/* Audit Log Details Modal */}
+                <Modal
+          isOpen={isModalOpen}
+          toggle={closeModal}
+          size="lg"
+          centered
+          style={{ padding: 0 }}
+        >
+          {/* Simple Header */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '20px',
+            borderBottom: '1px solid #e9ecef',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div className="d-flex align-items-center">
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '8px',
+                backgroundColor: '#007bff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '12px'
+              }}>
+                <i className="ni ni-archive-2" style={{ fontSize: '16px', color: 'white' }} />
+              </div>
+              <div>
+                <h5 style={{ margin: 0, fontWeight: 600, fontSize: '1.1rem', color: '#333' }}>
+                  Audit Log Details
+                </h5>
+                <small style={{ color: '#6c757d', fontSize: '0.85rem' }}>
+                  Activity information
+                </small>
+              </div>
+            </div>
+            <button
+              onClick={closeModal}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#6c757d',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#e9ecef'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content Area */}
+          <div style={{ padding: '24px', maxHeight: '60vh', overflowY: 'auto' }}>
+            {selectedAuditLog && (
+              <div>
+                {/* User Info */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  marginBottom: '20px',
+                  padding: '16px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  <div
+                    style={{ 
+                      width: '48px', 
+                      height: '48px', 
+                      borderRadius: '50%', 
+                      overflow: 'hidden',
+                      marginRight: '16px',
+                      border: '2px solid #fff',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                    }}
+                  >
+                    {!profileLoading && userProfiles[selectedAuditLog.user] && userProfiles[selectedAuditLog.user].profile_pic ? (
+                      <img 
+                        src={getProfilePictureUrl(userProfiles[selectedAuditLog.user])} 
+                        alt={selectedAuditLog.user || 'User'} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#007bff', 
+                        color: 'white', 
+                        display: (!profileLoading && userProfiles[selectedAuditLog.user] && userProfiles[selectedAuditLog.user].profile_pic) ? 'none' : 'flex',
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '18px', 
+                        fontWeight: 'bold' 
+                      }}
+                    >
+                      {getUserInitials(selectedAuditLog.user)}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#333', marginBottom: '4px' }}>
+                      {selectedAuditLog.user || 'Unknown User'}
+                    </div>
+                    <div style={{ 
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      backgroundColor: '#e3f2fd',
+                      color: '#1976d2',
+                      borderRadius: '20px',
+                      fontSize: '0.8rem',
+                      fontWeight: 500,
+                      textTransform: 'uppercase'
+                    }}>
+                      {selectedAuditLog.role || 'Unknown'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activity Info */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr 1fr', 
+                  gap: '12px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#fff',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '6px', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Action
+                    </div>
+                    <div>{getActionBadge(selectedAuditLog.action)}</div>
+                  </div>
+                  
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#fff',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '6px', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Module
+                    </div>
+                    <div>{getModuleBadge(selectedAuditLog.module)}</div>
+                  </div>
+                  
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#fff',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '6px', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Timestamp
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: '#333', fontWeight: 500 }}>
+                      {formatTimestamp(selectedAuditLog.timestamp)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Section */}
+                <div style={{ 
+                  backgroundColor: '#fff',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef',
+                  padding: '20px'
+                }}>
+                  <div style={{ 
+                    fontSize: '0.9rem', 
+                    color: '#333', 
+                    marginBottom: '12px', 
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <i className="ni ni-single-copy-04 mr-2" style={{ fontSize: '14px' }} />
+                    Complete Details
+                  </div>
+                  <div 
+                    style={{ 
+                      backgroundColor: '#f8f9fa', 
+                      borderRadius: '6px', 
+                      border: '1px solid #e9ecef',
+                      fontFamily: 'monospace',
+                      fontSize: '0.875rem',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      padding: '16px',
+                      lineHeight: '1.5',
+                      minHeight: '200px',
+                      maxHeight: '300px',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    {formatDetailsForModal(selectedAuditLog.details)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #e9ecef',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <button
+              onClick={closeModal}
+              style={{
+                padding: '8px 24px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.9rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#5a6268'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#6c757d'}
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
+     </>
+   );
+ };
 
 export default AuditLog; 

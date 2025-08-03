@@ -28,9 +28,11 @@ import {
   Nav,
   NavItem,
   NavLink,
+  Spinner,
 } from "reactstrap";
 import Header from "components/Headers/Header.js";
 import classnames from "classnames";
+import api from "services/api.js";
 
 const AttendanceLog = () => {
   // State management
@@ -57,270 +59,6 @@ const AttendanceLog = () => {
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-
-  // Mock data for demonstration
-  const mockAttendanceData = [
-    {
-      id: 1,
-      studentName: "Alex Thompson",
-      studentId: "2021-0001",
-      section: "BSIT 3A",
-      subject: "Programming 1",
-      teacherName: "Mr. Cruz",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 2,
-      studentName: "Emma Davis",
-      studentId: "2021-0002",
-      section: "BSIT 3A",
-      subject: "Programming 1",
-      teacherName: "Mr. Cruz",
-      date: "2024-01-15",
-      attendanceStatus: "Absent",
-      excuseLetterStatus: "Pending",
-      reason: "Medical appointment",
-      attachment: "medical_certificate.jpg"
-    },
-    {
-      id: 3,
-      studentName: "Michael Chen",
-      studentId: "2021-0003",
-      section: "BSIT 3A",
-      subject: "Programming 1",
-      teacherName: "Mr. Cruz",
-      date: "2024-01-15",
-      attendanceStatus: "Late",
-      excuseLetterStatus: "N/A",
-      reason: "Traffic delay",
-      attachment: null
-    },
-    {
-      id: 4,
-      studentName: "Sarah Johnson",
-      studentId: "2021-0004",
-      section: "BSIT 3A",
-      subject: "Programming 1",
-      teacherName: "Mr. Cruz",
-      date: "2024-01-15",
-      attendanceStatus: "Excused",
-      excuseLetterStatus: "Approved",
-      reason: "Family emergency",
-      attachment: "emergency_letter.pdf"
-    },
-    {
-      id: 5,
-      studentName: "David Wilson",
-      studentId: "2021-0005",
-      section: "BSIT 3A",
-      subject: "Programming 1",
-      teacherName: "Mr. Cruz",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 6,
-      studentName: "Lisa Rodriguez",
-      studentId: "2021-0006",
-      section: "BSIT 3B",
-      subject: "Data Structures",
-      teacherName: "Ms. Reyes",
-      date: "2024-01-15",
-      attendanceStatus: "Absent",
-      excuseLetterStatus: "Rejected",
-      reason: "Overslept",
-      attachment: "excuse_letter.pdf"
-    },
-    {
-      id: 7,
-      studentName: "James Brown",
-      studentId: "2021-0007",
-      section: "BSIT 3B",
-      subject: "Data Structures",
-      teacherName: "Ms. Reyes",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 8,
-      studentName: "Maria Garcia",
-      studentId: "2021-0008",
-      section: "BSIT 3B",
-      subject: "Data Structures",
-      teacherName: "Ms. Reyes",
-      date: "2024-01-15",
-      attendanceStatus: "Late",
-      excuseLetterStatus: "N/A",
-      reason: "Public transport delay",
-      attachment: null
-    },
-    {
-      id: 9,
-      studentName: "Robert Taylor",
-      studentId: "2021-0009",
-      section: "BSCS 2A",
-      subject: "Database Management",
-      teacherName: "Mr. Garcia",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 10,
-      studentName: "Jennifer Lee",
-      studentId: "2021-0010",
-      section: "BSCS 2A",
-      subject: "Database Management",
-      teacherName: "Mr. Garcia",
-      date: "2024-01-15",
-      attendanceStatus: "Excused",
-      excuseLetterStatus: "Approved",
-      reason: "Sports competition",
-      attachment: "competition_certificate.pdf"
-    },
-    {
-      id: 11,
-      studentName: "Christopher Martinez",
-      studentId: "2021-0011",
-      section: "BSCS 1A",
-      subject: "Programming 2",
-      teacherName: "Mrs. David",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 12,
-      studentName: "Amanda White",
-      studentId: "2021-0012",
-      section: "BSCS 1A",
-      subject: "Programming 2",
-      teacherName: "Mrs. David",
-      date: "2024-01-15",
-      attendanceStatus: "Absent",
-      excuseLetterStatus: "Pending",
-      reason: "Dental appointment",
-      attachment: "dental_certificate.pdf"
-    },
-    {
-      id: 13,
-      studentName: "Daniel Anderson",
-      studentId: "2021-0013",
-      section: "BSIS 2A",
-      subject: "Web Development",
-      teacherName: "Ms. Santos",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 14,
-      studentName: "Jessica Thomas",
-      studentId: "2021-0014",
-      section: "BSIS 2A",
-      subject: "Web Development",
-      teacherName: "Ms. Santos",
-      date: "2024-01-15",
-      attendanceStatus: "Late",
-      excuseLetterStatus: "N/A",
-      reason: "Car breakdown",
-      attachment: null
-    },
-    {
-      id: 15,
-      studentName: "Kevin Moore",
-      studentId: "2021-0015",
-      section: "BSIS 3A",
-      subject: "Software Engineering",
-      teacherName: "Mr. Lee",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 16,
-      studentName: "Nicole Jackson",
-      studentId: "2021-0016",
-      section: "BSIS 3A",
-      subject: "Software Engineering",
-      teacherName: "Mr. Lee",
-      date: "2024-01-15",
-      attendanceStatus: "Excused",
-      excuseLetterStatus: "Approved",
-      reason: "Academic conference",
-      attachment: "conference_invitation.pdf"
-    },
-    {
-      id: 17,
-      studentName: "Steven Martin",
-      studentId: "2021-0017",
-      section: "ACT 2A",
-      subject: "Computer Networks",
-      teacherName: "Ms. Tan",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 18,
-      studentName: "Rachel Clark",
-      studentId: "2021-0018",
-      section: "ACT 2A",
-      subject: "Computer Networks",
-      teacherName: "Ms. Tan",
-      date: "2024-01-15",
-      attendanceStatus: "Absent",
-      excuseLetterStatus: "Rejected",
-      reason: "Forgot class schedule",
-      attachment: "excuse_note.pdf"
-    },
-    {
-      id: 19,
-      studentName: "Brian Lewis",
-      studentId: "2021-0019",
-      section: "ACT 3A",
-      subject: "Operating Systems",
-      teacherName: "Mr. Ramos",
-      date: "2024-01-15",
-      attendanceStatus: "Present",
-      excuseLetterStatus: "N/A",
-      reason: "",
-      attachment: null
-    },
-    {
-      id: 20,
-      studentName: "Michelle Hall",
-      studentId: "2021-0020",
-      section: "ACT 3A",
-      subject: "Operating Systems",
-      teacherName: "Mr. Ramos",
-      date: "2024-01-15",
-      attendanceStatus: "Late",
-      excuseLetterStatus: "N/A",
-      reason: "Heavy traffic",
-      attachment: null
-    }
-  ];
 
   // Available options for filters
   const courses = [
@@ -350,50 +88,115 @@ const AttendanceLog = () => {
 
   // Get attendance status badge
   const getAttendanceStatusBadge = (status) => {
+    console.log("getAttendanceStatusBadge called with status:", status);
+    
+    // Normalize status to handle case variations
+    const normalizedStatus = status ? status.toString().toLowerCase() : '';
+    console.log("Normalized status:", normalizedStatus);
+    
+    // Define colors with hex values
     const colors = {
-      Present: "success",
-      Absent: "danger",
-      Late: "warning",
-      Excused: "info"
+      present: "#28a745", // green
+      absent: "#dc3545",   // red
+      late: "#ffc107",     // orange
+      excused: "#17a2b8"   // blue
     };
-    return <Badge color={colors[status] || "secondary"}>{status}</Badge>;
+    
+    // Get the color for the normalized status
+    const backgroundColor = colors[normalizedStatus] || "#6c757d"; // gray default
+    const textColor = normalizedStatus === "late" ? "#212529" : "#ffffff";
+    
+    console.log("Selected background color:", backgroundColor);
+    console.log("Selected text color:", textColor);
+    
+    const badgeStyle = {
+      backgroundColor: backgroundColor,
+      color: textColor,
+      padding: "0.375rem 0.75rem",
+      borderRadius: "0.375rem",
+      fontSize: "0.875rem",
+      fontWeight: "500",
+      display: "inline-block"
+    };
+    
+    return <Badge style={badgeStyle}>{status}</Badge>;
   };
 
   // Get excuse status badge
   const getExcuseStatusBadge = (status) => {
+    console.log("getExcuseStatusBadge called with status:", status);
+    
+    // Normalize status to handle case variations
+    const normalizedStatus = status ? status.toString().toLowerCase() : '';
+    console.log("Normalized excuse status:", normalizedStatus);
+    
+    // Define colors with hex values
     const colors = {
-      "N/A": "secondary",
-      Pending: "warning",
-      Approved: "success",
-      Rejected: "danger"
+      "n/a": "#6c757d",     // gray
+      pending: "#ffc107",    // orange
+      approved: "#28a745",   // green
+      rejected: "#dc3545"    // red
     };
-    return <Badge color={colors[status] || "secondary"}>{status}</Badge>;
+    
+    // Get the color for the normalized status
+    const backgroundColor = colors[normalizedStatus] || "#6c757d"; // gray default
+    const textColor = normalizedStatus === "pending" ? "#212529" : "#ffffff";
+    
+    console.log("Selected excuse background color:", backgroundColor);
+    console.log("Selected excuse text color:", textColor);
+    
+    const badgeStyle = {
+      backgroundColor: backgroundColor,
+      color: textColor,
+      padding: "0.375rem 0.75rem",
+      borderRadius: "0.375rem",
+      fontSize: "0.875rem",
+      fontWeight: "500",
+      display: "inline-block"
+    };
+    
+    return <Badge style={badgeStyle}>{status}</Badge>;
   };
 
-  // Filter data based on all filters
-  const filterData = () => {
-    let filtered = mockAttendanceData.filter(item => {
-      // Search filter
-      const searchMatch = !searchTerm || 
-        item.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.studentId.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Date range filter
-      const dateMatch = (!dateFrom || item.date >= dateFrom) && 
-                       (!dateTo || item.date <= dateTo);
-      
-      // Course filter
-      const courseMatch = activeCourseTab === "all" || item.section.toLowerCase().includes(activeCourseTab);
-      
-      // Other filters
-      const subjectMatch = !selectedSubject || item.subject === selectedSubject;
-      const sectionMatch = !selectedSection || item.section === selectedSection;
-      const teacherMatch = !selectedTeacher || item.teacherName === selectedTeacher;
-      const attendanceMatch = !selectedAttendanceStatus || item.attendanceStatus === selectedAttendanceStatus;
-      const excuseMatch = !selectedExcuseStatus || item.excuseLetterStatus === selectedExcuseStatus;
-      return searchMatch && dateMatch && courseMatch && subjectMatch && sectionMatch && 
-             teacherMatch && attendanceMatch && excuseMatch;
-    });
+     // Filter data based on all filters
+   const filterData = (data) => {
+     console.log("Filtering data with:", {
+       activeCourseTab,
+       dataLength: data.length,
+       sampleData: data.slice(0, 2)
+     });
+     
+     let filtered = data.filter(item => {
+       // Search filter
+       const searchMatch = !searchTerm || 
+         item.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         item.studentId.toLowerCase().includes(searchTerm.toLowerCase());
+       
+       // Date range filter
+       const dateMatch = (!dateFrom || item.date >= dateFrom) && 
+                        (!dateTo || item.date <= dateTo);
+       
+       // Course filter - check if section contains the program abbreviation
+       const courseMatch = activeCourseTab === "all" || 
+         (activeCourseTab === "bsit" && item.section.toUpperCase().includes("BSIT")) ||
+         (activeCourseTab === "bscs" && item.section.toUpperCase().includes("BSCS")) ||
+         (activeCourseTab === "bsis" && item.section.toUpperCase().includes("BSIS")) ||
+         (activeCourseTab === "act" && item.section.toUpperCase().includes("ACT"));
+       
+       // Debug course filtering
+       if (activeCourseTab !== "all") {
+         console.log(`Item section: "${item.section}", Active tab: "${activeCourseTab}", Course match: ${courseMatch}`);
+       }
+       
+       // Other filters
+       const subjectMatch = !selectedSubject || item.subject === selectedSubject;
+       const sectionMatch = !selectedSection || item.section === selectedSection;
+       const teacherMatch = !selectedTeacher || item.teacherName === selectedTeacher;
+       const attendanceMatch = !selectedAttendanceStatus || item.attendanceStatus === selectedAttendanceStatus;
+       const excuseMatch = !selectedExcuseStatus || item.excuseLetterStatus === selectedExcuseStatus;
+       return searchMatch && dateMatch && courseMatch && subjectMatch && sectionMatch && 
+              teacherMatch && attendanceMatch && excuseMatch;
+     });
 
     // Sort data
     filtered.sort((a, b) => {
@@ -458,7 +261,7 @@ const AttendanceLog = () => {
   const exportToCSV = () => {
     const headers = [
       'Student Name', 'Student ID', 'Section', 'Subject', 'Teacher Name',
-      'Date', 'Attendance Status', 'Excuse Letter Status', 'Reason'
+      'Date', 'Attendance Status', 'Excuse Letter Status', 'Reason', 'Attachment'
     ];
     
     const csvContent = [
@@ -472,7 +275,8 @@ const AttendanceLog = () => {
         item.date,
         item.attendanceStatus,
         item.excuseLetterStatus,
-        item.reason
+        item.reason,
+        item.attachment || 'N/A'
       ].join(','))
     ].join('\n');
     
@@ -514,18 +318,365 @@ const AttendanceLog = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Filter data when filters change
-  useEffect(() => {
-    filterData();
-  }, [searchTerm, activeCourseTab, dateFrom, dateTo, selectedSubject, selectedSection, 
-      selectedTeacher, selectedAttendanceStatus, selectedExcuseStatus, 
-      sortKey, sortDirection]);
+  // Fetch attendance data
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Test if API is accessible
+      console.log("Testing API accessibility...");
+      try {
+        const testResponse = await fetch('http://localhost/scms_new_backup/index.php/api/attendance-logs/logs', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        console.log("API test response status:", testResponse.status);
+        console.log("API test response ok:", testResponse.ok);
+      } catch (testError) {
+        console.log("API test failed:", testError);
+      }
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+             // Add program filter based on active course tab
+       if (activeCourseTab !== "all") {
+         const programMap = {
+           "bsit": "BSIT",
+           "bscs": "BSCS", 
+           "bsis": "BSIS",
+           "act": "ACT"
+         };
+         const program = programMap[activeCourseTab];
+         if (program) {
+           params.append('program', program);
+           console.log("Adding program filter:", program);
+         }
+       }
+      
+      // Add date filters
+      if (dateFrom) {
+        params.append('date_from', dateFrom);
+      }
+      if (dateTo) {
+        params.append('date_to', dateTo);
+      }
+      
+      // Add attendance status filter
+      if (selectedAttendanceStatus) {
+        params.append('status', selectedAttendanceStatus.toLowerCase());
+      }
+      
+             // First, let's test if there's any data at all without filters
+       console.log("Testing if there's any data available...");
+       try {
+         const testAllDataUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+         const testAllDataResponse = await fetch(testAllDataUrl, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${localStorage.getItem('token')}`,
+             'Accept': 'application/json'
+           },
+           mode: 'cors'
+         });
+         
+         if (testAllDataResponse.ok) {
+           const testAllData = await testAllDataResponse.json();
+           console.log("All data test response:", testAllData);
+           
+           if (testAllData?.data?.logs && testAllData.data.logs.length > 0) {
+             console.log("Found data without any filters:", testAllData.data.logs.length, "records");
+           } else {
+             console.log("No data found without filters");
+           }
+         }
+       } catch (testError) {
+         console.log("Test for all data failed:", testError);
+       }
+       
+       // Fetch attendance data from your specific endpoint
+       let attendanceResponse;
+       try {
+         console.log("Attempting to fetch attendance data...");
+         const url = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs?${params.toString()}`;
+                  console.log("Fetching from:", url);
+          console.log("Full URL with params:", url);
+         
+         const response = await fetch(url, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${localStorage.getItem('token')}`,
+             'Accept': 'application/json'
+           },
+           mode: 'cors'
+         });
+         
+         console.log("Response status:", response.status);
+         console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+         console.log("Response URL:", response.url);
+         
+         if (!response.ok) {
+           const errorText = await response.text();
+           console.error("Response error text:", errorText);
+           throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+         }
+         
+         attendanceResponse = await response.json();
+         console.log("Attendance data fetched successfully:", attendanceResponse);
+                   console.log("Response structure:", {
+            hasData: !!attendanceResponse?.data,
+            hasLogs: !!attendanceResponse?.data?.logs,
+            dataType: typeof attendanceResponse?.data,
+            logsType: typeof attendanceResponse?.data?.logs,
+            logsLength: attendanceResponse?.data?.logs?.length || 0,
+            fullResponse: attendanceResponse
+          });
+          
+          // Log the actual response structure to understand the data format
+          console.log("Full API Response:", JSON.stringify(attendanceResponse, null, 2));
+             } catch (error) {
+         console.log("Attendance endpoint failed", error);
+         
+                // Try without program filter as fallback
+       if (activeCourseTab !== "all") {
+         console.log("Trying without program filter as fallback...");
+         try {
+           const fallbackUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           console.log("Fallback URL:", fallbackUrl);
+           
+           const fallbackResponse = await fetch(fallbackUrl, {
+             method: 'GET',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${localStorage.getItem('token')}`,
+               'Accept': 'application/json'
+             },
+             mode: 'cors'
+           });
+           
+           if (fallbackResponse.ok) {
+             const fallbackData = await fallbackResponse.json();
+             console.log("Fallback data:", fallbackData);
+             
+             // Process the fallback data
+             let fallbackAttendanceData = [];
+             if (fallbackData?.data?.logs) {
+               fallbackAttendanceData = fallbackData.data.logs;
+             } else if (fallbackData?.logs) {
+               fallbackAttendanceData = fallbackData.logs;
+             } else if (Array.isArray(fallbackData?.data)) {
+               fallbackAttendanceData = fallbackData.data;
+             } else if (Array.isArray(fallbackData)) {
+               fallbackAttendanceData = fallbackData;
+             }
+             
+             console.log("Fallback attendance data:", fallbackAttendanceData);
+             
+             // If we have data without program filter, we'll filter it on the frontend
+             if (fallbackAttendanceData.length > 0) {
+               console.log("Found data without program filter, will filter on frontend");
+               setAttendanceData(Array.isArray(fallbackAttendanceData) ? fallbackAttendanceData : []);
+               setLoading(false);
+               return;
+             }
+           }
+         } catch (fallbackError) {
+           console.log("Fallback also failed:", fallbackError);
+         }
+       }
+         
+         // Try without authentication as last resort
+         console.log("Trying without authentication...");
+         try {
+           const noAuthUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           console.log("No auth URL:", noAuthUrl);
+           
+           const noAuthResponse = await fetch(noAuthUrl, {
+             method: 'GET',
+             headers: {
+               'Content-Type': 'application/json',
+               'Accept': 'application/json'
+             },
+             mode: 'cors'
+           });
+           
+           if (noAuthResponse.ok) {
+             const noAuthData = await noAuthResponse.json();
+             console.log("No auth data:", noAuthData);
+             
+             // Process the no auth data
+             let noAuthAttendanceData = [];
+             if (noAuthData?.data?.logs) {
+               noAuthAttendanceData = noAuthData.data.logs;
+             } else if (noAuthData?.logs) {
+               noAuthAttendanceData = noAuthData.logs;
+             } else if (Array.isArray(noAuthData?.data)) {
+               noAuthAttendanceData = noAuthData.data;
+             } else if (Array.isArray(noAuthData)) {
+               noAuthAttendanceData = noAuthData;
+             }
+             
+             console.log("No auth attendance data:", noAuthAttendanceData);
+             setAttendanceData(Array.isArray(noAuthAttendanceData) ? noAuthAttendanceData : []);
+             setLoading(false);
+             return;
+           }
+         } catch (noAuthError) {
+           console.log("No auth also failed:", noAuthError);
+         }
+         
+         setAttendanceData([]);
+         setLoading(false);
+         return;
+       }
+      
+             // Set attendance data - handle the nested structure from your API
+       let attendanceData = [];
+       console.log("Processing attendance response:", attendanceResponse);
+       
+       if (attendanceResponse?.data?.logs) {
+         // API returns { data: { logs: [...] } }
+         attendanceData = attendanceResponse.data.logs;
+         console.log("Using data.logs structure");
+       } else if (attendanceResponse?.logs) {
+         // API returns { logs: [...] }
+         attendanceData = attendanceResponse.logs;
+         console.log("Using logs structure");
+       } else if (Array.isArray(attendanceResponse?.data)) {
+         // API returns { data: [...] }
+         attendanceData = attendanceResponse.data;
+         console.log("Using data array structure");
+       } else if (Array.isArray(attendanceResponse)) {
+         // API returns [...] directly
+         attendanceData = attendanceResponse;
+         console.log("Using direct array structure");
+       } else if (attendanceResponse?.data && typeof attendanceResponse.data === 'object') {
+         // API might return { data: { ... } } with different structure
+         attendanceData = [attendanceResponse.data];
+         console.log("Using data object structure");
+       } else if (attendanceResponse && typeof attendanceResponse === 'object') {
+         // API might return a single object
+         attendanceData = [attendanceResponse];
+         console.log("Using single object structure");
+       }
+       
+       console.log("Processed attendance data:", attendanceData);
+       console.log("Attendance data length:", attendanceData.length);
+       
+       // Check if we got empty data with a program filter - this means backend filtering failed
+       if (attendanceData.length === 0 && activeCourseTab !== "all") {
+         console.log("Empty data with program filter detected, trying fallback...");
+         
+         // Try without program filter as fallback
+         try {
+           const fallbackUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           console.log("Fallback URL:", fallbackUrl);
+           
+           const fallbackResponse = await fetch(fallbackUrl, {
+             method: 'GET',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${localStorage.getItem('token')}`,
+               'Accept': 'application/json'
+             },
+             mode: 'cors'
+           });
+           
+           if (fallbackResponse.ok) {
+             const fallbackData = await fallbackResponse.json();
+             console.log("Fallback data:", fallbackData);
+             
+             // Process the fallback data
+             let fallbackAttendanceData = [];
+             if (fallbackData?.data?.logs) {
+               fallbackAttendanceData = fallbackData.data.logs;
+             } else if (fallbackData?.logs) {
+               fallbackAttendanceData = fallbackData.logs;
+             } else if (Array.isArray(fallbackData?.data)) {
+               fallbackAttendanceData = fallbackData.data;
+             } else if (Array.isArray(fallbackData)) {
+               fallbackAttendanceData = fallbackData;
+             }
+             
+             console.log("Fallback attendance data:", fallbackAttendanceData);
+             
+             // If we have data without program filter, we'll filter it on the frontend
+             if (fallbackAttendanceData.length > 0) {
+               console.log("Found data without program filter, will filter on frontend");
+               setAttendanceData(Array.isArray(fallbackAttendanceData) ? fallbackAttendanceData : []);
+               setLoading(false);
+               return;
+             }
+           }
+         } catch (fallbackError) {
+           console.log("Fallback also failed:", fallbackError);
+         }
+       }
+       
+       setAttendanceData(Array.isArray(attendanceData) ? attendanceData : []);
+      
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setAttendanceData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Load mock data
+     // Process attendance data
+   const processData = () => {
+     const processed = [];
+     
+     console.log("Processing attendance data:", attendanceData);
+     
+     // Process attendance records
+     if (Array.isArray(attendanceData)) {
+       attendanceData.forEach((record, index) => {
+         console.log(`Processing record ${index}:`, record);
+         
+         const processedRecord = {
+           id: record.log_id || record.id || Math.random().toString(36).substr(2, 9),
+           studentName: record.student_name || record.studentName || 'Unknown',
+           studentId: record.student_id_number || record.student_id || record.studentId || 'N/A',
+           section: record.section_name || record.section || 'N/A',
+           subject: record.subject_name || record.subject || 'N/A',
+           teacherName: record.teacher_name || record.teacherName || 'N/A',
+           date: record.date || record.created_at || record.timestamp || 'N/A',
+           attendanceStatus: record.attendance_status || record.attendanceStatus || 'Unknown',
+           excuseLetterStatus: record.excuse_status || record.excuseLetterStatus || 'N/A',
+           reason: record.reason || record.remarks || '',
+           attachment: record.attachment || record.attachments || null,
+           type: 'attendance',
+           source: 'attendance_record'
+         };
+         
+         console.log(`Processed record ${index}:`, processedRecord);
+         processed.push(processedRecord);
+       });
+     }
+     
+     console.log("Final processed data:", processed);
+     return processed;
+   };
+
   useEffect(() => {
-    setLoading(false);
-    setAttendanceData(mockAttendanceData);
-  }, []);
+    fetchData();
+  }, [dateFrom, dateTo, activeCourseTab, selectedAttendanceStatus]);
+
+  useEffect(() => {
+    try {
+      const processedData = processData();
+      filterData(processedData);
+    } catch (error) {
+      console.error("Error processing data:", error);
+      // Fallback to just attendance data
+      filterData(Array.isArray(attendanceData) ? attendanceData : []);
+    }
+  }, [attendanceData, searchTerm, selectedSubject, selectedSection, selectedTeacher, selectedExcuseStatus]);
 
   // Calculate pagination
   const totalItems = filteredData.length;
@@ -836,36 +987,53 @@ const AttendanceLog = () => {
                     </div>
                     {/* Header with count and action buttons */}
                     <div className="w-100 d-flex justify-content-between align-items-center" style={{ marginTop: '20px', marginBottom: '16px' }}>
+                        {/* Summary badges */}
+                        <div className="d-flex align-items-center" style={{ gap: '8px', marginBottom: '8px' }}>
+                          <Badge color="primary" style={{ fontSize: '0.7rem' }}>
+                            {attendanceData.length} Attendance Records
+                          </Badge>
+                        </div>
                       <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#32325d' }}>
                         {activeCourseTab === "all" ? "Attendance log" : courses.find(c => c.id === activeCourseTab)?.name || "Admin Attendance Log"} ({filteredData.length})
+                        {loading && <Spinner size="sm" className="ml-2" />}
                       </div>
                       <div className="d-flex align-items-center" style={{ gap: 12 }}>
-                        <UncontrolledDropdown className="d-inline-block">
-                          <DropdownToggle color="info" outline size="sm" style={{ padding: '3px 10px', fontSize: '0.75rem', margin: 0 }}>
-                            <i className="ni ni-archive-2 mr-2" /> Export
-                          </DropdownToggle>
-                          <DropdownMenu>
-                            <DropdownItem 
-                              onClick={exportToCSV}
-                              style={{ backgroundColor: 'white', transition: 'background 0.2s' }}
-                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#e7f3ff'}
-                              onMouseOut={e => e.currentTarget.style.backgroundColor = 'white'}
-                            >
-                              <i className="ni ni-single-copy-04 mr-2" />
-                              Export to CSV
-                            </DropdownItem>
-                            <DropdownItem 
-                              onClick={exportToPDF}
-                              style={{ backgroundColor: 'white', transition: 'background 0.2s' }}
-                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#e7f3ff'}
-                              onMouseOut={e => e.currentTarget.style.backgroundColor = 'white'}
-                            >
-                              <i className="ni ni-pdf mr-2" />
-                              Export to PDF
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </UncontrolledDropdown>
-                      </div>
+                         <Button
+                           color="secondary"
+                           outline
+                           size="sm"
+                           onClick={fetchData}
+                           style={{ padding: '3px 10px', fontSize: '0.75rem', margin: 0 }}
+                         >
+                           <i className="ni ni-refresh mr-2" />
+                           Refresh
+                         </Button>
+                         <UncontrolledDropdown className="d-inline-block">
+                           <DropdownToggle color="info" outline size="sm" style={{ padding: '3px 10px', fontSize: '0.75rem', margin: 0 }}>
+                             <i className="ni ni-archive-2 mr-2" /> Export
+                           </DropdownToggle>
+                           <DropdownMenu>
+                             <DropdownItem 
+                               onClick={exportToCSV}
+                               style={{ backgroundColor: 'white', transition: 'background 0.2s' }}
+                               onMouseOver={e => e.currentTarget.style.backgroundColor = '#e7f3ff'}
+                               onMouseOut={e => e.currentTarget.style.backgroundColor = 'white'}
+                             >
+                               <i className="ni ni-single-copy-04 mr-2" />
+                               Export to CSV
+                             </DropdownItem>
+                             <DropdownItem 
+                               onClick={exportToPDF}
+                               style={{ backgroundColor: 'white', transition: 'background 0.2s' }}
+                               onMouseOver={e => e.currentTarget.style.backgroundColor = '#e7f3ff'}
+                               onMouseOut={e => e.currentTarget.style.backgroundColor = 'white'}
+                             >
+                               <i className="ni ni-pdf mr-2" />
+                               Export to PDF
+                             </DropdownItem>
+                           </DropdownMenu>
+                         </UncontrolledDropdown>
+                       </div>
                     </div>
                   </Col>
                 </Row>
@@ -904,25 +1072,25 @@ const AttendanceLog = () => {
                   </thead>
                   <tbody>
                     {paginatedData.length > 0 ? (
-                      paginatedData.map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <div className="d-flex align-items-center">
-                              <div
-                                className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
-                                style={{ width: 32, height: 32, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid #e9ecef' }}
-                              >
-                                <img 
-                                  src={getRandomAvatar(item.id)} 
-                                  alt={item.studentName} 
-                                  style={{ width: 32, height: 32, objectFit: 'cover' }} 
-                                />
-                              </div>
-                              <div>
-                                <div className="font-weight-bold">{item.studentName}</div>
-                              </div>
-                            </div>
-                          </td>
+                                             paginatedData.map((item) => (
+                         <tr key={item.id}>
+                           <td>
+                             <div className="d-flex align-items-center">
+                               <div
+                                 className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
+                                 style={{ width: 32, height: 32, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid #e9ecef' }}
+                               >
+                                 <img 
+                                   src={getRandomAvatar(item.id)} 
+                                   alt={item.studentName} 
+                                   style={{ width: 32, height: 32, objectFit: 'cover' }} 
+                                 />
+                               </div>
+                               <div>
+                                 <div className="font-weight-bold">{item.studentName}</div>
+                               </div>
+                             </div>
+                           </td>
                           <td>
                             <div className="font-weight-bold">{item.studentId}</div>
                           </td>
