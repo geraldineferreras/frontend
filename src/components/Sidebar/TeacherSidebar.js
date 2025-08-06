@@ -56,15 +56,9 @@ const teacherModules = [
   { name: "Dashboard", icon: "ni ni-tv-2 text-primary", path: "/index" },
   { name: "Classroom", icon: "ni ni-building text-success", path: "/classroom" },
   { name: "Video Conferencing", icon: "ni ni-camera-compact text-purple", path: "/video-conferencing" },
-  { name: "Announcement", icon: "ni ni-bell-55 text-info", path: "/announcement" },
-  { name: "Materials", icon: "ni ni-archive-2 text-orange", path: "/materials" },
-  { name: "Assignments", icon: "ni ni-bullet-list-67 text-red", path: "/assignments" },
-  { name: "Submissions", icon: "ni ni-send text-primary", path: "/submissions" },
   { name: "Attendance", icon: "ni ni-check-bold text-green", path: "/attendance" },
-  { name: "Recitation & Grades", icon: "ni ni-chart-bar-32 text-yellow", path: "/grades" },
   { name: "Excuse Management", icon: "ni ni-single-copy-04 text-pink", path: "/excuse-management" },
-  // Fast Grade module with custom icon
-  { name: "Fast Grade", icon: <FastGradeIcon style={{ marginRight: 8, verticalAlign: 'middle' }} />, path: "/fast-grade" },
+  { name: "Notifications", icon: "ni ni-notification-70 text-info", path: "/notifications" },
 ];
 
 const TeacherSidebar = (props) => {

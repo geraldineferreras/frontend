@@ -62,6 +62,7 @@ import AssignmentDetailStudent from "views/examples/AssignmentDetailStudent.js";
 import StudentAttendance from "views/examples/StudentAttendance.js";
 import StudentExcuseLetter from "views/examples/StudentExcuseLetter.js";
 import StudentNotifications from "views/examples/StudentNotifications.js";
+import TeacherNotifications from "views/examples/TeacherNotifications.js";
 import TeacherFastGrade from "views/examples/TeacherFastGrade.js";
 import TaskDetail from "views/examples/TaskDetail.js";
 import TestUserData from "views/examples/TestUserData.js";
@@ -339,6 +340,13 @@ var routes = [
     name: "Excuse Management",
     icon: "ni ni-single-copy-04 text-pink",
     component: <ExcuseManagement />,
+    layout: "/teacher",
+  },
+  {
+    path: "/notifications",
+    name: "Notifications",
+    icon: "ni ni-notification-70 text-info",
+    component: <TeacherNotifications />,
     layout: "/teacher",
   },
   {

@@ -1,57 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip } from "reactstrap";
-import Cropper from 'react-easy-crop';
-import getCroppedImg from './utils/cropImage';
-import { useAuth } from '../../contexts/AuthContext';
+import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip, Spinner, Alert } from "reactstrap";
 
-const mockClasses = [
-  {
-    name: "Object Oriented Programming",
-    section: "BSIT 3A",
-    subject: "Object Oriented Programming",
-    code: "B7P3R9",
-    semester: "1ST SEMESTER",
-    schoolYear: "2024-2025",
-    banner: "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    name: "Data Structures and Algorithms",
-    section: "BSIT 2B",
-    subject: "Data Structures and Algorithms",
-    code: "A1C2D3",
-    semester: "1ST SEMESTER",
-    schoolYear: "2024-2025",
-    banner: "https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    name: "Database Management Systems",
-    section: "BSIT 3C",
-    subject: "Database Management Systems",
-    code: "X9Y8Z7",
-    semester: "1ST SEMESTER",
-    schoolYear: "2024-2025",
-    banner: "https://images.unsplash.com/photo-1503676382389-4809596d5290?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    name: "SAD SUBJECT",
-    section: "BSIT 3C",
-    subject: "SAD SUBJECT",
-    code: "M7AGZY",
-    semester: "1ST SEMESTER",
-    schoolYear: "2024-2025",
-    banner: "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    name: "SAD 312",
-    section: "BSIT 3C",
-    subject: "SAD 312",
-    code: "5XHJE9",
-    semester: "1ST SEMESTER",
-    schoolYear: "2024-2025",
-    banner: "https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=800&q=80"
-  }
-];
+
+import { useAuth } from '../../contexts/AuthContext';
+import apiService from '../../services/api';
+
+// Mock data removed - now using real API data
 
 const mockPosts = [
   {
@@ -81,82 +36,82 @@ const mockPosts = [
 const mockAssignments = [
   {
     id: 7,
-    title: "Activity 7",
+    title: "Text Encryption Model Analysis",
     due: "Nov 29, 2024, 5:00 PM",
     posted: "Nov 11, 2024",
     status: "Graded",
-    description: "Draw and explain four levels of text encryption model; each level has different conditions or processes.",
-    instructions: "View instructions",
+    description: "Create a comprehensive analysis of text encryption models. You will need to research and document four different levels of encryption, explaining the processes and conditions for each level. Include diagrams and practical examples.",
+    instructions: "1. Research four different text encryption methods\n2. Create detailed diagrams for each level\n3. Explain the mathematical processes involved\n4. Provide real-world examples\n5. Submit as PDF with diagrams and explanations",
     expanded: true
   },
   {
     id: 5,
-    title: "Activity 5",
+    title: "Database Design Project",
     due: "Nov 29, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Nov 8, 2024",
+    status: "Assigned",
+    description: "Design a complete database system for a library management system. Include entity relationship diagrams, normalization analysis, and SQL queries for common operations.",
+    instructions: "Use any database design tool (MySQL Workbench, Lucidchart, etc.) to create ERD. Include at least 5 entities with proper relationships. Submit both the diagram and SQL scripts.",
     expanded: false
   },
   {
     id: 6,
-    title: "Activity 6",
+    title: "Algorithm Implementation",
     due: "Nov 16, 2024",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Nov 5, 2024",
+    status: "Assigned",
+    description: "Implement and compare three sorting algorithms: Bubble Sort, Quick Sort, and Merge Sort. Analyze their time complexity and performance characteristics.",
+    instructions: "Code in any programming language. Include performance analysis with different input sizes. Submit source code and analysis report.",
     expanded: false
   },
   {
     id: 8,
-    title: "Final Project",
+    title: "Final Capstone Project",
     due: "Dec 13, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Nov 1, 2024",
+    status: "Assigned",
+    description: "Develop a complete web application using the technologies learned throughout the semester. This is your opportunity to showcase all your skills in a real-world project.",
+    instructions: "Choose your own project idea. Must include frontend, backend, and database. Present your project to the class. Submit code, documentation, and presentation slides.",
     expanded: false
   },
   {
     id: 4,
-    title: "Activity 4",
+    title: "Object-Oriented Programming Lab",
     due: "Oct 30, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Oct 15, 2024",
+    status: "Graded",
+    description: "Practice object-oriented programming concepts by creating a simple banking system with classes for accounts, transactions, and customers.",
+    instructions: "Implement inheritance, polymorphism, and encapsulation. Include unit tests. Submit Java source files and test results.",
     expanded: false
   },
   {
     id: 2,
-    title: "Activity 2",
+    title: "Data Structures Quiz",
     due: "Sep 30, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Sep 20, 2024",
+    status: "Graded",
+    description: "Online quiz covering arrays, linked lists, stacks, and queues. Multiple choice and coding questions included.",
+    instructions: "Complete the quiz on the learning management system. You have 60 minutes to complete 25 questions.",
     expanded: false
   },
   {
     id: 3,
-    title: "Activity 3",
+    title: "Programming Fundamentals Review",
     due: "Sep 24, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Sep 15, 2024",
+    status: "Graded",
+    description: "Review assignment covering basic programming concepts including variables, loops, functions, and basic algorithms.",
+    instructions: "Complete the programming exercises in the provided template. Submit your solution files.",
     expanded: false
   },
   {
     id: 1,
-    title: "Activity 1",
+    title: "Course Introduction Survey",
     due: "Sep 17, 2024, 5:00 PM",
-    posted: "",
-    status: "",
-    description: "",
-    instructions: "",
+    posted: "Sep 10, 2024",
+    status: "Graded",
+    description: "Complete the course introduction survey to help us understand your background and learning goals.",
+    instructions: "Fill out the online survey with your programming experience and course expectations.",
     expanded: false
   }
 ];
@@ -234,24 +189,7 @@ function formatRelativeTime(dateString) {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-const themes = [
-  { name: "Blue Gradient", value: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", type: "Color Theme" },
-  { name: "Purple Gradient", value: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", type: "Color Theme" },
-  { name: "Green Gradient", value: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", type: "Color Theme" },
-  { name: "Orange Gradient", value: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)", type: "Color Theme" },
-  { name: "Pink Gradient", value: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)", type: "Color Theme" },
-  { name: "Aqua Gradient", value: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", type: "Color Theme" },
-  { name: "Sunset", value: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)", type: "Color Theme" },
-  { name: "Deep Blue", value: "linear-gradient(135deg, #232526 0%, #414345 100%)", type: "Color Theme" },
-  { name: "Classroom SVG", value: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDQwMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iMzAiIHk9IjMwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjUwIiByeD0iOCIgZmlsbD0iIzQ0NGI1YSIvPjxyZWN0IHg9IjUwIiB5PSI4MCIgd2lkdGg9IjgwIiBoZWlnaHQ9IjEyIiByeD0iMyIgZmlsbD0iI2U5NzZkMiIvPjxyZWN0IHg9IjE3MCIgeT0iNjAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCIgcng9IjQiIGZpbGw9IiMzOWY5ZjEiLz48cmVjdCB4PSIyMzAiIHk9IjgwIiB3aWR0aD0iNTAiIGhlaWdodD0iMTAiIHJ4PSIyIiBmaWxsPSIjMTk3NmQyIi8+PHJlY3QgeD0iMjQwIiB5PSI2MCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjE1IiByeD0iMiIgZmlsbD0iI2Y5ZGM1YyIvPjxyZWN0IHg9IjMyMCIgeT0iNDAiIHdpZHRoPSI1MCIgaGVpZ2h0PSIzNSIgcng9IjUiIGZpbGw9IiM0NDRiNWEiLz48cmVjdCB4PSIzMzAiIHk9IjcwIiB3aWR0aD0iMzAiIGhlaWdodD0iNyIgcng9IjIiIGZpbGw9IiMxOTc2ZDIiLz48cmVjdCB4PSIzNDAiIHk9IjUwIiB3aWR0aD0iMjAiIGhlaWdodD0iMTAiIHJ4PSIyIiBmaWxsPSIjZjlkYzVjIi8+PC9zdmc+')", type: "SVG Theme" },
-  { name: "Books SVG", value: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDQwMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iNjAiIHk9IjYwIiB3aWR0aD0iMzAiIGhlaWdodD0iNDAiIHJ4PSI2IiBmaWxsPSIjNGNhZjUwIi8+PHJlY3QgeD0iMTAwIiB5PSI3MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjMwIiByeD0iNCIgZmlsbD0iI2Y5ZGM1YyIvPjxyZWN0IHg9IjE0MCIgeT0iODAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCIgcng9IjQiIGZpbGw9IiMxOTc2ZDIiLz48L3N2Zz4=')", type: "SVG Theme" },
-  { name: "Night Sky", value: "url('https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=600&q=80')", type: "Photo" },
-  { name: "Books Image", value: "url('https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=600&q=80')", type: "Photo" },
-  { name: "Mountains", value: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80')", type: "Photo" },
-  { name: "Classroom", value: "url('https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=600&q=80')", type: "Photo" },
-  { name: "Abstract", value: "url('https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=600&q=80')", type: "Photo" },
-  { name: "Notebook", value: "url('https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=600&q=80')", type: "Photo" }
-];
+
 
 const ClassroomDetailStudent = () => {
   const { code } = useParams();
@@ -263,7 +201,8 @@ const ClassroomDetailStudent = () => {
   const [gradeFilter, setGradeFilter] = useState("All");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedGradeId, setExpandedGradeId] = useState(7);
-  const currentClass = mockClasses.find(cls => cls.code === code) || mockClasses[0];
+  const [currentClass, setCurrentClass] = useState(null);
+  const [loadingClass, setLoadingClass] = useState(true);
   const [studentAnnouncement, setStudentAnnouncement] = useState("");
   const [studentAnnouncements, setStudentAnnouncements] = useState([]);
   const [formExpanded, setFormExpanded] = useState(false);
@@ -298,21 +237,8 @@ const ClassroomDetailStudent = () => {
     "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟"
   ];
 
-  const [selectedTheme, setSelectedTheme] = useState(() => {
-    const key = `classroom_theme_${code}`;
-    return localStorage.getItem(key) || themes[0].value;
-  });
-  const [showThemeModal, setShowThemeModal] = useState(false);
-  const [customTheme, setCustomTheme] = useState(() => {
-    const key = `classroom_custom_theme_${code}`;
-    return localStorage.getItem(key) || null;
-  });
-  const [cropModalOpen, setCropModalOpen] = useState(false);
-  const [cropImage, setCropImage] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [minZoom, setMinZoom] = useState(1);
+
+
   const [copied, setCopied] = useState(false);
   const [tooltipHover, setTooltipHover] = useState(false);
   // Add preview modal state and handler at the top of the component
@@ -400,80 +326,13 @@ const ClassroomDetailStudent = () => {
   }
   if (!loggedInName) loggedInName = 'You';
 
-  useEffect(() => {
-    if (!cropImage) return;
-    const img = new window.Image();
-    img.onload = () => {
-      const aspect = 3.5 / 1;
-      const imgAspect = img.width / img.height;
-      let minZoomValue = 1;
-      if (imgAspect > aspect) {
-        minZoomValue = aspect / imgAspect;
-      } else {
-        minZoomValue = imgAspect / aspect;
-      }
-      setMinZoom(Math.max(1, minZoomValue));
-    };
-    img.src = cropImage;
-  }, [cropImage]);
 
-  const handleSelectTheme = (themeValue) => {
-    setSelectedTheme(themeValue);
-    localStorage.setItem(`classroom_theme_${code}`, themeValue);
-    setShowThemeModal(false);
-  };
 
-  const handleUploadPhoto = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new window.Image();
-        img.onload = () => {
-          const maxDim = 2000;
-          let { width, height } = img;
-          if (width > maxDim || height > maxDim) {
-            const scale = Math.min(maxDim / width, maxDim / height);
-            width = Math.round(width * scale);
-            height = Math.round(height * scale);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const safeDataUrl = canvas.toDataURL('image/png');
-          setCropImage(safeDataUrl);
-          setCropModalOpen(true);
-        };
-        img.onerror = () => {
-          alert('Failed to load image for re-encoding.');
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const onCropComplete = (croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  };
 
-  const handleCropSave = async () => {
-    if (!croppedAreaPixels) {
-      alert('Crop area not set. Please move or resize the crop box.');
-      return;
-    }
-    try {
-      const croppedImg = await getCroppedImg(cropImage, croppedAreaPixels);
-      setShowThemeModal(false);
-      setCropModalOpen(false);
-      setCropImage(null);
-      handleSelectTheme(croppedImg);
-    } catch (e) {
-      alert('Failed to crop image');
-    }
-  };
+
+
+
 
   // Close emoji picker on outside click
   useEffect(() => {
@@ -875,12 +734,218 @@ const ClassroomDetailStudent = () => {
     setAttachments(prev => prev.filter((_, i) => i !== idx));
   }
 
+  const [realAssignments, setRealAssignments] = useState([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [assignmentsError, setAssignmentsError] = useState(null);
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
+  
+  // People tab state
+  const [peopleData, setPeopleData] = useState(null);
+  const [loadingPeople, setLoadingPeople] = useState(false);
+  const [peopleError, setPeopleError] = useState(null);
+  
+  // Grades tab state
+  const [gradesData, setGradesData] = useState(null);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [gradesError, setGradesError] = useState(null);
+
+  // Fetch the current class data based on the URL parameter
+  useEffect(() => {
+    const fetchCurrentClass = async () => {
+      setLoadingClass(true);
+      try {
+        const response = await apiService.getStudentClasses();
+        
+        if (response.status && response.data && Array.isArray(response.data)) {
+          const enrolled = response.data.filter(cls => cls.is_enrolled === true);
+          
+          // Find the class that matches the URL parameter (code)
+          let targetClass = null;
+          
+          // First try to find by class_code
+          targetClass = enrolled.find(cls => cls.class_code === code);
+          
+          // If not found by class_code, try to find by class_id (if code is numeric)
+          if (!targetClass && /^\d+$/.test(code)) {
+            targetClass = enrolled.find(cls => cls.class_id == code);
+          }
+          
+          // If still not found, use the first enrolled class
+          if (!targetClass && enrolled.length > 0) {
+            targetClass = enrolled[0];
+          }
+          
+          if (targetClass) {
+            const classData = {
+              id: targetClass.class_id,
+              name: `${targetClass.subject_name} (${targetClass.section_name})`,
+              section: targetClass.section_name,
+              subject: targetClass.subject_name,
+              code: targetClass.class_code || targetClass.class_id,
+              semester: targetClass.semester,
+              schoolYear: targetClass.school_year,
+              teacherName: targetClass.teacher_name
+            };
+            setCurrentClass(classData);
+            console.log('Current class loaded:', classData);
+          } else {
+            console.error('No matching class found for code:', code);
+            setCurrentClass(null);
+          }
+        } else {
+          console.error('Invalid response format for enrolled classes');
+          setCurrentClass(null);
+        }
+      } catch (error) {
+        console.error('Error fetching current class:', error);
+        setCurrentClass(null);
+      } finally {
+        setLoadingClass(false);
+      }
+    };
+    
+    fetchCurrentClass();
+  }, [code]);
+
+  // Fetch real assignments for Classwork tab
+  useEffect(() => {
+    console.log('useEffect triggered - activeTab:', activeTab, 'code:', code, 'currentClass.code:', currentClass?.code);
+    console.log('Current URL:', window.location.href);
+    
+    if (activeTab === 'classwork') {
+      console.log('Classwork tab is active');
+      setLoadingAssignments(true);
+      setAssignmentsError(null);
+      
+      // First, fetch the student's enrolled classes to get the correct class codes
+      apiService.getStudentClasses()
+        .then(response => {
+          console.log('Enrolled Classes Response:', response);
+          if (response.status && response.data && Array.isArray(response.data)) {
+            const enrolled = response.data.filter(cls => cls.is_enrolled === true);
+            setEnrolledClasses(enrolled);
+            console.log('Enrolled classes:', enrolled);
+            
+            // Use the current class code from the URL parameter
+            const classCode = currentClass ? currentClass.code : code;
+            console.log('Using class code:', classCode, 'from current class:', currentClass);
+            
+            // Now fetch assignments for this class using API service
+            return apiService.get(`/tasks/student/assigned?class_code=${classCode}`);
+          } else {
+            throw new Error('Invalid response format for enrolled classes');
+          }
+        })
+        .then(response => {
+          console.log('Assignments API Response:', response);
+          // Handle the nested data structure from your API
+          if (response.status && response.data && Array.isArray(response.data)) {
+            console.log('Setting assignments from response.data:', response.data);
+            setRealAssignments(response.data);
+          } else if (Array.isArray(response)) {
+            console.log('Setting assignments from response array:', response);
+            setRealAssignments(response);
+          } else {
+            console.log('No valid assignments data found, setting empty array');
+            setRealAssignments([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching data:', err);
+          setAssignmentsError('Failed to fetch assignments');
+          setRealAssignments([]);
+        })
+        .finally(() => setLoadingAssignments(false));
+    }
+  }, [activeTab, code, currentClass]);
+
+  // Fetch people data for People tab
+  useEffect(() => {
+    if (activeTab === 'people' && currentClass) {
+      console.log('People tab is active, fetching people data for class:', currentClass.code);
+      setLoadingPeople(true);
+      setPeopleError(null);
+      
+      apiService.get(`/student/classroom/${currentClass.code}/people`)
+        .then(response => {
+          console.log('People API Response:', response);
+          if (response.status && response.data) {
+            setPeopleData(response.data);
+          } else {
+            setPeopleError('Failed to load people data');
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching people data:', err);
+          setPeopleError('Failed to load people data');
+        })
+        .finally(() => setLoadingPeople(false));
+    }
+  }, [activeTab, currentClass]);
+
+  // Fetch grades data for Grades tab
+  useEffect(() => {
+    if (activeTab === 'grades' && currentClass) {
+      console.log('Grades tab is active, fetching grades data for class:', currentClass.code);
+      setLoadingGrades(true);
+      setGradesError(null);
+      
+      apiService.get(`/student/grades?class_code=${currentClass.code}`)
+        .then(response => {
+          console.log('Grades API Response:', response);
+          if (response.status && response.data) {
+            setGradesData(response.data);
+          } else {
+            setGradesError('Failed to load grades data');
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching grades data:', err);
+          setGradesError('Failed to load grades data');
+        })
+        .finally(() => setLoadingGrades(false));
+    }
+  }, [activeTab, currentClass]);
+
+  // Show loading state while fetching class data
+  if (loadingClass) {
+    return (
+      <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
+        <div className="container py-4">
+          <div className="text-center py-5">
+            <Spinner color="primary" size="lg" />
+            <h4 className="mt-3 text-muted">Loading class details...</h4>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if no class found
+  if (!currentClass) {
+    return (
+      <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
+        <div className="container py-4">
+          <div className="text-center py-5">
+            <i className="ni ni-books text-muted" style={{ fontSize: "4rem" }}></i>
+            <h4 className="mt-3 text-muted">Class not found</h4>
+            <p className="text-muted">The class you're looking for doesn't exist or you're not enrolled.</p>
+            <Button color="primary" size="lg" onClick={() => navigate('/student/classroom')}>
+              <i className="ni ni-fat-add mr-2"></i>
+              Back to Classes
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
       {/* Banner */}
       <div style={{
         borderRadius: 18,
-        background: selectedTheme && selectedTheme.startsWith('data:image') ? `url('${selectedTheme}')` : selectedTheme,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: "#fff",
         minHeight: 170,
         boxShadow: "0 4px 24px rgba(44,62,80,0.13)",
@@ -896,17 +961,6 @@ const ClassroomDetailStudent = () => {
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
       }}>
-        {selectedTheme && (selectedTheme.startsWith('url(') || selectedTheme.startsWith('data:image')) && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.38)',
-            zIndex: 1
-          }} />
-        )}
         <div style={{ position: 'relative', zIndex: 2 }}>
           <h1 style={{
             fontWeight: 800,
@@ -956,185 +1010,13 @@ const ClassroomDetailStudent = () => {
             <Badge color="light" className="text-dark">{currentClass.schoolYear}</Badge>
           </div>
         </div>
-        <div className="d-flex flex-column align-items-end" style={{ minWidth: 160, position: 'relative', zIndex: 2 }}>
-          <Button 
-            color="link" 
-            style={{ color: '#fff', fontWeight: 400, fontSize: 13, padding: 0, marginBottom: 4, textDecoration: 'none' }} 
-            onClick={() => setShowThemeModal(true)}
-          >
-            Select theme
-          </Button>
-          <Button 
-            color="link" 
-            style={{ color: '#fff', fontWeight: 400, fontSize: 13, padding: 0, textDecoration: 'none' }} 
-            onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          >
-            Upload photo
-          </Button>
-          <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleUploadPhoto} />
-        </div>
+
         <svg viewBox="0 0 1440 60" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 60 }} xmlns="http://www.w3.org/2000/svg">
           <path fill="#fff" fillOpacity="1" d="M0,32L48,37.3C96,43,192,53,288,49.3C384,45,480,27,576,21.3C672,16,768,32,864,37.3C960,43,1056,27,1152,21.3C1248,16,1344,32,1392,40.7L1440,48L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
         </svg>
       </div>
-      {/* Theme Selection Modal */}
-      <Modal isOpen={showThemeModal} toggle={() => setShowThemeModal(false)} centered size="lg">
-        <ModalHeader toggle={() => setShowThemeModal(false)} style={{ border: 'none' }}>Select a Theme</ModalHeader>
-        <ModalBody>
-          {customTheme && (
-            <div
-              key="custom-photo"
-              onClick={() => handleSelectTheme(customTheme)}
-              style={{
-                width: '100%',
-                height: 120,
-                borderRadius: 14,
-                cursor: 'pointer',
-                border: selectedTheme === customTheme ? '3px solid #007bff' : '2px solid #eee',
-                backgroundImage: `url('${customTheme}')`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'relative',
-                boxShadow: selectedTheme === customTheme ? '0 2px 12px rgba(44,62,80,0.15)' : 'none',
-                transition: 'border 0.2s, box-shadow 0.2s',
-                display: 'flex',
-                alignItems: 'flex-end',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                marginBottom: 24
-              }}
-              title="Custom Photo"
-            >
-              <span style={{
-                background: 'rgba(0,0,0,0.32)',
-                borderRadius: 8,
-                padding: '2px 10px',
-                margin: 8,
-                marginBottom: 10,
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 14,
-                position: 'absolute',
-                left: 8,
-                bottom: 8,
-                maxWidth: '90%',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.10)'
-              }}>Custom Photo</span>
-            </div>
-          )}
-          {(() => {
-            const groupedThemes = themes.reduce((acc, theme) => {
-              if (!acc[theme.type]) {
-                acc[theme.type] = [];
-              }
-              acc[theme.type].push(theme);
-              return acc;
-            }, {});
 
-            return Object.entries(groupedThemes).map(([type, themeList]) => (
-              <div key={type} style={{ marginBottom: 32 }}>
-                <h6 style={{
-                  color: '#8a98a8',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  marginBottom: 12,
-                  marginTop: 18,
-                  paddingBottom: 0,
-                  textTransform: 'uppercase',
-                  letterSpacing: 1.2,
-                  background: 'none',
-                  border: 'none',
-                  boxShadow: 'none',
-                  fontFamily: 'inherit',
-                  lineHeight: 1.2
-                }}>
-                  {type}
-                </h6>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
-                  {themeList.map((theme) => {
-                    const isGradient = theme.value.startsWith('linear-gradient');
-                    const isImage = theme.value.startsWith('url');
-                    return (
-                      <div
-                        key={theme.name}
-                        onClick={() => handleSelectTheme(theme.value)}
-                        style={{
-                          minWidth: 180,
-                          maxWidth: 220,
-                          height: 70,
-                          borderRadius: 14,
-                          cursor: 'pointer',
-                          border: selectedTheme === theme.value ? '3px solid #007bff' : '2px solid #eee',
-                          ...(isGradient ? { background: theme.value } : {}),
-                          ...(isImage ? { backgroundImage: theme.value } : {}),
-                          backgroundSize: '110%',
-                          backgroundPosition: 'center',
-                          position: 'relative',
-                          boxShadow: selectedTheme === theme.value ? '0 2px 12px rgba(44,62,80,0.15)' : 'none',
-                          transition: 'border 0.2s, box-shadow 0.2s',
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          marginBottom: 0
-                        }}
-                        title={theme.name}
-                      >
-                        <span style={{
-                          background: 'rgba(0,0,0,0.32)',
-                          borderRadius: 8,
-                          padding: '2px 10px',
-                          margin: 8,
-                          marginBottom: 10,
-                          color: '#fff',
-                          fontWeight: 600,
-                          fontSize: 14,
-                          position: 'absolute',
-                          left: 8,
-                          bottom: 8,
-                          maxWidth: '90%',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.10)'
-                        }}>{theme.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ));
-          })()}
-        </ModalBody>
-      </Modal>
-      {/* Crop Modal */}
-      <Modal isOpen={cropModalOpen} toggle={() => setCropModalOpen(false)} centered size="lg">
-        <ModalHeader toggle={() => setCropModalOpen(false)} style={{ border: 'none' }}>Crop Photo</ModalHeader>
-        <ModalBody>
-          {cropImage && (
-            <div style={{ position: 'relative', width: '100%', height: 320, background: '#222', borderRadius: 16, overflow: 'hidden' }}>
-              <Cropper
-                image={cropImage}
-                crop={crop}
-                zoom={zoom}
-                aspect={3.5 / 1}
-                minZoom={minZoom}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={onCropComplete}
-                cropShape="rect"
-                showGrid={false}
-              />
-            </div>
-          )}
-          <div className="d-flex justify-content-end mt-3">
-            <Button color="primary" onClick={handleCropSave}>Save</Button>
-          </div>
-        </ModalBody>
-      </Modal>
+
       {/* Tabs */}
       <div style={{ maxWidth: 1100, margin: '0 auto', marginTop: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px 0 rgba(44,62,80,.06)', padding: '0 24px', height: 56 }}>
@@ -2048,221 +1930,1048 @@ const ClassroomDetailStudent = () => {
       )}
       {/* Classwork Section */}
       {activeTab === "classwork" && (
-        <div style={{ maxWidth: 700, margin: '32px auto 0' }}>
-          {mockAssignments.map(a => (
-            <div key={a.id} style={{ marginBottom: 18 }}>
-              {expandedId === a.id ? (
-                <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px 0 rgba(44,62,80,.10)', border: '1px solid #eee', padding: 0, overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', padding: '18px 24px 0 24px' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 18 }}>
-                      <i className="ni ni-single-copy-04" style={{ fontSize: 24, color: '#888' }} />
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 17 }}>{a.title}</div>
-                    <div style={{ flex: 1 }} />
-                    <div style={{ color: '#888', fontSize: 14, fontWeight: 500 }}>Due {a.due}</div>
-                    <i className="ni ni-bold-down" style={{ fontSize: 20, color: '#888', marginLeft: 18, cursor: 'pointer' }} onClick={() => setExpandedId(null)} />
-                    <i className="ni ni-button-power" style={{ fontSize: 20, color: '#888', marginLeft: 12, cursor: 'pointer', opacity: 0.3 }} />
-                  </div>
-                  <div style={{ padding: '0 24px 0 86px', color: '#888', fontSize: 13, marginTop: 8, display: 'flex', alignItems: 'center' }}>
-                    <span>Posted {a.posted}</span>
-                    <span style={{ marginLeft: 'auto', color: '#4caf50', fontWeight: 600 }}>{a.status}</span>
-                  </div>
-                  <div style={{ padding: '12px 24px 0 86px', fontSize: 15, color: '#444' }}>{a.description}</div>
-                  <div style={{ padding: '12px 24px 12px 86px', borderTop: '1px solid #eee', background: '#fafbfc', fontSize: 15, color: '#1976d2', fontWeight: 600, cursor: 'pointer' }}
-                    onClick={() => navigate(`/student/classroom/${code}/assignment/${a.id}`)}
-                  >
-                    {a.instructions}
-                  </div>
+        <div style={{ maxWidth: 900, margin: '32px auto 0' }}>
+          {/* Stats Cards */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+            borderRadius: 20, 
+            padding: '32px 40px', 
+            position: 'relative',
+            overflow: 'hidden',
+            marginBottom: '32px'
+          }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', transform: 'translate(50%, -50%)' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: '20%', width: '100px', height: '100px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%' }} />
+            <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 24, justifyContent: 'center' }}>
+              <div style={{ 
+                background: 'rgba(255,255,255,0.15)', 
+                padding: '16px 24px', 
+                borderRadius: 12,
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 24 }}>{loadingAssignments ? '...' : realAssignments.length}</div>
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Total Assignments</div>
+              </div>
+              <div style={{ 
+                background: 'rgba(255,255,255,0.15)', 
+                padding: '16px 24px', 
+                borderRadius: 12,
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 24 }}>
+                  {loadingAssignments ? '...' : realAssignments.filter(a => {
+                    // Check for submission status first
+                    let status = 'pending';
+                    if (a.submission) {
+                      status = a.submission.status || 'submitted';
+                    } else if (a.submission_status) {
+                      status = a.submission_status;
+                    }
+                    
+                    const normalizedStatus = status.toLowerCase().trim();
+                    return normalizedStatus === 'submitted' || normalizedStatus === 'graded';
+                  }).length}
                 </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #eee', background: 'none', cursor: 'pointer' }} onClick={() => setExpandedId(a.id)}>
-                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 18 }}>
-                    <i className="ni ni-single-copy-04" style={{ fontSize: 20, color: '#888' }} />
-                  </div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
-                  <div style={{ flex: 1 }} />
-                  <div style={{ color: '#888', fontSize: 14, fontWeight: 500 }}>{a.due ? `Due ${a.due}` : ''}</div>
-                  <i className="ni ni-bold-up" style={{ fontSize: 18, color: '#888', marginLeft: 18, cursor: 'pointer', opacity: 0.7 }} />
-                  <i className="ni ni-button-power" style={{ fontSize: 18, color: '#888', marginLeft: 12, cursor: 'pointer', opacity: 0.2 }} />
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Completed</div>
+              </div>
+              <div style={{ 
+                background: 'rgba(255,255,255,0.15)', 
+                padding: '16px 24px', 
+                borderRadius: 12,
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 24 }}>
+                  {loadingAssignments ? '...' : realAssignments.filter(a => {
+                    // Check for submission status first
+                    let status = 'pending';
+                    if (a.submission) {
+                      status = a.submission.status || 'submitted';
+                    } else if (a.submission_status) {
+                      status = a.submission_status;
+                    }
+                    
+                    const normalizedStatus = status.toLowerCase().trim();
+                    return normalizedStatus !== 'submitted' && normalizedStatus !== 'graded';
+                  }).length}
                 </div>
-              )}
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Pending</div>
+              </div>
             </div>
-          ))}
+            {assignmentsError && <div style={{ color: '#fff', marginTop: 16, textAlign: 'center', fontWeight: 500 }}>{assignmentsError}</div>}
+          </div>
+
+          {/* Assignments List */}
+          {loadingAssignments ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <Spinner color="primary" size="lg" />
+              <h4 className="mt-3 text-muted">Loading assignments...</h4>
+            </div>
+          ) : realAssignments.length > 0 ? (
+            <div>
+              <h3 style={{ 
+                fontWeight: 600, 
+                fontSize: '24px', 
+                marginBottom: '24px', 
+                color: '#212529',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <i className="ni ni-single-copy-04" style={{ marginRight: '12px', color: '#6c757d' }} />
+                Your Assignments
+              </h3>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {realAssignments.map((assignment, index) => {
+                  // Debug: Log the assignment object structure
+                  console.log(`Assignment ${index + 1}:`, assignment);
+                  
+                  return (
+                  <div key={assignment.id || index} style={{
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    border: '1px solid #e9ecef',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    ':hover': {
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                          <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            background: '#f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: '12px',
+                            border: '2px solid #e9ecef'
+                          }}>
+                            <i className="ni ni-single-copy-04" style={{ fontSize: '20px', color: '#6c757d' }} />
+                          </div>
+                          <div>
+                            <h4 style={{
+                              fontWeight: 600,
+                              fontSize: '18px',
+                              margin: '0 0 4px 0',
+                              color: '#212529'
+                            }}>
+                              {assignment.title || assignment.task_title || `Assignment ${index + 1}`}
+                            </h4>
+                            <div style={{ fontSize: '14px', color: '#6c757d' }}>
+                              Posted {assignment.created_at ? new Date(assignment.created_at).toLocaleDateString() : 'Recently'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {assignment.description && (
+                          <div style={{
+                            fontSize: '14px',
+                            color: '#495057',
+                            lineHeight: 1.5,
+                            marginBottom: '16px',
+                            padding: '12px',
+                            background: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            {assignment.description}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                          {assignment.due_date && (
+                            <div style={{ display: 'flex', alignItems: 'center', fontSize: '13px', color: '#6c757d' }}>
+                              <i className="ni ni-time-alarm" style={{ marginRight: '6px' }} />
+                              Due {new Date(assignment.due_date).toLocaleDateString()}
+                            </div>
+                          )}
+                          
+                          <Badge style={{
+                            background: (() => {
+                              // Check for submission status first
+                              let status = 'pending';
+                              if (assignment.submission) {
+                                status = assignment.submission.status || 'submitted';
+                              } else if (assignment.submission_status) {
+                                status = assignment.submission_status;
+                              }
+                              
+                              const normalizedStatus = status.toLowerCase().trim();
+                              if (normalizedStatus === 'graded') return '#d4edda'; // Green for graded
+                              if (normalizedStatus === 'submitted') return '#d4edda'; // Green for submitted
+                              return '#fff3cd'; // Yellow for pending
+                            })(),
+                            color: (() => {
+                              // Check for submission status first
+                              let status = 'pending';
+                              if (assignment.submission) {
+                                status = assignment.submission.status || 'submitted';
+                              } else if (assignment.submission_status) {
+                                status = assignment.submission_status;
+                              }
+                              
+                              const normalizedStatus = status.toLowerCase().trim();
+                              if (normalizedStatus === 'graded') return '#155724'; // Dark green for graded
+                              if (normalizedStatus === 'submitted') return '#155724'; // Dark green for submitted
+                              return '#856404'; // Dark yellow for pending
+                            })(),
+                            borderRadius: '20px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            fontWeight: 600
+                          }}>
+                            {(() => {
+                              // Check for submission status first
+                              let status = 'pending';
+                              if (assignment.submission) {
+                                status = assignment.submission.status || 'submitted';
+                              } else if (assignment.submission_status) {
+                                status = assignment.submission_status;
+                              }
+                              
+                              const normalizedStatus = status.toLowerCase().trim();
+                              if (normalizedStatus === 'graded') return '🏆 Graded';
+                              if (normalizedStatus === 'submitted') return '✅ Submitted';
+                              return '⏳ Pending';
+                            })()}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        color="primary"
+                        size="sm"
+                        style={{
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          padding: '8px 16px',
+                          fontSize: '13px'
+                        }}
+                        onClick={() => {
+                          console.log('Clicking View Details for assignment:', assignment);
+                          console.log('Assignment ID field:', assignment.id);
+                          console.log('Assignment task_id field:', assignment.task_id);
+                          console.log('All assignment fields:', Object.keys(assignment));
+                          
+                          // Try to use the task_id if available, otherwise use id
+                          const taskId = assignment.task_id || assignment.id;
+                          if (taskId && taskId !== 'unknown') {
+                            navigate(`/student/classroom/${code}/assignment/${taskId}`);
+                          } else {
+                            console.error('No valid task ID found for assignment:', assignment);
+                            alert('Unable to load assignment details. Please try again.');
+                          }
+                        }}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e9ecef'
+            }}>
+              <i className="ni ni-single-copy-04" style={{ fontSize: '4rem', color: '#dee2e6', marginBottom: '16px' }} />
+              <h4 style={{ color: '#6c757d', marginBottom: '8px' }}>No assignments yet</h4>
+              <p style={{ color: '#6c757d', fontSize: '14px' }}>Your teacher hasn't posted any assignments for this class.</p>
+            </div>
+          )}
         </div>
       )}
       {/* People Section */}
       {activeTab === "people" && (
-        <div style={{ maxWidth: 700, margin: '32px auto 0', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px 0 rgba(44,62,80,.06)', padding: 32 }}>
-          {/* Teachers Section */}
-          <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 8 }}>Teachers</div>
-          <hr style={{ margin: '0 0 18px 0', borderColor: '#eee' }} />
-          {teachers.map((teacher, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
-              {teacher.avatar ? (
-                <img src={teacher.avatar} alt={teacher.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginRight: 18 }} />
-              ) : (
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#673ab7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 20, marginRight: 18 }}>
-                  {teacher.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </div>
-              )}
-              <span style={{ fontSize: 16, fontWeight: 500 }}>{teacher.name}</span>
+        <div style={{ maxWidth: 1100, margin: '32px auto 0' }}>
+          {loadingPeople ? (
+            <div style={{ textAlign: 'center', padding: '60px' }}>
+              <Spinner color="primary" size="lg" />
+              <div style={{ marginTop: '16px', color: '#6c757d', fontSize: '18px' }}>Loading people...</div>
             </div>
-          ))}
+          ) : peopleError ? (
+            <Alert color="danger" style={{ margin: '32px auto', maxWidth: 1100 }}>
+              <h4>Error Loading People</h4>
+              <p>{peopleError}</p>
+            </Alert>
+          ) : peopleData ? (
+            <>
+              {/* Top Stats Banner */}
+              <div style={{
+                background: '#f8f9fa',
+                borderRadius: '20px',
+                padding: '24px 32px',
+                marginBottom: '32px',
+                border: '1px solid #dee2e6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    <i className="ni ni-single-02" style={{ fontSize: '28px', color: '#6c757d' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500, marginBottom: '4px' }}>
+                      Total Class Members
+                    </div>
+                    <div style={{ fontSize: '32px', fontWeight: 700, color: '#212529' }}>
+                      {peopleData.statistics?.total_members || 0}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '32px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
+                      {peopleData.statistics?.total_teachers || 0}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
+                      Teachers
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
+                      {peopleData.statistics?.total_students || 0}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
+                      Students
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          {/* Classmates Section */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 36 }}>
-            <div style={{ fontWeight: 700, fontSize: 28 }}>Classmates</div>
-            <div style={{ color: '#555', fontWeight: 500, fontSize: 15 }}>{classmates.length} students</div>
-          </div>
-          <hr style={{ margin: '0 0 18px 0', borderColor: '#eee' }} />
-          {classmates.map((student, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 18 }}>
-              {student.avatar ? (
-                <img src={student.avatar} alt={student.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginRight: 18 }} />
-              ) : (
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#512da8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 20, marginRight: 18 }}>
-                  {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </div>
-              )}
-              <span style={{ fontSize: 16, fontWeight: 500 }}>{student.name}</span>
+              {/* Main Content Grid */}
+              <Row>
+                {/* Teachers Column */}
+                <Col lg={4}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    border: '1px solid #e9ecef',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                    padding: '28px',
+                    height: 'fit-content'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginBottom: '24px',
+                      paddingBottom: '16px',
+                      borderBottom: '2px solid #f8f9fa'
+                    }}>
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        background: '#e9ecef',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: '16px'
+                      }}>
+                        <i className="ni ni-single-02" style={{ fontSize: '20px', color: '#6c757d' }} />
+                      </div>
+                      <div>
+                        <h3 style={{
+                          fontWeight: 700,
+                          fontSize: '20px',
+                          margin: 0,
+                          color: '#212529'
+                        }}>
+                          Teaching Staff
+                        </h3>
+                        <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
+                          Course Instructors
+                        </div>
+                      </div>
+                    </div>
+                    {peopleData.teacher && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '16px',
+                        background: '#f8f9fa',
+                        borderRadius: '16px',
+                        marginBottom: '12px',
+                        border: '1px solid #e9ecef',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '4px',
+                          height: '100%',
+                          background: '#dee2e6'
+                        }} />
+                        {peopleData.teacher.profile_pic ? (
+                          <img
+                            src={(() => {
+                              let imageUrl;
+                              if (peopleData.teacher.profile_pic.startsWith('uploads/')) {
+                                imageUrl = `http://localhost/scms_new_backup/${peopleData.teacher.profile_pic}`;
+                              } else if (peopleData.teacher.profile_pic.startsWith('http://') || peopleData.teacher.profile_pic.startsWith('https://')) {
+                                imageUrl = peopleData.teacher.profile_pic;
+                              } else if (peopleData.teacher.profile_pic.startsWith('data:')) {
+                                imageUrl = peopleData.teacher.profile_pic;
+                              } else {
+                                imageUrl = `http://localhost/scms_new_backup/uploads/profile/${peopleData.teacher.profile_pic}`;
+                              }
+                              return imageUrl;
+                            })()}
+                            alt={peopleData.teacher.full_name}
+                            style={{
+                              width: '52px',
+                              height: '52px',
+                              borderRadius: '14px',
+                              objectFit: 'cover',
+                              marginRight: '16px',
+                              border: '2px solid #e9ecef',
+                              marginLeft: '8px'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '14px',
+                            background: '#e9ecef',
+                            color: '#6c757d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: '18px',
+                            marginRight: '16px',
+                            marginLeft: '8px'
+                          }}>
+                            {peopleData.teacher.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#212529',
+                            marginBottom: '4px'
+                          }}>
+                            {peopleData.teacher.full_name}
+                          </div>
+                          <div style={{
+                            fontSize: '13px',
+                            color: '#6c757d',
+                            fontWeight: 500
+                          }}>
+                            {peopleData.teacher.role}
+                          </div>
+                        </div>
+                        <div style={{
+                          background: '#d4edda',
+                          color: '#155724',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}>
+                          {peopleData.teacher.status}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+
+                {/* Students Column */}
+                <Col lg={8}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    border: '1px solid #e9ecef',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                    padding: '28px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '24px',
+                      paddingBottom: '16px',
+                      borderBottom: '2px solid #f8f9fa'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: '12px',
+                          background: '#e9ecef',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: '16px'
+                        }}>
+                          <i className="ni ni-single-02" style={{ fontSize: '20px', color: '#6c757d' }} />
+                        </div>
+                        <div>
+                          <h3 style={{
+                            fontWeight: 700,
+                            fontSize: '20px',
+                            margin: 0,
+                            color: '#212529'
+                          }}>
+                            Class Members
+                          </h3>
+                          <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
+                            Enrolled Students
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        background: '#f1f3f4',
+                        color: '#6c757d',
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        border: 'none'
+                      }}>
+                        {peopleData.students?.length || 0} Students
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                      {peopleData.students?.map((student, idx) => (
+                        <div key={student.user_id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '16px',
+                          background: '#f8f9fa',
+                          borderRadius: '16px',
+                          border: '1px solid #e9ecef',
+                          transition: 'all 0.2s ease',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '4px',
+                            height: '100%',
+                            background: '#dee2e6'
+                          }} />
+                          {student.profile_pic ? (
+                            <img
+                              src={(() => {
+                                let imageUrl;
+                                if (student.profile_pic.startsWith('uploads/')) {
+                                  imageUrl = `http://localhost/scms_new_backup/${student.profile_pic}`;
+                                } else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
+                                  imageUrl = student.profile_pic;
+                                } else if (student.profile_pic.startsWith('data:')) {
+                                  imageUrl = student.profile_pic;
+                                } else {
+                                  imageUrl = `http://localhost/scms_new_backup/uploads/profile/${student.profile_pic}`;
+                                }
+                                return imageUrl;
+                              })()}
+                              alt={student.full_name}
+                              style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '12px',
+                                objectFit: 'cover',
+                                marginRight: '16px',
+                                border: '2px solid #e9ecef',
+                                marginLeft: '8px'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '48px',
+                              height: '48px',
+                              borderRadius: '12px',
+                              background: '#e9ecef',
+                              color: '#6c757d',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '16px',
+                              marginRight: '16px',
+                              marginLeft: '8px'
+                            }}>
+                              {student.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            </div>
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: '15px',
+                              fontWeight: 600,
+                              color: '#212529',
+                              marginBottom: '2px'
+                            }}>
+                              {student.full_name}
+                            </div>
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#6c757d',
+                              fontWeight: 500
+                            }}>
+                              {student.role}
+                            </div>
+                          </div>
+                          <div style={{
+                            background: student.enrollment_status === 'active' ? '#d4edda' : '#f8d7da',
+                            color: student.enrollment_status === 'active' ? '#155724' : '#721c24',
+                            padding: '3px 10px',
+                            borderRadius: '16px',
+                            fontSize: '11px',
+                            fontWeight: 600
+                          }}>
+                            {student.status}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+              <i className="ni ni-single-02" style={{ fontSize: '4rem', marginBottom: '16px' }} />
+              <h4>No people data available</h4>
             </div>
-          ))}
+          )}
         </div>
       )}
       {/* Grades Section */}
       {activeTab === "grades" && (
-        <div style={{ maxWidth: 900, margin: '32px auto 0', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px 0 rgba(44,62,80,.06)', padding: 32 }}>
-          {/* Student Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 32 }}>
-            <img src="" alt="Ferreras, Geraldine P." style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
-            <span style={{ fontWeight: 700, fontSize: 28 }}>Ferreras, Geraldine P.</span>
-          </div>
-          <hr style={{ margin: '24px 0 32px 0', borderColor: '#eee' }} />
-          {/* Filter Dropdown */}
-          <div style={{ marginBottom: 32, position: 'relative', width: 360 }}>
-            <div
-              style={{
-                border: '2px solid #1976d2',
-                borderRadius: 8,
-                padding: '14px 18px',
-                fontSize: 16,
-                fontWeight: 500,
-                color: '#222',
-                background: '#fff',
-                cursor: 'pointer',
+        <div style={{ maxWidth: 1100, margin: '32px auto 0' }}>
+          {loadingGrades ? (
+            <div style={{ textAlign: 'center', padding: '60px' }}>
+              <Spinner color="primary" size="lg" />
+              <div style={{ marginTop: '16px', color: '#6c757d', fontSize: '18px' }}>Loading grades...</div>
+            </div>
+          ) : gradesError ? (
+            <Alert color="danger" style={{ margin: '32px auto', maxWidth: 1100 }}>
+              <h4>Error Loading Grades</h4>
+              <p>{gradesError}</p>
+            </Alert>
+          ) : gradesData ? (
+            <>
+              {/* Top Stats Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+                borderRadius: '20px',
+                padding: '24px 32px',
+                marginBottom: '32px',
+                border: '1px solid #dee2e6',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                userSelect: 'none'
-              }}
-              onClick={() => setDropdownOpen(v => !v)}
-            >
-              <span>{gradeFilter}</span>
-              <span style={{ marginLeft: 16, fontSize: 20, color: '#888', transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(-180deg)' : 'rotate(0deg)' }}>&#9660;</span>
-            </div>
-            {dropdownOpen && (
-              <div style={{
-                position: 'absolute',
-                top: '110%',
-                left: 0,
-                width: '100%',
-                background: '#fff',
-                border: '2px solid #1976d2',
-                borderRadius: 8,
-                boxShadow: '0 4px 16px 0 rgba(44,62,80,.10)',
-                zIndex: 10,
-                marginTop: 2
+                justifyContent: 'space-between'
               }}>
-                {gradeFilters.map(option => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    <i className="ni ni-chart-bar-32" style={{ fontSize: '28px', color: '#495057' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500, marginBottom: '4px' }}>
+                      Academic Performance
+                    </div>
+                    <div style={{ fontSize: '32px', fontWeight: 700, color: '#212529' }}>
+                      {gradesData.academic_performance?.student_name || 'Student'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '32px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
+                      {gradesData.academic_performance?.average_grade || 0}%
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
+                      Average Grade
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
+                      {gradesData.academic_performance?.total_assignments || 0}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
+                      Total Assignments
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+          {/* Main Content Grid */}
+          <Row>
+            {/* Filter Column */}
+            <Col lg={3}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '20px',
+                border: '1px solid #e9ecef',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                padding: '28px',
+                height: 'fit-content'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '24px',
+                  paddingBottom: '16px',
+                  borderBottom: '2px solid #f8f9fa'
+                }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: '#e9ecef',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '16px'
+                  }}>
+                    <i className="ni ni-settings" style={{ fontSize: '20px', color: '#6c757d' }} />
+                  </div>
+                  <div>
+                    <h3 style={{
+                      fontWeight: 700,
+                      fontSize: '20px',
+                      margin: 0,
+                      color: '#212529'
+                    }}>
+                      Grade Filters
+                    </h3>
+                    <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
+                      Filter by Status
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ position: 'relative' }}>
                   <div
-                    key={option}
                     style={{
-                      padding: '14px 18px',
-                      fontSize: 16,
+                      border: '2px solid #e9ecef',
+                      borderRadius: '12px',
+                      padding: '16px 20px',
+                      fontSize: '16px',
                       fontWeight: 500,
-                      color: '#222',
-                      background: gradeFilter === option ? '#f0f7ff' : '#fff',
+                      color: '#495057',
+                      background: '#ffffff',
                       cursor: 'pointer',
-                      borderRadius: 8
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      userSelect: 'none',
+                      transition: 'all 0.2s ease'
                     }}
-                    onClick={() => { setGradeFilter(option); setDropdownOpen(false); }}
+                    onClick={() => setDropdownOpen(v => !v)}
                   >
-                    {option}
+                    <span>{gradeFilter}</span>
+                    <i className="ni ni-bold-down" style={{ 
+                      fontSize: '16px', 
+                      color: '#6c757d', 
+                      transition: 'transform 0.2s', 
+                      transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' 
+                    }} />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* Assignment List */}
-          <div>
-            {mockAssignments.map(a => (
-              <div key={a.id}>
-                {expandedGradeId === a.id ? (
-                  <div style={{ border: '2px solid #1976d2', borderRadius: 12, marginBottom: 18, background: '#f8fafd' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', cursor: 'pointer' }} onClick={() => setExpandedGradeId(null)}>
-                      <div>
-                        <span style={{ fontWeight: 700, fontSize: 18, marginRight: 12 }}>{a.title}</span>
-                        <i className="ni ni-paper-clip" style={{ fontSize: 18, marginRight: 4, color: '#888' }} />
-                        <span style={{ fontSize: 15, color: '#888', marginRight: 18 }}>{a.id === 7 ? 3 : a.id === 5 || a.id === 6 || a.id === 8 || a.id === 2 ? 1 : 2}</span>
-                        <div style={{ fontSize: 15, color: '#888', marginTop: 2 }}>Due {a.due}</div>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 18 }}>{a.id === 8 ? 'Turned in' : a.id === 7 ? '45/50' : a.id === 5 ? '48/50' : a.id === 6 ? '50/50' : a.id === 4 ? '48/50' : a.id === 2 ? '42/50' : '45/50'}</div>
+                  {dropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '110%',
+                      left: 0,
+                      width: '100%',
+                      background: '#ffffff',
+                      border: '2px solid #e9ecef',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                      zIndex: 10,
+                      marginTop: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      {gradeFilters.map(option => (
+                        <div
+                          key={option}
+                          style={{
+                            padding: '16px 20px',
+                            fontSize: '16px',
+                            fontWeight: 500,
+                            color: '#495057',
+                            background: gradeFilter === option ? '#f8f9fa' : '#ffffff',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f8f9fa',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={() => { setGradeFilter(option); setDropdownOpen(false); }}
+                        >
+                          {option}
+                        </div>
+                      ))}
                     </div>
-                    {/* Expanded content for Activity 7 only */}
-                    {a.id === 7 && (
-                      <>
-                        <div style={{ display: 'flex', gap: 16, padding: '0 24px 24px 24px', flexWrap: 'wrap' }}>
-                          <div style={{ width: 220, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10, padding: 12, marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src="https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=120&q=80" alt="pdf" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover' }} />
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>FERRERAS, Geraldine P. ...</div>
-                              <div style={{ fontSize: 13, color: '#888' }}>PDF</div>
-                            </div>
-                          </div>
-                          <div style={{ width: 220, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10, padding: 12, marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src="https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=120&q=80" alt="img" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover' }} />
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 15 }}>Page 2.jpg</div>
-                              <div style={{ fontSize: 13, color: '#888' }}>Image</div>
-                            </div>
-                          </div>
-                          <div style={{ width: 220, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10, padding: 12, marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src="https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=120&q=80" alt="img" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover' }} />
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 15 }}>Page 1.jpg</div>
-                              <div style={{ fontSize: 13, color: '#888' }}>Image</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ padding: '0 24px 18px 24px' }}>
-                          <a
-                            href="#"
-                            style={{ color: '#1976d2', fontWeight: 500, fontSize: 16, textDecoration: 'underline' }}
-                            onClick={e => {
-                              e.preventDefault();
-                              navigate(`/student/classroom/${code}/assignment/${a.id}`);
-                            }}
-                          >
-                            View details
-                          </a>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ borderBottom: '1px solid #eee', padding: '18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpandedGradeId(a.id)}>
+                  )}
+                </div>
+              </div>
+            </Col>
+
+            {/* Assignments Column */}
+            <Col lg={9}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '20px',
+                border: '1px solid #e9ecef',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                padding: '28px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '24px',
+                  paddingBottom: '16px',
+                  borderBottom: '2px solid #f8f9fa'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: '#e9ecef',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: '16px'
+                    }}>
+                      <i className="ni ni-paper-diploma" style={{ fontSize: '20px', color: '#6c757d' }} />
+                    </div>
                     <div>
-                      <span style={{ fontWeight: 700, fontSize: 18, marginRight: 12 }}>{a.title}</span>
-                      <i className="ni ni-paper-clip" style={{ fontSize: 18, marginRight: 4, color: '#888' }} />
-                      <span style={{ fontSize: 15, color: '#888', marginRight: 18 }}>{a.id === 7 ? 3 : a.id === 5 || a.id === 6 || a.id === 8 || a.id === 2 ? 1 : 2}</span>
-                      <div style={{ fontSize: 15, color: '#888', marginTop: 2 }}>Due {a.due}</div>
+                      <h3 style={{
+                        fontWeight: 700,
+                        fontSize: '20px',
+                        margin: 0,
+                        color: '#212529'
+                      }}>
+                        Assignment Grades
+                      </h3>
+                      <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
+                        Your Academic Progress
+                      </div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{a.id === 8 ? 'Turned in' : a.id === 7 ? '45/50' : a.id === 5 ? '48/50' : a.id === 6 ? '50/50' : a.id === 4 ? '48/50' : a.id === 2 ? '42/50' : '45/50'}</div>
                   </div>
-                )}
+                  <div style={{
+                    background: '#f1f3f4',
+                    color: '#6c757d',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    border: 'none'
+                  }}>
+                    {gradesData.grades?.length || 0} Items
+                  </div>
+                </div>
+
+                <div>
+                  {gradesData.grades?.map(a => (
+                    <div key={a.id}>
+                      {expandedGradeId === a.id ? (
+                        <div style={{ 
+                          border: '2px solid #e9ecef', 
+                          borderRadius: '16px', 
+                          marginBottom: '16px', 
+                          background: '#f8f9fa',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            padding: '20px 24px', 
+                            cursor: 'pointer',
+                            background: '#ffffff',
+                            borderBottom: '1px solid #e9ecef'
+                          }} onClick={() => setExpandedGradeId(null)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '18px', color: '#212529', marginBottom: '4px' }}>
+                                  {a.title}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6c757d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <i className="ni ni-paper-clip" style={{ fontSize: '14px' }} />
+                                  <span>{a.attachment_count || 0} attachments</span>
+                                  <span style={{ margin: '0 8px' }}>•</span>
+                                  <span>Due {new Date(a.due_date).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ 
+                              fontWeight: 700, 
+                              fontSize: '20px',
+                              color: '#495057'
+                            }}>
+                              {a.grade ? `${a.grade}/${a.points}` : a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending'}
+                            </div>
+                          </div>
+                          {/* Expanded content for assignments with attachments */}
+                          {a.attachment_url && (
+                            <>
+                              <div style={{ padding: '24px', background: '#ffffff' }}>
+                                <div style={{ 
+                                  fontSize: '16px', 
+                                  fontWeight: 600, 
+                                  color: '#212529', 
+                                  marginBottom: '16px' 
+                                }}>
+                                  Submitted Files
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                                  <div style={{ 
+                                    background: '#f8f9fa', 
+                                    border: '1px solid #e9ecef', 
+                                    borderRadius: '12px', 
+                                    padding: '16px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px' 
+                                  }}>
+                                    <div style={{
+                                      width: '40px',
+                                      height: '40px',
+                                      borderRadius: '8px',
+                                      background: '#e9ecef',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#6c757d',
+                                      fontWeight: 700,
+                                      fontSize: '14px'
+                                    }}>
+                                      {a.attachment_type === 'file' ? 'FILE' : 'IMG'}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#212529', marginBottom: '2px' }}>
+                                        {a.attachment_url.split('/').pop()}
+                                      </div>
+                                      <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                        {a.attachment_type === 'file' ? 'File' : 'Image File'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ marginTop: '20px' }}>
+                                  <a
+                                    href="#"
+                                    style={{ 
+                                      color: '#495057', 
+                                      fontWeight: 600, 
+                                      fontSize: '16px', 
+                                      textDecoration: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      navigate(`/student/classroom/${currentClass?.code || code}/assignment/${a.task_id || a.id}`);
+                                    }}
+                                  >
+                                    <i className="ni ni-single-02" style={{ fontSize: '16px' }} />
+                                    View Assignment Details
+                                  </a>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          borderBottom: '1px solid #f8f9fa', 
+                          padding: '20px 0', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }} onClick={() => setExpandedGradeId(a.id)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '16px', color: '#212529', marginBottom: '4px' }}>
+                                {a.title}
+                              </div>
+                              <div style={{ fontSize: '13px', color: '#6c757d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="ni ni-paper-clip" style={{ fontSize: '12px' }} />
+                                <span>{a.attachment_count || 0} attachments</span>
+                                <span style={{ margin: '0 8px' }}>•</span>
+                                <span>Due {new Date(a.due_date).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ 
+                            fontWeight: 700, 
+                            fontSize: '18px',
+                            color: '#495057'
+                          }}>
+                            {a.grade ? `${a.grade}/${a.points}` : a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            </Col>
+          </Row>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+              <i className="ni ni-chart-bar-32" style={{ fontSize: '4rem', marginBottom: '16px' }} />
+              <h4>No grades data available</h4>
+            </div>
+          )}
         </div>
       )}
       {/* TODO: Add content for other tabs */}

@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
+const webpush = require('web-push');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +34,14 @@ const dbConfig = {
   connectionLimit: 10,
   queueLimit: 0
 };
+
+// VAPID keys for push notifications
+const vapidKeys = webpush.generateVAPIDKeys();
+webpush.setVapidDetails(
+  'mailto:your-email@example.com',
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
 
 let dbPool;
 
@@ -251,6 +260,68 @@ app.get('/health', (req, res) => {
     connections: activeConnections.size,
     uptime: process.uptime()
   });
+});
+
+// VAPID public key endpoint
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({
+    publicKey: vapidKeys.publicKey
+  });
+});
+
+// Push subscription endpoint
+app.post('/api/push-subscription', async (req, res) => {
+  try {
+    const { userId, userRole, subscription } = req.body;
+    
+    if (dbPool) {
+      await dbPool.execute(
+        'INSERT INTO push_subscriptions (user_id, user_role, subscription_data, created_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE subscription_data = VALUES(subscription_data), updated_at = NOW()',
+        [userId, userRole, JSON.stringify(subscription)]
+      );
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving push subscription:', error);
+    res.status(500).json({ error: 'Failed to save subscription' });
+  }
+});
+
+// Send push notification endpoint
+app.post('/api/push/send', async (req, res) => {
+  try {
+    const { userId, message, type, data } = req.body;
+    
+    if (dbPool) {
+      // Get user's push subscription
+      const [subscriptions] = await dbPool.execute(
+        'SELECT subscription_data FROM push_subscriptions WHERE user_id = ?',
+        [userId]
+      );
+      
+      if (subscriptions.length > 0) {
+        const subscription = JSON.parse(subscriptions[0].subscription_data);
+        
+        const payload = JSON.stringify({
+          title: 'SCMS Notification',
+          body: message,
+          type,
+          data,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico'
+        });
+        
+        await webpush.sendNotification(subscription, payload);
+        console.log(`Push notification sent to user ${userId}`);
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+    res.status(500).json({ error: 'Failed to send push notification' });
+  }
 });
 
 // Start server

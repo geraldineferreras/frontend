@@ -15,6 +15,7 @@ class ApiService {
   // Helper method for making requests
   async makeRequest(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
+    console.log('API Request URL:', url);
     const { method = 'GET', headers = {}, body, requireAuth = false } = options;
     
     // Get token from localStorage if authentication is required
@@ -80,6 +81,15 @@ class ApiService {
   }
 
   async post(endpoint, data, requireAuth = true) {
+    // Special handling for FormData (file uploads)
+    if (data instanceof FormData) {
+      return this.makeRequest(endpoint, { 
+        method: 'POST', 
+        body: data, // Don't stringify FormData
+        requireAuth 
+      });
+    }
+    
     return this.makeRequest(endpoint, { 
       method: 'POST', 
       body: typeof data === 'string' ? data : JSON.stringify(data), 
@@ -1271,6 +1281,7 @@ class ApiService {
 
   // Excuse Letter methods
   async submitExcuseLetter(excuseData) {
+    console.log('Submitting excuse letter with data:', excuseData);
     return this.makeRequest('/excuse-letters/submit', {
       method: 'POST',
       body: JSON.stringify(excuseData),
@@ -1300,10 +1311,12 @@ class ApiService {
   }
 
   async getStudentExcuseLetters(filters = {}) {
+    console.log('Getting student excuse letters with filters:', filters);
     const queryParams = new URLSearchParams();
     if (filters.classId) queryParams.append('class_id', filters.classId);
     if (filters.status) queryParams.append('status', filters.status);
     const endpoint = `/excuse-letters/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log('Student excuse letters endpoint:', endpoint);
     return this.makeRequest(endpoint, {
       method: 'GET',
       requireAuth: true,
@@ -1329,6 +1342,13 @@ class ApiService {
     return this.makeRequest(`/excuse-letters/update/${letterId}`, {
       method: 'PUT',
       body: JSON.stringify(statusData),
+      requireAuth: true,
+    });
+  }
+
+  async getExcuseLetterStatistics() {
+    return this.makeRequest('/excuse-letters/statistics', {
+      method: 'GET',
       requireAuth: true,
     });
   }
@@ -1507,6 +1527,222 @@ class ApiService {
       method: 'GET',
       requireAuth: true,
     });
+  }
+
+  // Task Management API Methods
+  async createTask(taskData) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      let response;
+      
+      if (taskData instanceof FormData) {
+        // Handle FormData (file uploads)
+        response = await axios.post(`${API_BASE}/tasks/create`, taskData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // Handle JSON data
+        response = await axios.post(`${API_BASE}/tasks/create`, taskData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Task creation error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      const message = error.response?.data?.message || error.message || 'Task creation failed';
+      console.error('Task creation error:', message);
+      throw new Error(message);
+    }
+  }
+
+  async getTeacherTasks(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.type) queryParams.append('type', filters.type);
+    if (filters.isDraft !== undefined) queryParams.append('is_draft', filters.isDraft);
+    if (filters.classCode) queryParams.append('class_code', filters.classCode);
+    if (filters.status) queryParams.append('status', filters.status);
+    
+    const endpoint = `/tasks/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getTaskDetails(taskId) {
+    return this.makeRequest(`/tasks/${taskId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentTaskDetails(taskId) {
+    return this.makeRequest(`/tasks/student/${taskId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async updateTask(taskId, taskData) {
+    return this.makeRequest(`/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+      requireAuth: true,
+    });
+  }
+
+  async publishTask(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/publish`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  }
+
+  async scheduleTask(taskId, scheduleData) {
+    return this.makeRequest(`/tasks/${taskId}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify(scheduleData),
+      requireAuth: true,
+    });
+  }
+
+  async archiveTask(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/archive`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  }
+
+  async deleteTask(taskId) {
+    console.log('API Service: Hard deleting task with ID:', taskId);
+    console.log('API Service: Endpoint:', `/tasks/${taskId}/hard-delete`);
+    
+    const response = await this.makeRequest(`/tasks/${taskId}/hard-delete`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+    
+    console.log('API Service: Hard delete response:', response);
+    return response;
+  }
+
+  async submitTask(taskId, submissionData) {
+    return this.makeRequest(`/tasks/${taskId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(submissionData),
+      requireAuth: true,
+    });
+  }
+
+  async gradeSubmission(submissionId, gradeData) {
+    return this.makeRequest(`/tasks/submissions/${submissionId}/grade`, {
+      method: 'POST',
+      body: JSON.stringify(gradeData),
+      requireAuth: true,
+    });
+  }
+
+  async addTaskComment(taskId, commentData) {
+    return this.makeRequest(`/tasks/${taskId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(commentData),
+      requireAuth: true,
+    });
+  }
+
+  async getTaskComments(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/comments`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentTasks(filters = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (filters.classCode) queryParams.append('class_code', filters.classCode);
+    if (filters.type) queryParams.append('type', filters.type);
+    if (filters.status) queryParams.append('status', filters.status);
+    
+    const endpoint = `/tasks/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getTaskStatistics(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async bulkGradeSubmissions(taskId, gradesData) {
+    return this.makeRequest(`/tasks/${taskId}/bulk-grade`, {
+      method: 'POST',
+      body: JSON.stringify(gradesData),
+      requireAuth: true,
+    });
+  }
+
+  // Student Assignment Methods
+  async getAvailableStudents(classCodes) {
+    const codes = Array.isArray(classCodes) ? classCodes.join(',') : classCodes;
+    return this.makeRequest(`/tasks/available-students?class_codes=${codes}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async assignStudentsToTask(taskId, students) {
+    return this.makeRequest(`/tasks/${taskId}/assign-students`, {
+      method: 'POST',
+      body: JSON.stringify({ students }),
+      requireAuth: true,
+    });
+  }
+
+  async getAssignedStudents(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/assigned-students`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getAssignmentStatistics(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/assignment-stats`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  getFilePreviewUrl(filename, isSubmission = false) {
+    const baseUrl = API_BASE.replace('/api', '');
+    const endpoint = isSubmission 
+      ? `/uploads/submissions/${filename}`
+      : `/uploads/tasks/${filename}`;
+    
+    return `${baseUrl}${endpoint}`;
   }
 }
 

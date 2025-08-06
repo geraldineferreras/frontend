@@ -14,6 +14,7 @@ const ExcuseManagement = () => {
   const [detailModal, setDetailModal] = useState({ open: false, excuse: null });
   const [confirmModal, setConfirmModal] = useState({ open: false, excuse: null, action: null });
   const [excuses, setExcuses] = useState([]);
+  const [availableClasses, setAvailableClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [teacherNotes, setTeacherNotes] = useState("");
@@ -63,6 +64,12 @@ const ExcuseManagement = () => {
         
         setExcuses(Array.isArray(excusesData) ? excusesData : []);
         console.log('Final excuses array:', Array.isArray(excusesData) ? excusesData : []); // Debug final result
+        
+        // Extract available classes from the API response
+        if (response.data && response.data.available_classes && Array.isArray(response.data.available_classes)) {
+          setAvailableClasses(response.data.available_classes);
+          console.log('Available classes:', response.data.available_classes);
+        }
       } else {
         console.log('API response status is false:', response); // Debug failed response
         setError("Failed to load excuse letters");
@@ -169,11 +176,23 @@ const ExcuseManagement = () => {
   // Table row highlight
   const getRowClass = (status) => status === "pending" ? "bg-warning-light" : "";
 
-  // Get unique classes from excuses
+  // Get unique classes from excuses (fallback if available_classes not provided)
   const uniqueClasses = [...new Set(excuses.map(e => e.class_name))].map(name => ({
     id: name,
     name: name
   }));
+
+  // Helper function to get attachment URL from various possible field names
+  const getAttachmentUrl = (excuse) => {
+    // Check if image_path exists and construct the full URL
+    if (excuse.image_path) {
+      const baseUrl = 'http://localhost/scms_new_backup/';
+      return `${baseUrl}${excuse.image_path}`;
+    }
+    
+    // Fallback to other possible field names
+    return excuse.attachment || excuse.attachment_url || excuse.file_path || excuse.image_url || excuse.file_url || excuse.attachment_path || null;
+  };
 
   return (
     <>
@@ -355,12 +374,20 @@ const ExcuseManagement = () => {
               <Col lg={3} md={6} sm={12} xs={12} className="mb-3">
                 <FormGroup>
                   <label className="form-control-label">Select Class</label>
-                  <Input type="select" value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="form-control-alternative">
-                    <option value="">All Classes</option>
-                    {uniqueClasses.map(cls => (
-                      <option key={cls.id} value={cls.id}>{cls.name}</option>
-                    ))}
-                  </Input>
+                                     <Input type="select" value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="form-control-alternative">
+                     <option value="">All Classes</option>
+                     {availableClasses.length > 0 ? (
+                       availableClasses.map(cls => (
+                         <option key={cls.class_id} value={cls.class_id}>
+                           {cls.subject_name} ({cls.subject_code}) - {cls.section_name}
+                         </option>
+                       ))
+                     ) : (
+                       uniqueClasses.map(cls => (
+                         <option key={cls.id} value={cls.id}>{cls.name}</option>
+                       ))
+                     )}
+                   </Input>
                 </FormGroup>
               </Col>
               <Col lg={2} md={6} sm={6} xs={12} className="mb-3">
@@ -407,16 +434,17 @@ const ExcuseManagement = () => {
           <CardBody>
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h3 className="mb-0 text-dark font-weight-bold">Excuse Letters</h3>
-              <div className="d-flex flex-column flex-sm-row gap-2">
-                <Button color="secondary" size="sm" className="mb-2 mb-sm-0" onClick={loadExcuseLetters}>
-                  <i className="fas fa-sync-alt mr-1"></i>
-                  <span className="d-none d-sm-inline">Refresh</span>
-                </Button>
-                <Button color="info" size="sm">
-                  <i className="fas fa-download mr-1"></i>
-                  <span className="d-none d-sm-inline">Export Data</span>
-                </Button>
-              </div>
+                             <div className="d-flex flex-column flex-sm-row gap-2">
+                 <Button color="secondary" size="sm" className="mb-2 mb-sm-0" onClick={loadExcuseLetters}>
+                   <i className="fas fa-sync-alt mr-1"></i>
+                   <span className="d-none d-sm-inline">Refresh</span>
+                 </Button>
+                 <Button color="info" size="sm">
+                   <i className="fas fa-download mr-1"></i>
+                   <span className="d-none d-sm-inline">Export Data</span>
+                 </Button>
+                 
+               </div>
             </div>
             
             <Table className="align-items-center table-flush" style={{ width: '100%', minWidth: 'auto' }}>
@@ -477,13 +505,13 @@ const ExcuseManagement = () => {
                           {e.reason?.length > 18 ? e.reason.slice(0, 18) + "..." : e.reason}
                         </span>
                       </td>
-                      <td className="d-none d-lg-table-cell text-center" style={{ width: '10%' }}>
-                        {e.attachment && (
-                          <Button color="link" className="p-0" onClick={() => setDetailModal({ open: true, excuse: e })}>
-                            <i className="fas fa-file-image text-primary"></i>
-                          </Button>
-                        )}
-                      </td>
+                                             <td className="d-none d-lg-table-cell text-center" style={{ width: '10%' }}>
+                         {e.image_path && (
+                           <Button color="link" className="p-0" onClick={() => setDetailModal({ open: true, excuse: e })}>
+                             <i className="fas fa-file-image text-primary"></i>
+                           </Button>
+                         )}
+                       </td>
                       <td style={{ width: '10%' }}>
                         <Badge color={statusColors[e.status]} className="badge-pill">{e.status}</Badge>
                       </td>
@@ -525,26 +553,31 @@ const ExcuseManagement = () => {
                   <Col md={6}><b>Name:</b> {detailModal.excuse.student_name}</Col>
                   <Col md={6}><b>ID:</b> {detailModal.excuse.student_id}</Col>
                 </Row>
-                <Row className="mb-2">
-                  <Col md={6}><b>Section:</b> {detailModal.excuse.section_name}</Col>
-                  <Col md={6}><b>Class:</b> {detailModal.excuse.class_name}</Col>
-                                     <Col md={6}><b>Date:</b> {detailModal.excuse.date_absent}</Col>
-                </Row>
-                <Row className="mb-2">
-                  <Col md={12}><b>Reason:</b><br />{detailModal.excuse.reason}</Col>
-                </Row>
-                {detailModal.excuse.attachment && (
-                  <Row className="mb-2">
-                    <Col md={12} className="text-center">
-                      <img
-                        src={detailModal.excuse.attachment}
-                        alt="Attachment"
-                        style={{ maxWidth: "100%", maxHeight: 250, cursor: "zoom-in", borderRadius: 8 }}
-                        onClick={e => window.open(detailModal.excuse.attachment, "_blank")}
-                      />
-                    </Col>
-                  </Row>
-                )}
+                                 <Row className="mb-2">
+                   <Col md={6}><b>Section:</b> {detailModal.excuse.section_name}</Col>
+                   <Col md={6}><b>Class:</b> {detailModal.excuse.subject_name} ({detailModal.excuse.subject_code})</Col>
+                 </Row>
+                 <Row className="mb-2">
+                   <Col md={6}><b>Date:</b> {detailModal.excuse.date_absent}</Col>
+                 </Row>
+                                 <Row className="mb-2">
+                   <Col md={12}><b>Reason:</b><br />{detailModal.excuse.reason}</Col>
+                 </Row>
+                 {detailModal.excuse.image_path && (
+                   <Row className="mb-2">
+                     <Col md={12}>
+                       <b>Attachment:</b>
+                     </Col>
+                     <Col md={12} className="text-center mt-2">
+                       <img
+                         src={getAttachmentUrl(detailModal.excuse)}
+                         alt="Attachment"
+                         style={{ maxWidth: "100%", maxHeight: 300, cursor: "zoom-in", borderRadius: 8, border: "1px solid #dee2e6" }}
+                         onClick={e => window.open(getAttachmentUrl(detailModal.excuse), "_blank")}
+                       />
+                     </Col>
+                   </Row>
+                 )}
                 {detailModal.excuse.status === "pending" && (
                   <Row className="mt-3">
                     <Col className="text-center">

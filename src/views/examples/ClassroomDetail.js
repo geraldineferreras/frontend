@@ -214,9 +214,25 @@ const getRandomAvatar = (userId) => {
 
 const getAvatarForUser = (user) => {
   if (!user) return userDefault;
+  
+  // Check for profile picture and construct full URL
   if (user.profile_pic && user.profile_pic !== userDefault) {
-    return user.profile_pic;
+    // If it's already a full URL, return as is
+    if (user.profile_pic.startsWith('http')) {
+      return user.profile_pic;
+    }
+    // Construct full URL for profile picture - use the correct path structure
+    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${user.profile_pic}`;
   }
+  
+  // Check for profile_image as alternative field name
+  if (user.profile_image && user.profile_image !== userDefault) {
+    if (user.profile_image.startsWith('http')) {
+      return user.profile_image;
+    }
+    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${user.profile_image}`;
+  }
+  
   if (user.id) {
     return getRandomAvatar(user.id);
   }
@@ -464,6 +480,15 @@ const ClassroomDetail = () => {
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [grades, setGrades] = useState(sampleGrades);
+  
+  // Grades tab state for real data
+  const [gradesData, setGradesData] = useState(null);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [gradesError, setGradesError] = useState(null);
+  
+  // Drafts and scheduled tasks loading states
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [loadingScheduled, setLoadingScheduled] = useState(false);
 
   // Save students to localStorage whenever they change
   useEffect(() => {
@@ -556,6 +581,7 @@ const ClassroomDetail = () => {
           section_name: student.section_name,
           joinedDate: student.enrolled_at,
           enrollment_status: student.enrollment_status,
+          profile_pic: student.profile_pic || student.profile_image,
           role: "Student"
         }));
         
@@ -772,14 +798,56 @@ const ClassroomDetail = () => {
     }
   }, []);
 
-  // Load tasks from localStorage for current classroom
-  useEffect(() => {
-    const classroomKey = `classroom_tasks_${code}`;
-    const savedTasks = localStorage.getItem(classroomKey);
-    if (savedTasks) {
-      const parsedTasks = JSON.parse(savedTasks);
-      setTasks(parsedTasks);
+  // Load tasks from API for current classroom
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [taskError, setTaskError] = useState(null);
+
+  const fetchTasks = async () => {
+    if (!code) return;
+    
+    setLoadingTasks(true);
+    setTaskError(null);
+    
+    try {
+      const response = await apiService.getTeacherTasks({
+        classCode: code,
+        isDraft: 0, // Get published tasks by default
+        status: 'active'
+      });
+      
+      if (response.status) {
+        console.log('API Response:', response);
+        console.log('Tasks data:', response.data);
+        setTasks(response.data || []);
+      } else {
+        setTaskError(response.message || 'Failed to load tasks');
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      setTaskError(error.message || 'Failed to load tasks');
+    } finally {
+      setLoadingTasks(false);
     }
+  };
+
+  const loadTaskComments = async (taskId) => {
+    console.log('Loading comments for taskId:', taskId);
+    try {
+      const response = await apiService.getTaskComments(taskId);
+      if (response.status) {
+        setTasks(prev => prev.map(task => 
+          (task.task_id || task.id || task._id || task.taskId) === taskId 
+            ? { ...task, comments: response.data || [] }
+            : task
+        ));
+      }
+    } catch (error) {
+      console.error('Error loading task comments:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
   }, [code]);
   
   // Add state for assignment dropdowns
@@ -830,6 +898,7 @@ const ClassroomDetail = () => {
     attachments: [],
     visibleTo: [],
     postToClassrooms: ['current'],
+    assignedStudents: [],
     submitted: false
   });
   const [taskAttachments, setTaskAttachments] = useState([]);
@@ -1794,6 +1863,98 @@ useEffect(() => {
     };
   }, []);
 
+  // Fetch grades data for Grades tab
+  useEffect(() => {
+    if (activeTab === 'grades' && code) {
+      console.log('Grades tab is active, fetching grades data for class:', code);
+      setLoadingGrades(true);
+      setGradesError(null);
+      
+      apiService.get(`/teacher/classroom/${code}/grades`)
+        .then(response => {
+          console.log('Grades API Response:', response);
+          if (response.status && response.data) {
+            setGradesData(response.data);
+          } else {
+            setGradesError('Failed to load grades data');
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching grades data:', err);
+          setGradesError('Failed to load grades data');
+        })
+        .finally(() => setLoadingGrades(false));
+    }
+  }, [activeTab, code]);
+
+  // Fetch drafts and scheduled tasks when component mounts
+  useEffect(() => {
+    if (code) {
+      console.log('Fetching drafts and scheduled tasks for class:', code);
+      
+      // Fetch drafts
+      setLoadingDrafts(true);
+      apiService.get(`/tasks/drafts?class_code=${code}`)
+        .then(response => {
+          console.log('Drafts API Response:', response);
+          if (response.status && response.data) {
+            const drafts = response.data.map(draft => ({
+              id: draft.task_id,
+              title: draft.title,
+              text: draft.instructions,
+              type: draft.type,
+              points: draft.points,
+              dueDate: draft.due_date,
+              allowComments: draft.allow_comments,
+              lastEdited: draft.created_at,
+              attachments: draft.attachment_url ? [{ url: draft.attachment_url, type: draft.attachment_type }] : [],
+              visibleTo: draft.assigned_students || [],
+              status: 'draft',
+              api_response: draft
+            }));
+            setTaskDrafts(drafts);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching drafts:', err);
+          // If endpoint doesn't exist, keep existing drafts in local state
+          console.log('Drafts endpoint not available, using local state');
+        })
+        .finally(() => setLoadingDrafts(false));
+
+      // Fetch scheduled tasks
+      setLoadingScheduled(true);
+      apiService.get(`/tasks/scheduled?class_code=${code}`)
+        .then(response => {
+          console.log('Scheduled Tasks API Response:', response);
+          if (response.status && response.data) {
+            const scheduled = response.data.map(task => ({
+              id: task.task_id,
+              title: task.title,
+              text: task.instructions,
+              type: task.type,
+              points: task.points,
+              dueDate: task.due_date,
+              allowComments: task.allow_comments,
+              scheduledFor: task.scheduled_at,
+              lastEdited: task.created_at,
+              attachments: task.attachment_url ? [{ url: task.attachment_url, type: task.attachment_type }] : [],
+              visibleTo: task.assigned_students || [],
+              status: 'scheduled',
+              api_response: task
+            }));
+            setTaskScheduled(scheduled);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching scheduled tasks:', err);
+          // If endpoint doesn't exist, keep existing scheduled tasks in local state
+          console.log('Scheduled tasks endpoint not available, using local state');
+        })
+        .finally(() => setLoadingScheduled(false));
+    }
+  }, [code]);
+
   // QR Scanner useEffect
   useEffect(() => {
     if (isQrScannerOpen) {
@@ -2681,6 +2842,33 @@ useEffect(() => {
     }));
   };
 
+  // Load available students for task assignment
+  const loadAvailableStudents = async (classCodes) => {
+    try {
+      const response = await apiService.getAvailableStudents(classCodes);
+      if (response.status) {
+        // Transform the API response to match the expected format
+        const availableStudents = response.data.map(student => ({
+          id: student.student_id,
+          name: student.full_name,
+          email: student.email,
+          profile_pic: student.profile_pic,
+          student_num: student.student_num,
+          class_code: student.class_code,
+          filtered: true
+        }));
+        setStudents(availableStudents);
+      }
+    } catch (error) {
+      console.error('Error loading available students:', error);
+      // Fallback to current students if API fails
+      setStudents(prevStudents => prevStudents.map(student => ({
+        ...student,
+        filtered: true
+      })));
+    }
+  };
+
   // Add state for cropping modal
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropImage, setCropImage] = useState(null);
@@ -3123,7 +3311,12 @@ useEffect(() => {
     setTaskForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePostTask = (e) => {
+  const handleEditTaskFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditTaskForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePostTask = async (e) => {
     e.preventDefault();
     
     // Set submitted flag to true to show validation errors
@@ -3134,97 +3327,419 @@ useEffect(() => {
       return;
     }
     
-    const newTask = {
-      id: Date.now(),
-      ...taskForm,
-      author: 'Teacher',
-      date: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-      isPinned: false,
-      comments: [],
-      attachments: [...taskAttachments],
-      assignedStudents: taskAssignedStudents // <-- Add this line
-    };
-    
-    // Save task to selected classrooms
-    const selectedClassrooms = taskForm.postToClassrooms || ['current'];
-    
-    selectedClassrooms.forEach(classroomId => {
-      if (classroomId === 'current') {
-        // Save to current classroom's localStorage and update state
-        const classroomKey = `classroom_tasks_${code}`;
-        const existingTasks = JSON.parse(localStorage.getItem(classroomKey) || '[]');
-        const updatedTasks = [newTask, ...existingTasks];
-        localStorage.setItem(classroomKey, JSON.stringify(updatedTasks));
-        setTasks(prev => [newTask, ...prev]);
+    try {
+      // Convert postToClassrooms to actual class codes
+      // 'current' should be replaced with the current classroom code
+      const classCodes = (taskForm.postToClassrooms || []).map(classroom => {
+        if (classroom === 'current') {
+          return code; // Current classroom code
+        }
+        return classroom; // Other selected classroom codes
+      });
+      
+      console.log('Selected classrooms:', taskForm.postToClassrooms);
+      console.log('Class codes to send:', classCodes);
+      console.log('Assigned students:', taskAssignedStudents);
+      console.log('Students data:', students);
+      
+      // Prepare task data with student assignment fields
+      const taskData = {
+        title: taskForm.title.trim(),
+        type: taskForm.type.toLowerCase(),
+        points: parseInt(taskForm.points),
+        instructions: taskForm.text.trim(),
+        class_codes: classCodes, // Use all selected classroom codes
+        allow_comments: taskForm.allowComments,
+        is_draft: false,
+        is_scheduled: false,
+        scheduled_at: null,
+        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null,
+        attachment_type: taskAttachments.length > 0 ? 'file' : null,
+        attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
+        assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
+        assigned_students: taskAssignedStudents.length > 0 ? taskAssignedStudents.map(studentId => {
+          const student = students.find(s => s.id === studentId);
+          return {
+            student_id: studentId,
+            class_code: code // Current classroom code
+          };
+        }) : []
+      };
+      
+      // If there are file attachments, use FormData
+      let response;
+      if (taskAttachments.length > 0) {
+        const formData = new FormData();
+        
+        // Add each task field individually to FormData
+        formData.append('title', taskData.title);
+        formData.append('type', taskData.type);
+        formData.append('points', taskData.points);
+        formData.append('instructions', taskData.instructions);
+        formData.append('class_codes', JSON.stringify(taskData.class_codes));
+        formData.append('allow_comments', taskData.allow_comments ? '1' : '0');
+        formData.append('is_draft', taskData.is_draft ? '1' : '0');
+        formData.append('is_scheduled', taskData.is_scheduled ? '1' : '0');
+        formData.append('scheduled_at', taskData.scheduled_at || '');
+        formData.append('due_date', taskData.due_date || '');
+        formData.append('attachment_type', taskData.attachment_type || '');
+        formData.append('attachment_url', taskData.attachment_url || '');
+        formData.append('assignment_type', taskData.assignment_type);
+        formData.append('assigned_students', JSON.stringify(taskData.assigned_students));
+        
+        // Add the first file attachment (backend expects single file)
+        if (taskAttachments.length > 0 && taskAttachments[0].file) {
+          formData.append('attachment', taskAttachments[0].file);
+        }
+        
+        console.log('Sending FormData with files:', taskAttachments);
+        console.log('FormData task data:', taskData);
+        console.log('FormData contents:');
+        for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+        }
+        response = await apiService.createTask(formData);
       } else {
-        // Save to other classrooms using their code
-        const classroomKey = `classroom_tasks_${classroomId}`;
-        const existingTasks = JSON.parse(localStorage.getItem(classroomKey) || '[]');
-        const updatedTasks = [newTask, ...existingTasks];
-        localStorage.setItem(classroomKey, JSON.stringify(updatedTasks));
+        // No files, send as JSON
+        console.log('Sending JSON data:', taskData);
+        console.log('JSON stringified:', JSON.stringify(taskData, null, 2));
+        response = await apiService.createTask(taskData);
       }
-    });
-    
-    // Remove the draft from drafts if we're editing one
-    if (currentDraftId) {
-      setTaskDrafts(prev => prev.filter(draft => draft.id !== currentDraftId));
+      
+      if (response.status) {
+        // Add the new task to the state
+        const newTask = {
+          ...response.data,
+          id: response.data.task_id,
+          author: 'Teacher',
+          date: response.data.created_at,
+          likes: 0,
+          isLiked: false,
+          isPinned: false,
+          comments: [],
+          attachments: [...taskAttachments],
+          assignedStudents: taskAssignedStudents
+        };
+        
+        setTasks(prev => [newTask, ...prev]);
+        
+        // Remove the draft from drafts if we're editing one
+        if (currentDraftId) {
+          setTaskDrafts(prev => prev.filter(draft => draft.id !== currentDraftId));
+        }
+        
+        // Reset form
+        setTaskForm({
+          type: 'Assignment',
+          title: '',
+          text: '',
+          dueDate: '',
+          points: '',
+          allowComments: true,
+          attachments: [],
+          visibleTo: [],
+          postToClassrooms: ['current'],
+          assignedStudents: [],
+          submitted: false
+        });
+        setTaskAttachments([]);
+        setTaskAssignedStudents([]);
+        setCurrentDraftId(null);
+        
+        // Show success message
+        alert('Task created successfully!');
+      } else {
+        alert(response.message || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
+      alert(error.message || 'Failed to create task');
     }
-    
-    setTaskForm({
-      type: 'Assignment',
-      title: '',
-      text: '',
-      dueDate: '',
-      points: '',
-      allowComments: true,
-      attachments: [],
-      visibleTo: [],
-      postToClassrooms: ['current'],
-      submitted: false
-    });
-    setTaskAttachments([]);
-    setTaskAssignedStudents([]);
-    setCurrentDraftId(null); // Reset the current draft ID
   };
 
-  const handleSaveTaskDraft = () => {
+  const handleSaveTaskDraft = async () => {
     setTaskForm(prev => ({ ...prev, submitted: true }));
     if (!taskForm.title.trim() || !taskForm.points || !taskForm.text.trim()) {
       return;
     }
-    const draft = {
-      id: currentDraftId || Date.now(),
-      ...taskForm,
-      lastEdited: new Date().toISOString(),
-      attachments: [...taskAttachments],
-      visibleTo: [...taskAssignedStudents]
-    };
-    setTaskDrafts(prev => {
-      if (currentDraftId) {
-        // Update existing draft
-        return prev.map(d => d.id === currentDraftId ? draft : d);
-      } else {
-        // Add new draft
-        return [draft, ...prev];
+
+    try {
+      // Prepare the API payload
+      const taskData = {
+        title: taskForm.title.trim(),
+        type: taskForm.type.toLowerCase(),
+        points: parseInt(taskForm.points),
+        instructions: taskForm.text.trim(),
+        class_codes: taskForm.postToClassrooms && taskForm.postToClassrooms.length > 0 
+          ? taskForm.postToClassrooms.map(cls => cls === 'current' ? code : cls)
+          : [code],
+        assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
+        assigned_students: taskAssignedStudents.length > 0 ? taskAssignedStudents.map(studentId => {
+          const student = students.find(s => s.id === studentId);
+          return {
+            student_id: studentId,
+            class_code: code // Current classroom code
+          };
+        }) : [],
+        allow_comments: taskForm.allowComments,
+        is_draft: true, // This is a draft
+        is_scheduled: false,
+        scheduled_at: null,
+        attachment_type: taskAttachments.length > 0 ? 'file' : null,
+        attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
+        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null
+      };
+
+
+      
+      // Validate required data
+      if (!code) {
+        alert('Error: Classroom code is missing. Please refresh the page and try again.');
+        return;
       }
-    });
-    setTaskForm({
-      type: 'Assignment',
-      title: '',
-      text: '',
-      dueDate: '',
-      points: '',
-      allowComments: true,
-      attachments: [],
-      visibleTo: [],
-      postToClassrooms: ['current'],
-      submitted: false
-    });
-    setTaskAttachments([]);
-    setTaskAssignedStudents([]);
-    setCurrentDraftId(null); // <-- reset after save
+
+      // If there are file attachments, use FormData
+      let response;
+      if (taskAttachments.length > 0) {
+        const formData = new FormData();
+        
+        // Add each task field individually to FormData
+        formData.append('title', taskData.title);
+        formData.append('type', taskData.type);
+        formData.append('points', taskData.points);
+        formData.append('instructions', taskData.instructions);
+        formData.append('class_codes', JSON.stringify(taskData.class_codes));
+        formData.append('allow_comments', taskData.allow_comments ? '1' : '0');
+        formData.append('is_draft', taskData.is_draft ? '1' : '0');
+        formData.append('is_scheduled', taskData.is_scheduled ? '1' : '0');
+        formData.append('scheduled_at', taskData.scheduled_at || '');
+        formData.append('due_date', taskData.due_date || '');
+        formData.append('attachment_type', taskData.attachment_type || '');
+        formData.append('attachment_url', taskData.attachment_url || '');
+        formData.append('assignment_type', taskData.assignment_type);
+        formData.append('assigned_students', JSON.stringify(taskData.assigned_students));
+        
+        // Add the first file attachment (backend expects single file)
+        if (taskAttachments.length > 0 && taskAttachments[0].file) {
+          formData.append('attachment', taskAttachments[0].file);
+        }
+        
+        console.log('Sending FormData with files for draft:', taskAttachments);
+        response = await apiService.createTask(formData);
+      } else {
+        // No files, send as JSON
+        console.log('Sending JSON data for draft:', taskData);
+        response = await apiService.post('/tasks/create', taskData);
+      }
+      
+      if (response.status && response.data) {
+        console.log('Task draft saved successfully:', response.data);
+        
+        // Add to local state for immediate display
+        const draft = {
+          id: response.data.task_id || Date.now(),
+          ...taskForm,
+          lastEdited: new Date().toISOString(),
+          attachments: [...taskAttachments],
+          visibleTo: [...taskAssignedStudents],
+          api_response: response.data
+        };
+        
+        setTaskDrafts(prev => {
+          if (currentDraftId) {
+            // Update existing draft
+            return prev.map(d => d.id === currentDraftId ? draft : d);
+          } else {
+            // Add new draft
+            return [draft, ...prev];
+          }
+        });
+
+        // Reset form
+        setTaskForm({
+          type: 'Assignment',
+          title: '',
+          text: '',
+          dueDate: '',
+          points: '',
+          allowComments: true,
+          attachments: [],
+          visibleTo: [],
+          postToClassrooms: ['current'],
+          submitted: false
+        });
+        setTaskAttachments([]);
+        setTaskAssignedStudents([]);
+        setCurrentDraftId(null);
+        setTaskFormExpanded(false);
+        
+        // Show drafts tab after saving
+        setShowTaskDraftsCollapse(true);
+        setShowTaskScheduledCollapse(false);
+        
+        alert("Task draft saved successfully!");
+      } else {
+        throw new Error('Failed to save task draft');
+      }
+    } catch (error) {
+      console.error('Error saving task draft:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      let errorMessage = 'Error saving task draft';
+      if (error.response?.data?.message) {
+        errorMessage += `: ${error.response.data.message}`;
+      } else if (error.message) {
+        errorMessage += `: ${error.message}`;
+      } else {
+        errorMessage += ': Unknown error occurred';
+      }
+      
+      alert(errorMessage);
+    }
+  };
+
+  const handleScheduleTask = async () => {
+    if (!taskScheduleDate || !taskScheduleTime) {
+      alert("Please select both date and time for scheduling.");
+      return;
+    }
+
+    if (!taskForm.title.trim() || !taskForm.points || !taskForm.text.trim()) {
+      alert("Please fill in all required fields (title, points, and description).");
+      return;
+    }
+
+    try {
+      const scheduledDateTime = `${taskScheduleDate}T${taskScheduleTime}`;
+      
+      // Prepare the API payload
+      const taskData = {
+        title: taskForm.title.trim(),
+        type: taskForm.type.toLowerCase(),
+        points: parseInt(taskForm.points),
+        instructions: taskForm.text.trim(),
+        class_codes: taskForm.postToClassrooms && taskForm.postToClassrooms.length > 0 
+          ? taskForm.postToClassrooms.map(cls => cls === 'current' ? code : cls)
+          : [code],
+        assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
+        assigned_students: taskAssignedStudents.length > 0 ? taskAssignedStudents.map(studentId => {
+          const student = students.find(s => s.id === studentId);
+          return {
+            student_id: studentId,
+            class_code: code // Current classroom code
+          };
+        }) : [],
+        allow_comments: taskForm.allowComments,
+        is_draft: false, // This is scheduled, not a draft
+        is_scheduled: true, // This is scheduled
+        scheduled_at: scheduledDateTime,
+        attachment_type: taskAttachments.length > 0 ? 'file' : null,
+        attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
+        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null
+      };
+
+      console.log('Scheduling task with data:', taskData);
+      
+      // Validate required data
+      if (!code) {
+        alert('Error: Classroom code is missing. Please refresh the page and try again.');
+        return;
+      }
+
+      // If there are file attachments, use FormData
+      let response;
+      if (taskAttachments.length > 0) {
+        const formData = new FormData();
+        
+        // Add each task field individually to FormData
+        formData.append('title', taskData.title);
+        formData.append('type', taskData.type);
+        formData.append('points', taskData.points);
+        formData.append('instructions', taskData.instructions);
+        formData.append('class_codes', JSON.stringify(taskData.class_codes));
+        formData.append('allow_comments', taskData.allow_comments ? '1' : '0');
+        formData.append('is_draft', taskData.is_draft ? '1' : '0');
+        formData.append('is_scheduled', taskData.is_scheduled ? '1' : '0');
+        formData.append('scheduled_at', taskData.scheduled_at || '');
+        formData.append('due_date', taskData.due_date || '');
+        formData.append('attachment_type', taskData.attachment_type || '');
+        formData.append('attachment_url', taskData.attachment_url || '');
+        formData.append('assignment_type', taskData.assignment_type);
+        formData.append('assigned_students', JSON.stringify(taskData.assigned_students));
+        
+        // Add the first file attachment (backend expects single file)
+        if (taskAttachments.length > 0 && taskAttachments[0].file) {
+          formData.append('attachment', taskAttachments[0].file);
+        }
+        
+        console.log('Sending FormData with files for scheduled task:', taskAttachments);
+        response = await apiService.createTask(formData);
+      } else {
+        // No files, send as JSON
+        console.log('Sending JSON data for scheduled task:', taskData);
+        response = await apiService.post('/tasks/create', taskData);
+      }
+      
+      if (response.status && response.data) {
+        console.log('Task scheduled successfully:', response.data);
+        
+        // Add to local state for immediate display
+        const scheduledTask = {
+          id: response.data.task_id || Date.now(),
+          ...taskForm,
+          scheduledFor: scheduledDateTime,
+          lastEdited: new Date().toISOString(),
+          attachments: [...taskAttachments],
+          visibleTo: [...taskAssignedStudents],
+          status: 'scheduled',
+          api_response: response.data
+        };
+
+        setTaskScheduled(prev => [scheduledTask, ...prev]);
+        
+        // Reset form
+        setTaskForm({
+          type: 'Assignment',
+          title: '',
+          text: '',
+          dueDate: '',
+          points: '',
+          allowComments: true,
+          attachments: [],
+          visibleTo: [],
+          postToClassrooms: ['current'],
+          submitted: false
+        });
+        setTaskAttachments([]);
+        setTaskAssignedStudents([]);
+        setTaskScheduleDate('');
+        setTaskScheduleTime('');
+        setShowTaskScheduleModal(false);
+        setTaskFormExpanded(false);
+        
+        alert(`Task scheduled successfully for ${new Date(scheduledDateTime).toLocaleString()}`);
+      } else {
+        throw new Error('Failed to schedule task');
+      }
+    } catch (error) {
+      console.error('Error scheduling task:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      let errorMessage = 'Error scheduling task';
+      if (error.response?.data?.message) {
+        errorMessage += `: ${error.response.data.message}`;
+      } else if (error.message) {
+        errorMessage += `: ${error.message}`;
+      } else {
+        errorMessage += ': Unknown error occurred';
+      }
+      
+      alert(errorMessage);
+    }
   };
 
   const handleCancelTaskPost = () => {
@@ -3256,8 +3771,23 @@ useEffect(() => {
     setTaskAttachments(prev => [...prev, ...newAttachments]);
   };
 
+  const handleEditTaskFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const newAttachments = files.map(file => ({
+      file,
+      name: file.name,
+      type: 'File',
+      size: file.size
+    }));
+    setEditTaskAttachments(prev => [...prev, ...newAttachments]);
+  };
+
   const handleRemoveTaskAttachment = (idx) => {
     setTaskAttachments(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleRemoveEditTaskAttachment = (idx) => {
+    setEditTaskAttachments(prev => prev.filter((_, i) => i !== idx));
   };
   const handleLikeTask = (taskId) => {
     setTasks(prev => prev.map(task => 
@@ -3275,46 +3805,365 @@ useEffect(() => {
     ));
   };
 
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editTaskForm, setEditTaskForm] = useState({
+    type: 'Assignment',
+    title: '',
+    text: '',
+    dueDate: '',
+    points: '',
+    allowComments: true,
+    attachments: [],
+    visibleTo: [],
+    postToClassrooms: ['current'],
+    submitted: false
+  });
+  const [editTaskAttachments, setEditTaskAttachments] = useState([]);
+
   const handleEditTask = (taskId) => {
-    const task = tasks.find(t => t.id === taskId);
+    console.log('Editing task with ID:', taskId);
+    console.log('Available tasks:', tasks);
+    
+    // Find the task using the prioritized ID field
+    const task = tasks.find(t => (t.task_id || t.id || t._id || t.taskId) === taskId);
+    
     if (task) {
-      setTaskForm({
+      console.log('Found task to edit:', task);
+      
+      // Set editing state
+      setEditingTaskId(taskId);
+      
+      // Format due date for datetime-local input
+      let formattedDueDate = '';
+      if (task.due_date) {
+        const dueDate = new Date(task.due_date);
+        formattedDueDate = dueDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
+      }
+      
+      // Handle class_codes - it might be a string, array, or undefined
+      let classCodes = ['current'];
+      if (task.class_codes) {
+        if (Array.isArray(task.class_codes)) {
+          classCodes = task.class_codes;
+        } else if (typeof task.class_codes === 'string') {
+          try {
+            // Try to parse as JSON if it's a string
+            const parsed = JSON.parse(task.class_codes);
+            classCodes = Array.isArray(parsed) ? parsed : ['current'];
+          } catch (e) {
+            // If parsing fails, treat as single code
+            classCodes = [task.class_codes];
+          }
+        } else {
+          classCodes = [task.class_codes];
+        }
+      }
+      
+      // Populate the edit form with task data
+      setEditTaskForm({
+        type: task.type || 'Assignment',
+        title: task.title || '',
+        text: task.instructions || task.text || '',
+        dueDate: formattedDueDate,
+        points: task.points || '',
+        allowComments: task.allow_comments || task.allowComments || true,
+        attachments: [],
+        visibleTo: [],
+        postToClassrooms: classCodes,
+        submitted: false
+      });
+      
+      // Set attachments if any
+      if (task.attachment_url) {
+        setEditTaskAttachments([{
+          name: task.attachment_url,
+          type: task.attachment_type || 'file',
+          url: task.attachment_url
+        }]);
+      } else {
+        setEditTaskAttachments([]);
+      }
+      
+      // Open the edit modal
+      setShowEditTaskModal(true);
+      
+      console.log('Edit form populated with task data:', {
         type: task.type,
         title: task.title,
-        text: task.text,
-        dueDate: task.dueDate,
+        text: task.instructions,
+        dueDate: formattedDueDate,
         points: task.points,
-        allowComments: task.allowComments,
-        attachments: [],
-        visibleTo: []
+        allowComments: task.allow_comments
       });
-      setTaskAttachments(task.attachments || []);
-      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } else {
+      console.error('Task not found for editing:', taskId);
+      alert('Task not found for editing');
     }
   };
 
-  const handleDeleteTask = (taskId) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    
+    if (!editingTaskId) return;
+    
+    console.log('Updating task with ID:', editingTaskId);
+    console.log('Edit form data:', editTaskForm);
+    
+    setEditTaskForm(prev => ({ ...prev, submitted: true }));
+    
+    if (!editTaskForm.title.trim() || !editTaskForm.points || !editTaskForm.text.trim()) {
+      return;
+    }
+    
+    try {
+      // Process class codes
+      const classCodes = (editTaskForm.postToClassrooms || []).map(classroom => {
+        if (classroom === 'current') {
+          return code; // Current classroom code
+        }
+        return classroom; // Other selected classroom codes
+      });
+
+      // Format due date if available
+      const formattedDueDate = editTaskForm.dueDate ? new Date(editTaskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null;
+
+      const taskData = {
+        title: editTaskForm.title.trim(),
+        type: editTaskForm.type.toLowerCase(),
+        points: parseInt(editTaskForm.points),
+        instructions: editTaskForm.text.trim(),
+        class_codes: classCodes,
+        allow_comments: editTaskForm.allowComments,
+        due_date: formattedDueDate,
+        attachment_type: editTaskAttachments.length > 0 ? 'file' : null,
+        attachment_url: editTaskAttachments.length > 0 ? editTaskAttachments[0].name : null
+      };
+      
+      console.log('Sending update data:', taskData);
+      
+      let response;
+      if (editTaskAttachments.length > 0 && editTaskAttachments[0].file) {
+        // Handle file upload with FormData
+        const formData = new FormData();
+        formData.append('title', taskData.title);
+        formData.append('type', taskData.type);
+        formData.append('points', taskData.points);
+        formData.append('instructions', taskData.instructions);
+        formData.append('class_codes', JSON.stringify(taskData.class_codes));
+        formData.append('allow_comments', taskData.allow_comments ? '1' : '0');
+        formData.append('due_date', taskData.due_date || '');
+        formData.append('attachment_type', taskData.attachment_type || '');
+        formData.append('attachment_url', taskData.attachment_url || '');
+
+        editTaskAttachments.forEach((attachment, index) => {
+          if (attachment.file) {
+            formData.append(`attachment_${index}`, attachment.file);
+          }
+        });
+        
+        // Use the createTask method for FormData (it handles both create and update)
+        response = await apiService.createTask(formData);
+      } else {
+        // Use JSON for update without files
+        response = await apiService.updateTask(editingTaskId, taskData);
+      }
+      
+      if (response.status) {
+        console.log('Task updated successfully:', response);
+        
+        // Update the task in state using the prioritized ID field
+        setTasks(prev => prev.map(task => 
+          (task.task_id || task.id || task._id || task.taskId) === editingTaskId 
+            ? { 
+                ...task, 
+                title: response.data.title,
+                type: response.data.type,
+                points: response.data.points,
+                instructions: response.data.instructions,
+                allow_comments: response.data.allow_comments,
+                due_date: response.data.due_date,
+                class_codes: response.data.class_codes,
+                attachment_type: response.data.attachment_type,
+                attachment_url: response.data.attachment_url,
+                updated_at: response.data.updated_at
+              }
+            : task
+        ));
+        
+        // Reset form and close modal
+        setEditTaskForm({
+          type: 'Assignment',
+          title: '',
+          text: '',
+          dueDate: '',
+          points: '',
+          allowComments: true,
+          attachments: [],
+          visibleTo: [],
+          postToClassrooms: ['current'],
+          submitted: false
+        });
+        setEditTaskAttachments([]);
+        setEditingTaskId(null);
+        setShowEditTaskModal(false);
+        
+        alert('Task updated successfully!');
+      } else {
+        alert(response.message || 'Failed to update task');
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      alert(error.message || 'Failed to update task');
+    }
   };
 
-  const handlePostTaskComment = (taskId) => {
+  const handleCancelEditTask = () => {
+    console.log('Canceling task edit');
+    setEditingTaskId(null);
+    setEditTaskForm({
+      type: 'Assignment',
+      title: '',
+      text: '',
+      dueDate: '',
+      points: '',
+      allowComments: true,
+      attachments: [],
+      visibleTo: [],
+      postToClassrooms: ['current'],
+      submitted: false
+    });
+    setEditTaskAttachments([]);
+    setShowEditTaskModal(false);
+  };
+
+  const handlePublishTask = async (taskId) => {
+    try {
+      const response = await apiService.publishTask(taskId);
+      
+      if (response.status) {
+        setTasks(prev => prev.map(task => 
+          task.id === taskId 
+            ? { ...task, is_draft: false, status: 'active' }
+            : task
+        ));
+        alert('Task published successfully!');
+      } else {
+        alert(response.message || 'Failed to publish task');
+      }
+    } catch (error) {
+      console.error('Error publishing task:', error);
+      alert(error.message || 'Failed to publish task');
+    }
+  };
+
+  const handleArchiveTask = async (taskId) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!confirm('Are you sure you want to archive this task?')) {
+      return;
+    }
+    
+    try {
+      const response = await apiService.archiveTask(taskId);
+      
+      if (response.status) {
+        setTasks(prev => prev.filter(task => (task.task_id || task.id || task._id || task.taskId) !== taskId));
+        alert('Task archived successfully!');
+      } else {
+        alert(response.message || 'Failed to archive task');
+      }
+    } catch (error) {
+      console.error('Error archiving task:', error);
+      alert(error.message || 'Failed to archive task');
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    console.log('Attempting to delete task with ID:', taskId);
+    console.log('Task ID type:', typeof taskId);
+    
+    // eslint-disable-next-line no-restricted-globals
+    if (!confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+    
+    try {
+      console.log('Making API call to delete task:', taskId);
+      const response = await apiService.deleteTask(taskId);
+      console.log('Delete API response:', response);
+      
+      if (response.status) {
+        console.log('Task deleted successfully from API');
+        setTasks(prev => prev.filter(task => (task.task_id || task.id || task._id || task.taskId) !== taskId));
+        alert('Task deleted successfully!');
+        
+        // Check if we're currently on the task detail page for this task
+        const currentPath = window.location.pathname;
+        if (currentPath.includes(`/task/${taskId}`)) {
+          // Get classroom code from localStorage or current URL
+          let classroomCode = null;
+          const currentClassroom = localStorage.getItem('currentClassroom');
+          if (currentClassroom) {
+            try {
+              const classroomData = JSON.parse(currentClassroom);
+              classroomCode = classroomData.code;
+            } catch (e) {
+              console.error('Error parsing classroom data:', e);
+            }
+          }
+          
+          if (classroomCode) {
+            // Navigate back to classroom detail with "class" tab active
+            window.location.href = `/teacher/classroom/${classroomCode}?tab=class`;
+          } else {
+            // Fallback to previous page
+            window.history.back();
+          }
+        }
+      } else {
+        console.error('API returned error status:', response);
+        alert(response.message || 'Failed to delete task');
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      alert(error.message || 'Failed to delete task');
+    }
+  };
+
+  const handlePostTaskComment = async (taskId) => {
     const commentText = taskCommentInputs[taskId];
     if (!commentText?.trim()) return;
     
-    const newComment = {
-      id: Date.now(),
-      text: commentText,
-      author: 'Student',
-      date: new Date().toISOString()
-    };
-    
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, comments: [...(task.comments || []), newComment] }
-        : task
-    ));
-    
-    setTaskCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+    try {
+      const response = await apiService.addTaskComment(taskId, {
+        comment: commentText.trim()
+      });
+      
+      if (response.status) {
+        // Refresh the task to get updated comments
+        const taskResponse = await apiService.getTaskDetails(taskId);
+        if (taskResponse.status) {
+          setTasks(prev => prev.map(task => 
+            (task.task_id || task.id || task._id || task.taskId) === taskId 
+              ? { ...task, comments: taskResponse.data.comments || [] }
+              : task
+          ));
+        }
+        
+        setTaskCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+      } else {
+        alert(response.message || 'Failed to add comment');
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      alert(error.message || 'Failed to add comment');
+    }
   };
 
   const handleEditTaskComment = (taskId, commentIdx, text) => {
@@ -4892,7 +5741,40 @@ useEffect(() => {
           <TabPane tabId="class">
             <Card className="mb-4" style={{ borderRadius: 18, boxShadow: '0 8px 32px rgba(50,76,221,0.10)', background: 'linear-gradient(135deg, #f8fafc 0%, #e9ecef 100%)', border: '1.5px solid #e9ecef' }}>
               <CardBody>
-                <h4 className="mb-4" style={{ fontWeight: 800, color: '#324cdd', letterSpacing: 1 }}>Class Tasks <i className="ni ni-tag text-warning ml-2" /></h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontWeight: 800, color: '#324cdd', letterSpacing: 1, margin: 0 }}>
+                    Class Tasks <i className="ni ni-tag text-warning ml-2" />
+                  </h4>
+                  <Button
+                    color="light"
+                    size="sm"
+                    onClick={fetchTasks}
+                    disabled={loadingTasks}
+                    style={{ 
+                      borderRadius: 8, 
+                      padding: '6px 12px', 
+                      fontSize: 12, 
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    {loadingTasks ? (
+                      <>
+                        <div className="spinner-border spinner-border-sm" role="status">
+                          <span className="sr-only">Loading...</span>
+                        </div>
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ni ni-refresh" />
+                        Refresh
+                      </>
+                    )}
+                  </Button>
+                </div>
                 {activeTab === "class" && (
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8, gap: 2 }}>
                     <Button
@@ -4948,8 +5830,8 @@ useEffect(() => {
                         <div style={{ color: '#888' }}>No scheduled tasks.</div>
                       ) : (
                           [...taskScheduled].sort((a, b) => {
-                            const aDate = new Date(a.scheduledFor?.date + ' ' + a.scheduledFor?.time);
-                            const bDate = new Date(b.scheduledFor?.date + ' ' + b.scheduledFor?.time);
+                            const aDate = new Date(a.scheduledFor);
+                            const bDate = new Date(b.scheduledFor);
                             return aDate - bDate;
                           }).map((item, idx) => (
                             <div key={idx} 
@@ -4977,7 +5859,7 @@ useEffect(() => {
                                   {truncate(item.text, 60)}
                                         </div>
                                 <div style={{ fontSize: 11, color: '#8898AA', marginTop: 2 }}>
-                                  Scheduled for {item.scheduledFor.date} at {item.scheduledFor.time}
+                                  Scheduled for {new Date(item.scheduledFor).toLocaleString()}
                                       </div>
                                 <div style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12 }}>
@@ -4999,77 +5881,78 @@ useEffect(() => {
                     </Card>
                   </Collapse>
                 )}
-                {activeTab === "class" && (
-                  <Collapse isOpen={showTaskDraftsCollapse}>
-                    <Card style={{ marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 8px #324cdd11' }}>
-                      <CardBody style={{ maxHeight: 320, overflowY: 'auto' }}>
-                        <h5>Draft Tasks</h5>
-                        {taskDrafts.length === 0 ? (
-                          <div style={{ color: '#888' }}>No drafts saved.</div>
-                        ) : (
-                          [...taskDrafts].sort((a, b) => {
-                            const aDate = new Date(a.lastEdited);
-                            const bDate = new Date(b.lastEdited);
-                            return bDate - aDate;
-                          }).map((draft, idx) => (
-                            <div key={idx} 
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'flex-start', 
-                                justifyContent: 'space-between', 
-                                padding: '8px 12px',
-                                borderBottom: '1px solid #e9ecef', 
-                                background: currentDraftId === draft.id ? '#f8faff' : '#fff',
-                                borderRadius: 8,
-                                marginBottom: 6,
-                                boxShadow: currentDraftId === draft.id ? '0 2px 8px #324cdd15' : '0 1px 4px #324cdd08',
-                                cursor: 'pointer',
-                                transition: 'background 0.13s',
-                                fontFamily: 'inherit',
-                                fontSize: 14,
-                                color: '#232b3b',
-                                fontWeight: 600,
-                                border: currentDraftId === draft.id ? '1px solid #bfcfff' : 'none'
-                              }}
-                              onClick={() => {
-                                setTaskForm({
-                                  type: draft.type || 'Assignment',
-                                  title: draft.title || '',
-                                  text: draft.text || '',
-                                  dueDate: draft.dueDate || '',
-                                  points: draft.points || '',
-                                  allowComments: draft.allowComments !== undefined ? draft.allowComments : true,
-                                  attachments: draft.attachments || [],
-                                  visibleTo: draft.visibleTo || [],
-                                  postToClassrooms: draft.postToClassrooms || ['current'],
-                                  submitted: false
-                                });
-                                setTaskAttachments(draft.attachments || []);
-                                setTaskAssignedStudents(draft.visibleTo || []);
-                                setTaskFormExpanded(true);
-                                setCurrentDraftId(draft.id); 
-                              }}
-                            >
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, fontSize: 15, color: '#232b3b', marginBottom: 2, fontFamily: 'inherit', letterSpacing: 0.5 }}>{draft.title || '(No Title)'}</div>
-                                <div style={{ fontWeight: 500, fontSize: 13, color: '#232b3b', opacity: 0.85, fontFamily: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
-                                  {truncate(draft.text, 60)}
-                                  </div>
-                                <div style={{ fontSize: 12, color: '#7D8FA9', marginTop: 2, display: 'flex', gap: 12, alignItems: 'center' }}>
-                                  <span><b>Type:</b> {draft.type || 'Assignment'}</span>
-                                  <span><b>Points:</b> {draft.points || '-'}</span>
-                                  <span><b>Due:</b> {draft.dueDate || '-'}</span>
-                              </div>
-                                <div style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                                  <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12 }}>
-                                    <i className="fa fa-paperclip" style={{ marginRight: 3, fontSize: 12 }} />
-                                    {draft.attachments && draft.attachments.length ? `${draft.attachments.length} attachment${draft.attachments.length !== 1 ? 's' : ''}` : 'No attachments'}
-                                  </span>
-                                  <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>
-                                    <i className="fa fa-users" style={{ marginRight: 3, fontSize: 12 }} />
-                                    {draft.visibleTo && draft.visibleTo.length > 0
-                                      ? `${draft.visibleTo.length} student${draft.visibleTo.length !== 1 ? 's' : ''} selected`
-                                      : '0 students selected'}
+                                {activeTab === "class" && (
+                  <>
+                    <Collapse isOpen={showTaskDraftsCollapse}>
+                      <Card style={{ marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 8px #324cdd11' }}>
+                        <CardBody style={{ maxHeight: 320, overflowY: 'auto' }}>
+                                                  <h5>Draft Tasks</h5>
+                          {taskDrafts.length === 0 ? (
+                            <div style={{ color: '#888' }}>No drafts saved.</div>
+                          ) : (
+                            [...taskDrafts].sort((a, b) => {
+                              const aDate = new Date(a.lastEdited);
+                              const bDate = new Date(b.lastEdited);
+                              return bDate - aDate;
+                            }).map((draft, idx) => (
+                              <div key={idx} 
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'flex-start', 
+                                  justifyContent: 'space-between', 
+                                  padding: '8px 12px',
+                                  borderBottom: '1px solid #e9ecef', 
+                                  background: currentDraftId === draft.id ? '#f8faff' : '#fff',
+                                  borderRadius: 8,
+                                  marginBottom: 6,
+                                  boxShadow: currentDraftId === draft.id ? '0 2px 8px #324cdd15' : '0 1px 4px #324cdd08',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.13s',
+                                  fontFamily: 'inherit',
+                                  fontSize: 14,
+                                  color: '#232b3b',
+                                  fontWeight: 600,
+                                  border: currentDraftId === draft.id ? '1px solid #bfcfff' : 'none'
+                                }}
+                                onClick={() => {
+                                  setTaskForm({
+                                    type: draft.type || 'Assignment',
+                                    title: draft.title || '',
+                                    text: draft.text || '',
+                                    dueDate: draft.dueDate || '',
+                                    points: draft.points || '',
+                                    allowComments: draft.allowComments !== undefined ? draft.allowComments : true,
+                                    attachments: draft.attachments || [],
+                                    visibleTo: draft.visibleTo || [],
+                                    postToClassrooms: draft.postToClassrooms || ['current'],
+                                    submitted: false
+                                  });
+                                  setTaskAttachments(draft.attachments || []);
+                                  setTaskAssignedStudents(draft.visibleTo || []);
+                                  setTaskFormExpanded(true);
+                                  setCurrentDraftId(draft.id); 
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 15, color: '#232b3b', marginBottom: 2, fontFamily: 'inherit', letterSpacing: 0.5 }}>{draft.title || '(No Title)'}</div>
+                                  <div style={{ fontWeight: 500, fontSize: 13, color: '#232b3b', opacity: 0.85, fontFamily: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
+                                    {truncate(draft.text, 60)}
+                                    </div>
+                                  <div style={{ fontSize: 12, color: '#7D8FA9', marginTop: 2, display: 'flex', gap: 12, alignItems: 'center' }}>
+                                    <span><b>Type:</b> {draft.type || 'Assignment'}</span>
+                                    <span><b>Points:</b> {draft.points || '-'}</span>
+                                    <span><b>Due:</b> {draft.dueDate || '-'}</span>
+                                </div>
+                                  <div style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                                    <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12 }}>
+                                      <i className="fa fa-paperclip" style={{ marginRight: 3, fontSize: 12 }} />
+                                      {draft.attachments && draft.attachments.length ? `${draft.attachments.length} attachment${draft.attachments.length !== 1 ? 's' : ''}` : 'No attachments'}
+                                    </span>
+                                    <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>
+                                      <i className="fa fa-users" style={{ marginRight: 3, fontSize: 12 }} />
+                                      {draft.visibleTo && draft.visibleTo.length > 0
+                                        ? `${draft.visibleTo.length} student${draft.visibleTo.length !== 1 ? 's' : ''} selected`
+                                        : '0 students selected'}
                                   </span>
                                 </div>
                               </div>
@@ -5083,6 +5966,7 @@ useEffect(() => {
                       </CardBody>
                     </Card>
                   </Collapse>
+                  </>
                 )}
                 {activeTab === "class" && (
                   <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: '1.5px solid #e9ecef', padding: '1.5rem 1.5rem 1rem', marginBottom: 32, width: '100%', maxWidth: '100%', position: 'relative' }}>
@@ -5131,7 +6015,17 @@ useEffect(() => {
                                   boxShadow: 'none',
                                   transition: 'background 0.15s, color 0.15s',
                                 }}
-                                onClick={() => setShowCreateStudentSelectModal(true)}
+                                onClick={async () => {
+                                  // Load available students when opening the modal
+                                  const classCodes = (taskForm.postToClassrooms || []).map(classroom => {
+                                    if (classroom === 'current') {
+                                      return code; // Current classroom code
+                                    }
+                                    return classroom; // Other selected classroom codes
+                                  });
+                                  await loadAvailableStudents(classCodes);
+                                  setShowCreateStudentSelectModal(true);
+                                }}
                                 aria-label="Add students"
                               >
                                 <i className="fa fa-user-plus" style={{ fontSize: 16 }} />
@@ -5167,7 +6061,7 @@ useEffect(() => {
                               </div>
                               </div>
                     <Collapse isOpen={taskFormExpanded}>
-                      <Form onSubmit={handlePostTask}>
+                      <Form onSubmit={editingTaskId ? handleUpdateTask : handlePostTask}>
                       <div className="d-flex flex-wrap" style={{ gap: 16, marginBottom: 16, width: '100%' }}>
 <div style={{ flex: 1, minWidth: 200 }}>
   <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Post to Classrooms</label>
@@ -5434,6 +6328,19 @@ useEffect(() => {
                           )}
                         </div>
 
+                        <div style={{ flex: 1, minWidth: 150, maxWidth: 200 }}>
+                          <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Due Date</label>
+                          <input
+                            name="dueDate"
+                            type="datetime-local"
+                            value={taskForm.dueDate}
+                            onChange={handleTaskFormChange}
+                            className="form-control"
+                            style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                            placeholder="Select due date..."
+                          />
+                        </div>
+
                       </div>
                       <FormGroup className="mb-3">
                         <Input
@@ -5446,6 +6353,92 @@ useEffect(() => {
                           required
                         />
                       </FormGroup>
+
+                      {/* Selected Students Display */}
+                      {taskAssignedStudents.length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <label style={{ fontWeight: 600, fontSize: 14, color: '#222', marginBottom: 8, display: 'block' }}>
+                            Assigned Students ({taskAssignedStudents.length})
+                          </label>
+                          <div style={{ 
+                            background: '#f8f9fa', 
+                            borderRadius: 8, 
+                            border: '1px solid #e9ecef',
+                            padding: 12,
+                            maxHeight: 120,
+                            overflowY: 'auto'
+                          }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                              {taskAssignedStudents.map(studentId => {
+                                const student = students.find(s => s.id === studentId);
+                                return student ? (
+                                  <div
+                                    key={studentId}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      background: '#fff',
+                                      borderRadius: 16,
+                                      padding: '4px 8px',
+                                      border: '1px solid #e9ecef',
+                                      fontSize: 12
+                                    }}
+                                  >
+                                    <div style={{ 
+                                      width: 20, 
+                                      height: 20, 
+                                      borderRadius: '50%', 
+                                      background: student.profile_pic ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#fff',
+                                      fontWeight: 600,
+                                      fontSize: 10,
+                                      marginRight: 6,
+                                      overflow: 'hidden'
+                                    }}>
+                                      {student.profile_pic ? (
+                                        <img
+                                          src={student.profile_pic}
+                                          alt={student.name}
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                          }}
+                                        />
+                                      ) : (
+                                        student.name.charAt(0).toUpperCase()
+                                      )}
+                                    </div>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>
+                                      {student.name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setTaskAssignedStudents(prev => prev.filter(id => id !== studentId));
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#dc3545',
+                                        cursor: 'pointer',
+                                        marginLeft: 6,
+                                        fontSize: 14,
+                                        fontWeight: 'bold'
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ) : null;
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div className="d-flex flex-row flex-wrap" style={{ gap: 24, marginBottom: 0, width: '100%' }}>
                         <div style={{ display: 'flex', gap: 8, marginTop: 2, justifyContent: 'flex-start' }}>
                           <input type="file" style={{ display: 'none' }} ref={taskFileInputRef} onChange={handleTaskFileChange} />
@@ -5544,11 +6537,15 @@ useEffect(() => {
                             className="btn btn-secondary"
                             style={{ borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 600 }}
                             onClick={() => {
-                              handleCancelTaskPost();
+                              if (editingTaskId) {
+                                handleCancelEditTask();
+                              } else {
+                                handleCancelTaskPost();
+                              }
                               setTaskFormExpanded(false);
                             }}
                           >
-                            Cancel
+                            {editingTaskId ? 'Cancel Edit' : 'Cancel'}
                           </button>
                           <button
                             type="submit"
@@ -5619,15 +6616,16 @@ useEffect(() => {
                               </DropdownItem>
                               <DropdownItem 
                                 onClick={() => {
-                                  setShowScheduleModal(true);
+                                  setShowTaskScheduleModal(true);
                                 }}
                                 style={{ 
                                   padding: '8px 16px', 
                                   fontSize: 14, 
-                                  color: '#333',
-                            cursor: 'pointer'
-                          }}
-                        >
+                                  color: (taskForm.title.trim() && taskForm.points && taskForm.text.trim()) ? '#333' : '#ccc',
+                                  cursor: (taskForm.title.trim() && taskForm.points && taskForm.text.trim()) ? 'pointer' : 'not-allowed'
+                                }}
+                                disabled={!(taskForm.title.trim() && taskForm.points && taskForm.text.trim())}
+                              >
                                 Schedule
                               </DropdownItem>
                             </DropdownMenu>
@@ -5640,19 +6638,76 @@ useEffect(() => {
                   )}
                 {activeTab === "class" && (
                   <div style={{ width: '100%' }}>
-                    {tasks.map((task) => (
-                      <Card key={task.id} className="mb-4" style={{ borderRadius: 16, boxShadow: '0 2px 8px #324cdd11', border: '1.5px solid #e9ecef', background: '#fff', cursor: 'pointer' }}
-                        onClick={() => navigate(`/teacher/task/${task.id}`)}
+                    {loadingTasks && (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="sr-only">Loading...</span>
+                        </div>
+                        <div style={{ marginTop: '1rem', fontSize: '14px' }}>Loading tasks...</div>
+                      </div>
+                    )}
+                    
+                    {taskError && (
+                      <Alert color="danger" style={{ marginBottom: '1rem' }}>
+                        <strong>Error loading tasks:</strong> {taskError}
+                        <Button 
+                          color="link" 
+                          size="sm" 
+                          onClick={fetchTasks}
+                          style={{ padding: 0, marginLeft: '0.5rem' }}
+                        >
+                          Retry
+                        </Button>
+                      </Alert>
+                    )}
+                    
+                    {!loadingTasks && !taskError && tasks.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                        <i className="ni ni-collection" style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }} />
+                        <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.5rem' }}>No tasks yet</div>
+                        <div style={{ fontSize: '14px' }}>Create your first task to get started</div>
+                      </div>
+                    )}
+                    
+                    {!loadingTasks && !taskError && tasks.map((task) => (
+                                              <Card key={task.task_id || task.id || task._id || task.taskId} className="mb-4" style={{ borderRadius: 16, boxShadow: '0 2px 8px #324cdd11', border: '1.5px solid #e9ecef', background: '#fff', cursor: 'pointer' }}
+                        onClick={() => {
+                          console.log('Task object:', task);
+                          
+                          // Try different possible ID field names - prioritize task_id since that's what the API returns
+                          const taskId = task.task_id || task.id || task._id || task.taskId;
+                          
+                          console.log('Selected Task ID:', taskId);
+                          console.log('Task ID alternatives:', {
+                            id: task.id,
+                            task_id: task.task_id,
+                            _id: task._id,
+                            taskId: task.taskId
+                          });
+                          
+                          if (taskId && taskId !== 'undefined') {
+                            console.log('Navigating to task detail with ID:', taskId);
+                            navigate(`/teacher/task/${taskId}`);
+                          } else {
+                            console.error('Task ID is undefined or invalid:', task);
+                            console.error('Available task fields:', Object.keys(task));
+                            alert('Task ID is missing. Cannot navigate to task detail.');
+                          }
+                        }}
                       >
                         <CardBody style={{ padding: '1.5rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 16 }}>
-                                {task.author.charAt(0).toUpperCase()}
+                                {(task.teacher_name || task.author || 'Teacher').charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 700, fontSize: 16, color: '#232b3b' }}>{task.author}</div>
-                                <div style={{ fontSize: 13, color: '#8898AA' }}>{formatRelativeTime(task.date)}</div>
+                                <div style={{ fontWeight: 700, fontSize: 16, color: '#232b3b' }}>
+                                  {task.teacher_name || task.author || 'Teacher'}
+                                </div>
+                                <div style={{ fontSize: 13, color: '#8898AA' }}>
+                                  {formatRelativeTime(task.created_at || task.date)}
+                                </div>
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -5662,19 +6717,30 @@ useEffect(() => {
                                 </Badge>
                               )}
                               <UncontrolledDropdown>
-                                <DropdownToggle tag="button" style={{ background: 'none', border: 'none', fontSize: 18, color: '#666', cursor: 'pointer' }}>
-                                  <i className="ni ni-bold-down" />
+                                <DropdownToggle tag="button" style={{ background: 'none', border: 'none', fontSize: 16, color: '#666', cursor: 'pointer', padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                  <div style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: '#666' }}></div>
+                                  <div style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: '#666' }}></div>
+                                  <div style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: '#666' }}></div>
                                 </DropdownToggle>
                                 <DropdownMenu>
-                                  <DropdownItem onClick={() => handlePinTask(task.id)}>
-                                    <i className="ni ni-pin-3" style={{ marginRight: 8 }} />
-                                    {task.isPinned ? 'Unpin' : 'Pin'} Task
-                                  </DropdownItem>
-                                  <DropdownItem onClick={() => handleEditTask(task.id)}>
+                                  <DropdownItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditTask(task.task_id || task.id || task._id || task.taskId);
+                                  }}>
                                     <i className="ni ni-ruler-pencil" style={{ marginRight: 8 }} />
                                     Edit
                                   </DropdownItem>
-                                  <DropdownItem onClick={() => handleDeleteTask(task.id)}>
+                                  <DropdownItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log('Task object being deleted:', task);
+                                    console.log('Available task ID fields:', {
+                                      task_id: task.task_id,
+                                      id: task.id,
+                                      _id: task._id,
+                                      taskId: task.taskId
+                                    });
+                                    handleDeleteTask(task.task_id || task.id || task._id || task.taskId);
+                                  }}>
                                     <i className="ni ni-fat-remove" style={{ marginRight: 8 }} />
                                     Delete
                                   </DropdownItem>
@@ -5688,8 +6754,16 @@ useEffect(() => {
                             </h5>
                           )}
                           <div style={{ fontSize: 15, color: '#232b3b', lineHeight: 1.6, marginBottom: 16 }}>
-                            {task.text}
+                            {task.instructions || task.text}
                           </div>
+                          {task.points && (
+                            <div style={{ marginBottom: 16 }}>
+                              <Badge color="info" style={{ fontSize: 12, padding: '4px 8px' }}>
+                                <i className="ni ni-chart-bar-32" style={{ marginRight: 4 }} />
+                                {task.points} points
+                              </Badge>
+                            </div>
+                          )}
                           {task.attachments && task.attachments.length > 0 && (
                             <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                               {task.attachments.map((att, idx) => {
@@ -6032,44 +7106,136 @@ useEffect(() => {
           <TabPane tabId="grades">
             <Card className="mb-4" style={{ borderRadius: 14, boxShadow: '0 2px 8px rgba(44,62,80,0.07)' }}>
               <CardBody>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h4 className="mb-0">Grades</h4>
-                  <Button color="primary" size="sm" style={{ borderRadius: "8px" }} onClick={() => setShowAddGradeModal(true)}>
-                    <i className="ni ni-fat-add mr-1"></i> Add Grade
-                  </Button>
-                </div>
-                <Table responsive>
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Assignment #1</th>
-                      <th>Quiz #1</th>
-                      <th>Project #1</th>
-                      <th>Average</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grades.map((grade) => (
-                      <tr key={grade.studentId}>
-                        <td>{grade.studentName}</td>
-                        <td>{grade.assignment1}</td>
-                        <td>{grade.quiz1}</td>
-                        <td>{grade.project1}</td>
-                        <td>
-                          <Badge color={grade.average >= 90 ? "success" : grade.average >= 80 ? "primary" : "warning"}>
-                            {grade.average.toFixed(1)}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Button color="link" size="sm" className="p-0 mr-2">
-                            <i className="ni ni-ruler-pencil"></i>
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+                {loadingGrades ? (
+                  <div className="text-center py-5">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="sr-only">Loading...</span>
+                    </div>
+                    <p className="mt-3 text-muted">Loading grades...</p>
+                  </div>
+                ) : gradesError ? (
+                  <Alert color="danger">
+                    <h4>Error Loading Grades</h4>
+                    <p>{gradesError}</p>
+                  </Alert>
+                ) : gradesData ? (
+                  <>
+                    {/* Statistics Banner */}
+                    <div className="row mb-4">
+                      <div className="col-md-3">
+                        <div className="text-center p-3 bg-light rounded">
+                          <h5 className="text-muted mb-1">Total Students</h5>
+                          <h3 className="mb-0 text-primary">{gradesData.statistics?.total_students || 0}</h3>
+                        </div>
+                      </div>
+                      <div className="col-md-3">
+                        <div className="text-center p-3 bg-light rounded">
+                          <h5 className="text-muted mb-1">Total Assignments</h5>
+                          <h3 className="mb-0 text-success">{gradesData.statistics?.total_assignments || 0}</h3>
+                        </div>
+                      </div>
+                      <div className="col-md-3">
+                        <div className="text-center p-3 bg-light rounded">
+                          <h5 className="text-muted mb-1">Submissions</h5>
+                          <h3 className="mb-0 text-info">{gradesData.statistics?.total_submissions || 0}</h3>
+                        </div>
+                      </div>
+                      <div className="col-md-3">
+                        <div className="text-center p-3 bg-light rounded">
+                          <h5 className="text-muted mb-1">Class Average</h5>
+                          <h3 className="mb-0 text-warning">{gradesData.statistics?.average_class_grade || 0}%</h3>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Students Grades Table */}
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h4 className="mb-0">Student Grades</h4>
+                      <Button color="primary" size="sm" style={{ borderRadius: "8px" }} onClick={() => setShowAddGradeModal(true)}>
+                        <i className="ni ni-fat-add mr-1"></i> Add Grade
+                      </Button>
+                    </div>
+                    
+                    <Table responsive>
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          {gradesData.tasks?.map(task => (
+                            <th key={task.task_id}>{task.title}</th>
+                          ))}
+                          <th>Total Points</th>
+                          <th>Average</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gradesData.students?.map((student) => (
+                          <tr key={student.student_id}>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                {student.profile_pic ? (
+                                  <img
+                                    src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${student.profile_pic}`}
+                                    alt={student.student_name}
+                                    className="rounded-circle mr-2"
+                                    style={{ width: '32px', height: '32px', objectFit: 'cover' }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.nextSibling.style.display = 'block';
+                                    }}
+                                  />
+                                ) : null}
+                                <div>
+                                  <div className="font-weight-bold">{student.student_name}</div>
+                                  <small className="text-muted">{student.student_num}</small>
+                                </div>
+                              </div>
+                            </td>
+                            {gradesData.tasks?.map(task => {
+                              const assignment = student.assignments?.find(a => a.task_id === task.task_id);
+                              return (
+                                <td key={task.task_id}>
+                                  {assignment ? (
+                                    <div>
+                                      <div className="font-weight-bold">
+                                        {assignment.grade}/{assignment.points}
+                                      </div>
+                                      <small className={`badge badge-${assignment.status === 'graded' ? 'success' : assignment.status === 'submitted' ? 'info' : 'warning'}`}>
+                                        {assignment.status}
+                                      </small>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td>
+                              <div className="font-weight-bold">
+                                {student.total_earned}/{student.total_points}
+                              </div>
+                            </td>
+                            <td>
+                              <Badge color={student.average_grade >= 90 ? "success" : student.average_grade >= 80 ? "primary" : "warning"}>
+                                {student.average_grade}%
+                              </Badge>
+                            </td>
+                            <td>
+                              <Button color="link" size="sm" className="p-0 mr-2">
+                                <i className="ni ni-ruler-pencil"></i>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </>
+                ) : (
+                  <div className="text-center py-5">
+                    <i className="ni ni-chart-bar-32 text-muted" style={{ fontSize: '4rem' }}></i>
+                    <h4 className="mt-3 text-muted">No grades data available</h4>
+                  </div>
+                )}
               </CardBody>
             </Card>
           </TabPane>
@@ -6613,6 +7779,214 @@ useEffect(() => {
         </div>
               </Modal>
 
+        {/* Add Users Modal */}
+        <Modal isOpen={showCreateStudentSelectModal} toggle={() => setShowCreateStudentSelectModal(false)} centered size="lg">
+          <ModalHeader toggle={() => setShowCreateStudentSelectModal(false)}>
+            <div style={{ fontWeight: 600, fontSize: 18, color: '#333' }}>Add Users</div>
+          </ModalHeader>
+          <ModalBody>
+            <div style={{ marginBottom: 16 }}>
+              <Input
+                type="text"
+                placeholder="Search students..."
+                style={{
+                  borderRadius: 8,
+                  border: '1px solid #e9ecef',
+                  padding: '12px 16px',
+                  fontSize: 14,
+                  background: '#fff'
+                }}
+                onChange={(e) => {
+                  const searchTerm = e.target.value.toLowerCase();
+                  setStudents(prev => 
+                    prev.map(student => ({
+                      ...student,
+                      filtered: !searchTerm || 
+                        student.name.toLowerCase().includes(searchTerm) ||
+                        student.email.toLowerCase().includes(searchTerm)
+                    }))
+                  );
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
+                  Students ({taskAssignedStudents.length})
+                </span>
+                <button
+                  type="button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#5E72E4',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                  onClick={() => {
+                    if (taskAssignedStudents.length === students.length) {
+                      setTaskAssignedStudents([]);
+                    } else {
+                      setTaskAssignedStudents(students.map(s => s.id));
+                    }
+                  }}
+                >
+                  {taskAssignedStudents.length === students.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              
+              <div style={{ 
+                maxHeight: 300, 
+                overflowY: 'auto', 
+                border: '1px solid #e9ecef', 
+                borderRadius: 8,
+                background: '#fff'
+              }}>
+                {students.filter(s => s.filtered !== false).map((student) => (
+                  <div
+                    key={student.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #f8f9fa',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onClick={() => {
+                      if (taskAssignedStudents.includes(student.id)) {
+                        setTaskAssignedStudents(prev => prev.filter(id => id !== student.id));
+                      } else {
+                        setTaskAssignedStudents(prev => [...prev, student.id]);
+                      }
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = '#f8f9fa'}
+                    onMouseOut={e => e.currentTarget.style.background = '#fff'}
+                  >
+                    <div style={{ 
+                      width: 32, 
+                      height: 32, 
+                      borderRadius: '50%', 
+                      background: student.profile_pic ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      marginRight: 12,
+                      overflow: 'hidden'
+                    }}>
+                      {student.profile_pic ? (
+                        <img
+                          src={getAvatarForUser(student)}
+                          alt={student.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <span style={{
+                        display: student.profile_pic ? 'none' : 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%'
+                      }}>
+                        {student.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
+                        {student.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        {student.email}
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={taskAssignedStudents.includes(student.id)}
+                      onChange={() => {}} // Handled by onClick
+                      style={{
+                        width: 18,
+                        height: 18,
+                        cursor: 'pointer'
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div style={{ 
+              background: '#f8f9fa', 
+              padding: '16px', 
+              borderRadius: 8,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ 
+                  width: 24, 
+                  height: 24, 
+                  borderRadius: '50%', 
+                  background: '#ddd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  color: '#666'
+                }}>
+                  <i className="fa fa-user-plus" />
+                </div>
+                <span style={{ fontSize: 14, color: '#666' }}>
+                  {taskAssignedStudents.length === 0 
+                    ? 'No students selected' 
+                    : `${taskAssignedStudents.length} student${taskAssignedStudents.length !== 1 ? 's' : ''} selected`
+                  }
+                </span>
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="secondary"
+              onClick={() => setShowCreateStudentSelectModal(false)}
+              style={{ borderRadius: 8, fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              onClick={() => {
+                // Save selected students to task form
+                setTaskForm(prev => ({
+                  ...prev,
+                  assignedStudents: taskAssignedStudents
+                }));
+                setShowCreateStudentSelectModal(false);
+              }}
+              style={{ 
+                borderRadius: 8, 
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none'
+              }}
+            >
+              Confirm
+            </Button>
+          </ModalFooter>
+        </Modal>
+
         {/* Task Options Modal */}
         <Modal isOpen={showTaskOptionsModal} toggle={() => setShowTaskOptionsModal(false)} centered>
           <ModalHeader toggle={() => setShowTaskOptionsModal(false)}>
@@ -6676,6 +8050,353 @@ useEffect(() => {
               </button>
             </div>
           </ModalBody>
+      </Modal>
+
+      {/* Edit Task Modal */}
+      <Modal isOpen={showEditTaskModal} toggle={() => setShowEditTaskModal(false)} size="lg" centered>
+        <ModalHeader toggle={() => setShowEditTaskModal(false)} style={{ fontWeight: 700, fontSize: 20 }}>
+          Edit Task
+        </ModalHeader>
+        <ModalBody style={{ padding: '24px' }}>
+          <Form onSubmit={handleUpdateTask}>
+            <div className="d-flex flex-wrap" style={{ gap: 16, marginBottom: 16, width: '100%' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Post to Classrooms</label>
+                <Select
+                  isMulti
+                  options={[
+                    { value: 'current', label: currentClassroom.name || currentClassroom.title || 'Current Classroom', avatar: currentClassroom.avatar || null, code: code, isDisabled: true },
+                    ...classrooms.map(cls => ({
+                      value: cls.code,
+                      label: cls.name || cls.title || 'Untitled',
+                      avatar: cls.avatar || null,
+                      code: cls.code,
+                      isDisabled: false
+                    }))
+                  ]}
+                  value={editTaskForm.postToClassrooms ? editTaskForm.postToClassrooms.map(code => {
+                    if (code === 'current') {
+                      return { value: 'current', label: currentClassroom.name || currentClassroom.title || 'Current Classroom', avatar: currentClassroom.avatar || null, code: code, isDisabled: true };
+                    }
+                    const classroom = classrooms.find(cls => cls.code === code);
+                    return {
+                      value: classroom?.code,
+                      label: classroom?.name || classroom?.title || 'Untitled',
+                      avatar: classroom?.avatar || null,
+                      code: classroom?.code,
+                      isDisabled: false
+                    };
+                  }) : []}
+                  onChange={(selectedOptions) => {
+                    const values = selectedOptions ? selectedOptions.map(option => option.value) : [];
+                    setEditTaskForm(prev => ({ ...prev, postToClassrooms: values }));
+                  }}
+                  styles={{
+                    control: (provided) => ({
+                      ...provided,
+                      borderRadius: 8,
+                      fontSize: 14,
+                      background: '#f8fafc',
+                      border: '1px solid #bfcfff',
+                      minHeight: 40
+                    }),
+                    option: (provided, state) => ({
+                      ...provided,
+                      background: state.isSelected ? '#324cdd' : state.isFocused ? '#e3eafe' : '#fff',
+                      color: state.isSelected ? '#fff' : '#333',
+                      padding: '8px 12px'
+                    })
+                  }}
+                  placeholder="Select classrooms..."
+                />
+              </div>
+            </div>
+            
+            <div className="d-flex flex-wrap" style={{ gap: 16, marginBottom: 16, width: '100%' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Task Type *</label>
+                <select
+                  name="type"
+                  value={editTaskForm.type}
+                  onChange={handleEditTaskFormChange}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  required
+                >
+                  <option value="Assignment">Assignment</option>
+                  <option value="Quiz">Quiz</option>
+                  <option value="Project">Project</option>
+                  <option value="Exam">Exam</option>
+                  <option value="Homework">Homework</option>
+                </select>
+                {editTaskForm.submitted && !editTaskForm.type && (
+                  <small className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>Task type is required.</small>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Title *</label>
+                <input
+                  name="title"
+                  type="text"
+                  value={editTaskForm.title}
+                  onChange={handleEditTaskFormChange}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  placeholder="Enter task title..."
+                  required
+                />
+                {editTaskForm.submitted && !editTaskForm.title && (
+                  <small className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>Title is required.</small>
+                )}
+              </div>
+            </div>
+            
+            <div className="d-flex flex-wrap" style={{ gap: 16, marginBottom: 16, width: '100%' }}>
+              <div style={{ flex: 1, minWidth: 120, maxWidth: 150 }}>
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Points *</label>
+                <input
+                  name="points"
+                  type="number"
+                  min="1"
+                  value={editTaskForm.points}
+                  onChange={handleEditTaskFormChange}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  placeholder="Enter points..."
+                  required
+                />
+                {editTaskForm.submitted && !editTaskForm.points && (
+                  <small className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>Points are required.</small>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Due Date</label>
+                <input
+                  name="dueDate"
+                  type="datetime-local"
+                  value={editTaskForm.dueDate}
+                  onChange={handleEditTaskFormChange}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Instructions *</label>
+              <textarea
+                name="text"
+                value={editTaskForm.text}
+                onChange={handleEditTaskFormChange}
+                className="form-control"
+                style={{ 
+                  borderRadius: 8, 
+                  fontSize: 14, 
+                  background: '#f8fafc', 
+                  border: '1px solid #bfcfff',
+                  minHeight: 120,
+                  resize: 'vertical'
+                }}
+                placeholder="Enter task instructions..."
+                required
+              />
+              {editTaskForm.submitted && !editTaskForm.text && (
+                <small className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>Instructions are required.</small>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>Attachments</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <input
+                  type="file"
+                  onChange={handleEditTaskFileChange}
+                  style={{ display: 'none' }}
+                  id="edit-task-file-input"
+                  multiple
+                />
+                <label
+                  htmlFor="edit-task-file-input"
+                  className="btn btn-outline-primary"
+                  style={{ 
+                    borderRadius: 8, 
+                    fontSize: 14, 
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    margin: 0
+                  }}
+                >
+                  <i className="ni ni-cloud-upload-96" style={{ marginRight: 8 }} />
+                  Choose Files
+                </label>
+                <span style={{ fontSize: 12, color: '#666' }}>
+                  {editTaskAttachments.length} file(s) selected
+                </span>
+              </div>
+              {editTaskAttachments.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {editTaskAttachments.map((attachment, index) => (
+                    <div key={index} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8, 
+                      padding: '8px 12px',
+                      background: '#f8fafc',
+                      borderRadius: 6,
+                      border: '1px solid #e9ecef'
+                    }}>
+                      <i className="ni ni-single-copy-04" style={{ color: '#666' }} />
+                      <span style={{ fontSize: 14, flex: 1 }}>{attachment.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEditTaskAttachment(index)}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: '#dc3545', 
+                          cursor: 'pointer',
+                          padding: '4px 8px'
+                        }}
+                      >
+                        <i className="ni ni-fat-remove" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  name="allowComments"
+                  checked={editTaskForm.allowComments}
+                  onChange={(e) => setEditTaskForm(prev => ({ ...prev, allowComments: e.target.checked }))}
+                  style={{ margin: 0 }}
+                />
+                <label style={{ fontSize: 14, color: '#222', margin: 0 }}>
+                  Allow students to comment on this task
+                </label>
+              </div>
+            </div>
+          </Form>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            color="secondary"
+            onClick={handleCancelEditTask}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              border: '1px solid #e9ecef'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="primary"
+            onClick={handleUpdateTask}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #667eea 0%, #324cdd 100%)',
+              border: 'none'
+            }}
+          >
+            Update Task
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Task Schedule Modal */}
+      <Modal isOpen={showTaskScheduleModal} toggle={() => setShowTaskScheduleModal(false)} centered>
+        <ModalHeader toggle={() => setShowTaskScheduleModal(false)} style={{ fontWeight: 700, fontSize: 20 }}>
+          <i className="ni ni-time-alarm" style={{ marginRight: 8, color: '#f39c12' }} />
+          Schedule Task
+        </ModalHeader>
+        <ModalBody style={{ padding: '24px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+              Choose when you want this task to be published automatically.
+            </p>
+            
+            <div className="row">
+              <div className="col-md-6">
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222', marginBottom: 8, display: 'block' }}>
+                  Schedule Date *
+                </label>
+                <input
+                  type="date"
+                  value={taskScheduleDate}
+                  onChange={(e) => setTaskScheduleDate(e.target.value)}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+              <div className="col-md-6">
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222', marginBottom: 8, display: 'block' }}>
+                  Schedule Time *
+                </label>
+                <input
+                  type="time"
+                  value={taskScheduleTime}
+                  onChange={(e) => setTaskScheduleTime(e.target.value)}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  required
+                />
+              </div>
+            </div>
+            
+            {taskScheduleDate && taskScheduleTime && (
+              <div style={{ 
+                marginTop: 16, 
+                padding: '12px 16px', 
+                background: '#e3eafe', 
+                borderRadius: 8, 
+                border: '1px solid #bfcfff' 
+              }}>
+                <div style={{ fontSize: 14, color: '#324cdd', fontWeight: 600 }}>
+                  <i className="ni ni-time-alarm" style={{ marginRight: 6 }} />
+                  Task will be published on:
+                </div>
+                <div style={{ fontSize: 16, color: '#324cdd', marginTop: 4 }}>
+                  {new Date(`${taskScheduleDate}T${taskScheduleTime}`).toLocaleString()}
+                </div>
+              </div>
+            )}
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            color="secondary"
+            onClick={() => setShowTaskScheduleModal(false)}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              border: '1px solid #e9ecef'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="primary"
+            onClick={handleScheduleTask}
+            disabled={!taskScheduleDate || !taskScheduleTime}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #667eea 0%, #324cdd 100%)',
+              border: 'none'
+            }}
+          >
+            <i className="ni ni-time-alarm" style={{ marginRight: 6 }} />
+            Schedule Task
+          </Button>
+        </ModalFooter>
       </Modal>
 
       {/* Copy Toast */}

@@ -60,7 +60,7 @@
     "moment": "2.29.4",
     "nouislider": "15.4.0",
     "opencv.js": "^1.2.1",
-    "pdfjs-dist": "^5.3.93",
+    "pdfjs-dist": "^5.4.54",
     "qrcode.react": "^4.2.0",
     "react": "18.2.0",
     "react-bootstrap": "^2.10.10",

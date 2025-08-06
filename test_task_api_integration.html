@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task API Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Task API Integration Test</h1>
+        <p class="info">This page demonstrates the real API integration for task management in the teacher role.</p>
+
+        <div class="test-section">
+            <h2>API Endpoints Added</h2>
+            <ul>
+                <li><strong>POST /tasks/create</strong> - Create a new task</li>
+                <li><strong>GET /tasks/teacher</strong> - Get teacher's tasks with filters</li>
+                <li><strong>GET /tasks/{id}</strong> - Get task details</li>
+                <li><strong>PUT /tasks/{id}</strong> - Update task</li>
+                <li><strong>POST /tasks/{id}/publish</strong> - Publish draft task</li>
+                <li><strong>POST /tasks/{id}/schedule</strong> - Schedule task</li>
+                <li><strong>POST /tasks/{id}/archive</strong> - Archive task</li>
+                <li><strong>DELETE /tasks/{id}</strong> - Delete task</li>
+                <li><strong>POST /tasks/{id}/submit</strong> - Student submit task</li>
+                <li><strong>POST /tasks/submissions/{id}/grade</strong> - Grade submission</li>
+                <li><strong>POST /tasks/{id}/comments</strong> - Add comment</li>
+                <li><strong>GET /tasks/{id}/comments</strong> - Get task comments</li>
+                <li><strong>GET /tasks/student</strong> - Get student's tasks</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Frontend Integration Features</h2>
+            <ul>
+                <li><strong>Real-time Task Loading</strong> - Tasks are fetched from API instead of localStorage</li>
+                <li><strong>Loading States</strong> - Shows loading spinner while fetching tasks</li>
+                <li><strong>Error Handling</strong> - Displays error messages with retry functionality</li>
+                <li><strong>Task Creation</strong> - Creates tasks via API with proper validation</li>
+                <li><strong>Task Editing</strong> - Updates existing tasks via API</li>
+                <li><strong>Task Deletion</strong> - Deletes tasks via API with confirmation</li>
+                <li><strong>Task Publishing</strong> - Publishes draft tasks via API</li>
+                <li><strong>Task Archiving</strong> - Archives tasks via API</li>
+                <li><strong>Comment System</strong> - Adds and loads comments via API</li>
+                <li><strong>Refresh Functionality</strong> - Manual refresh button for tasks</li>
+                <li><strong>Empty State</strong> - Shows helpful message when no tasks exist</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>API Service Methods Added</h2>
+            <pre><code>// Task Management API Methods
+async createTask(taskData) {
+  return this.makeRequest('/tasks/create', {
+    method: 'POST',
+    body: JSON.stringify(taskData),
+    requireAuth: true,
+  });
+}
+
+async getTeacherTasks(filters = {}) {
+  const queryParams = new URLSearchParams();
+  
+  if (filters.type) queryParams.append('type', filters.type);
+  if (filters.isDraft !== undefined) queryParams.append('is_draft', filters.isDraft);
+  if (filters.classCode) queryParams.append('class_code', filters.classCode);
+  if (filters.status) queryParams.append('status', filters.status);
+  
+  const endpoint = `/tasks/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  return this.makeRequest(endpoint, {
+    method: 'GET',
+    requireAuth: true,
+  });
+}
+
+async getTaskDetails(taskId) {
+  return this.makeRequest(`/tasks/${taskId}`, {
+    method: 'GET',
+    requireAuth: true,
+  });
+}
+
+async updateTask(taskId, taskData) {
+  return this.makeRequest(`/tasks/${taskId}`, {
+    method: 'PUT',
+    body: JSON.stringify(taskData),
+    requireAuth: true,
+  });
+}
+
+async publishTask(taskId) {
+  return this.makeRequest(`/tasks/${taskId}/publish`, {
+    method: 'POST',
+    requireAuth: true,
+  });
+}
+
+async archiveTask(taskId) {
+  return this.makeRequest(`/tasks/${taskId}/archive`, {
+    method: 'POST',
+    requireAuth: true,
+  });
+}
+
+async deleteTask(taskId) {
+  return this.makeRequest(`/tasks/${taskId}`, {
+    method: 'DELETE',
+    requireAuth: true,
+  });
+}
+
+async addTaskComment(taskId, commentData) {
+  return this.makeRequest(`/tasks/${taskId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(commentData),
+    requireAuth: true,
+  });
+}
+
+async getTaskComments(taskId) {
+  return this.makeRequest(`/tasks/${taskId}/comments`, {
+    method: 'GET',
+    requireAuth: true,
+  });
+}</code></pre>
+        </div>
+
+        <div class="test-section">
+            <h2>Key Frontend Changes</h2>
+            <ul>
+                <li><strong>State Management</strong> - Added loadingTasks, taskError states</li>
+                <li><strong>API Integration</strong> - Replaced localStorage with API calls</li>
+                <li><strong>Error Handling</strong> - Added try-catch blocks with user feedback</li>
+                <li><strong>Loading UI</strong> - Added loading spinners and disabled states</li>
+                <li><strong>Form Handling</strong> - Updated to handle both create and edit modes</li>
+                <li><strong>Data Mapping</strong> - Updated to handle API response structure</li>
+                <li><strong>Refresh Functionality</strong> - Added manual refresh button</li>
+                <li><strong>Empty States</strong> - Added helpful empty state messages</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Testing Instructions</h2>
+            <ol>
+                <li><strong>Login as Teacher</strong> - Access the classroom with teacher role</li>
+                <li><strong>Navigate to Class Tasks Tab</strong> - Click on the "Class Tasks" tab</li>
+                <li><strong>Check Loading State</strong> - Should see loading spinner while fetching tasks</li>
+                <li><strong>Create New Task</strong> - Use the "Create Task" button to add a new task</li>
+                <li><strong>Edit Task</strong> - Click the dropdown menu on a task and select "Edit"</li>
+                <li><strong>Delete Task</strong> - Test task deletion with confirmation</li>
+                <li><strong>Add Comments</strong> - Test adding comments to tasks</li>
+                <li><strong>Refresh Tasks</strong> - Use the refresh button to reload tasks</li>
+                <li><strong>Test Error Handling</strong> - Disconnect network to see error states</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>Expected API Responses</h2>
+            <h3>Create Task Response:</h3>
+            <pre><code>{
+  "status": true,
+  "message": "Task created successfully",
+  "data": {
+    "task_id": 1,
+    "title": "Research Paper Assignment",
+    "type": "assignment",
+    "points": 100,
+    "instructions": "Write a 10-page research paper...",
+    "teacher_id": "T001",
+    "teacher_name": "Joel Quiambao",
+    "created_at": "2025-01-15 10:30:00",
+    "status": "active"
+  }
+}</code></pre>
+
+            <h3>Get Tasks Response:</h3>
+            <pre><code>{
+  "status": true,
+  "message": "Tasks retrieved successfully",
+  "data": [
+    {
+      "task_id": 1,
+      "title": "Research Paper Assignment",
+      "type": "assignment",
+      "points": 100,
+      "instructions": "Write a 10-page research paper...",
+      "teacher_name": "Joel Quiambao",
+      "created_at": "2025-01-15 10:30:00",
+      "submission_count": 5
+    }
+  ]
+}</code></pre>
+        </div>
+
+        <div class="test-section">
+            <h2>Success Criteria</h2>
+            <ul>
+                <li class="success">✅ API endpoints are properly integrated</li>
+                <li class="success">✅ Loading states are displayed during API calls</li>
+                <li class="success">✅ Error handling shows user-friendly messages</li>
+                <li class="success">✅ Task creation works with real API</li>
+                <li class="success">✅ Task editing updates via API</li>
+                <li class="success">✅ Task deletion works with confirmation</li>
+                <li class="success">✅ Comments system integrated with API</li>
+                <li class="success">✅ Refresh functionality works</li>
+                <li class="success">✅ Empty states are helpful</li>
+                <li class="success">✅ Form validation works properly</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Next Steps</h2>
+            <ul>
+                <li><strong>Student Integration</strong> - Implement student task viewing and submission</li>
+                <li><strong>Grading System</strong> - Add teacher grading functionality</li>
+                <li><strong>File Uploads</strong> - Integrate file upload for task attachments</li>
+                <li><strong>Notifications</strong> - Add real-time notifications for task updates</li>
+                <li><strong>Advanced Filtering</strong> - Add more filter options for tasks</li>
+                <li><strong>Bulk Operations</strong> - Add bulk edit/delete functionality</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

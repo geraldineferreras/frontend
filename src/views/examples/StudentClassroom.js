@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from "react";
 import { Card, CardBody, Button, Row, Col, Badge, Input, Spinner, Alert } from "reactstrap";
 import { useNavigate } from "react-router-dom";
@@ -38,20 +40,20 @@ const StudentClassroom = () => {
       const response = await apiService.getStudentClasses();
       if (response.status && response.data) {
         console.log('Student classes fetched:', response.data);
-        // Transform API data to match our expected format
-        const transformedClasses = response.data.map((cls, index) => ({
-          id: cls.class_code || index + 1,
-          name: cls.subject_name,
-          section: cls.section_name,
-          subject: cls.subject_name,
-          code: cls.class_code,
-          semester: cls.semester,
-          schoolYear: cls.school_year,
-          teacherName: cls.teacher_name,
-          enrolledAt: cls.enrolled_at,
-          studentCount: 0, // API doesn't provide student count for students
-          theme: colorThemes[index % colorThemes.length]
-        }));
+                 // Transform API data to match our expected format
+         const transformedClasses = response.data.map((cls, index) => ({
+           id: cls.class_id || index + 1,
+           name: cls.subject_name,
+           section: cls.section_name,
+           subject: cls.subject_name,
+           code: cls.class_code || cls.class_id, // Use class_code if available, fallback to class_id
+           semester: cls.semester,
+           schoolYear: cls.school_year,
+           teacherName: cls.teacher_name,
+           enrolledAt: cls.date_created,
+           studentCount: 0, // API doesn't provide student count for students
+           theme: colorThemes[index % colorThemes.length]
+         }));
         setEnrolledClasses(transformedClasses);
       } else {
         setError('No data received from server');
