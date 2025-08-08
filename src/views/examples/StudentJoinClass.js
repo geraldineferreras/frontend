@@ -34,6 +34,7 @@ export default function StudentJoinClass() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [qrScanning, setQrScanning] = useState(false);
   const [qrError, setQrError] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
   const inputRef = useRef(null);
   const qrScannerRef = useRef(null);
 
@@ -90,8 +91,9 @@ export default function StudentJoinClass() {
       const response = await apiService.joinClass(classCode);
       if (response.status) {
         setSuccess(response.message || "Successfully joined the class!");
+        setRedirecting(true);
         setTimeout(() => {
-          window.location.href = "/student/index#my-classes";
+          window.location.href = `/student/classroom/${classCode}`;
         }, 2000);
       } else {
         setError(response.message || "Failed to join class. Please try again.");
@@ -178,24 +180,25 @@ export default function StudentJoinClass() {
         // Show loading state
         setLoading(true);
         
-        try {
-          // Automatically join the class
-          const response = await apiService.joinClass(code);
-          if (response.status) {
-            setSuccess(response.message || "Successfully joined the class!");
-            // Redirect after showing success message
-            setTimeout(() => {
-              window.location.href = "/student/index#my-classes";
-            }, 2000);
-          } else {
-            setError(response.message || "Failed to join class. Please try again.");
-          }
-        } catch (error) {
-          console.error('Error joining class:', error);
-          setError(error.message || "Failed to join class. Please check the class code and try again.");
-        } finally {
-          setLoading(false);
-        }
+                 try {
+           // Automatically join the class
+           const response = await apiService.joinClass(code);
+           if (response.status) {
+             setSuccess(response.message || "Successfully joined the class!");
+             setRedirecting(true);
+             // Redirect to the specific class page after showing success message
+             setTimeout(() => {
+               window.location.href = `/student/classroom/${code}`;
+             }, 2000);
+           } else {
+             setError(response.message || "Failed to join class. Please try again.");
+           }
+         } catch (error) {
+           console.error('Error joining class:', error);
+           setError(error.message || "Failed to join class. Please check the class code and try again.");
+         } finally {
+           setLoading(false);
+         }
       } else {
         setQrError("Invalid class code format in QR code. Expected 5-8 alphanumeric characters.");
       }
@@ -259,8 +262,18 @@ export default function StudentJoinClass() {
             <div>
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Class code</div>
               <div style={{ color: '#666', fontSize: 13, marginBottom: 18 }}>Ask your teacher for the class code, then enter it here.</div>
-              {error && <Alert color="danger" fade>{error}</Alert>}
-              {success && <Alert color="success" fade>{success}</Alert>}
+                             {error && <Alert color="danger" fade>{error}</Alert>}
+               {success && (
+                 <Alert color="success" fade>
+                   {success}
+                   {redirecting && (
+                     <div className="mt-2 d-flex align-items-center">
+                       <Spinner size="sm" className="me-2" />
+                       <span>Redirecting to classroom...</span>
+                     </div>
+                   )}
+                 </Alert>
+               )}
               <Form onSubmit={handleSubmit} autoComplete="off">
                 <FormGroup>
                   <Input
@@ -307,7 +320,18 @@ export default function StudentJoinClass() {
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Scan QR Code</div>
               <div style={{ color: '#666', fontSize: 13, marginBottom: 18 }}>Point your camera at the QR code provided by your teacher.</div>
               
-              {qrError && <Alert color="danger" fade>{qrError}</Alert>}
+                             {qrError && <Alert color="danger" fade>{qrError}</Alert>}
+               {success && (
+                 <Alert color="success" fade>
+                   {success}
+                   {redirecting && (
+                     <div className="mt-2 d-flex align-items-center">
+                       <Spinner size="sm" className="me-2" />
+                       <span>Redirecting to classroom...</span>
+                     </div>
+                   )}
+                 </Alert>
+               )}
               
               <div className="text-center">
                 <Button

@@ -18,6 +18,7 @@ const ExcuseManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [teacherNotes, setTeacherNotes] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Load excuse letters on component mount
   useEffect(() => {
@@ -113,56 +114,207 @@ const ExcuseManagement = () => {
     setConfirmModal({ open: true, excuse, action });
   };
 
+  // Helper function to check for existing attendance record and update it
+  const updateExistingAttendanceRecord = async (excuse, status, notes) => {
+    try {
+      console.log('Checking for existing attendance record with filters:', {
+        studentId: excuse.student_id,
+        date: excuse.date_absent,
+        classId: excuse.class_id
+      });
+      
+      // First, try to find existing attendance record for this student on this date
+      const filters = {
+        studentId: excuse.student_id,
+        date: excuse.date_absent,
+        classId: excuse.class_id
+      };
+      
+      const existingRecords = await apiService.getAttendanceRecords(filters);
+      console.log('Existing attendance records response:', existingRecords);
+      
+      if (existingRecords.status && existingRecords.data && existingRecords.data.length > 0) {
+        // Update existing record
+        const existingRecord = existingRecords.data[0];
+        console.log('Found existing attendance record:', existingRecord);
+        
+        const updateData = {
+          status: status,
+          notes: notes
+        };
+        
+        console.log('Updating existing attendance record with data:', updateData);
+        
+        const updateResponse = await apiService.updateAttendanceRecord(existingRecord.attendance_id, updateData);
+        console.log('Update attendance response:', updateResponse);
+        
+        if (updateResponse.status) {
+          console.log('Successfully updated existing attendance record');
+          return true;
+        } else {
+          console.error('Failed to update existing attendance record:', updateResponse);
+          return false;
+        }
+      } else {
+        console.log('No existing attendance record found for this student/date/class combination');
+        return false; // No existing record found
+      }
+    } catch (error) {
+      console.error('Error checking/updating existing attendance record:', error);
+      return false;
+    }
+  };
+
   const confirmReview = async () => {
     if (!confirmModal.excuse) return;
     
     try {
       setLoading(true);
+      setError(""); // Clear any previous errors
+      setSuccessMessage(""); // Clear any previous success messages
       const status = confirmModal.action === "approve" ? "approved" : "rejected";
       
-             // Update excuse letter status
-       const updateResponse = await apiService.updateExcuseLetterStatus(confirmModal.excuse.letter_id, {
+      console.log('Starting excuse letter review process:', {
+        letterId: confirmModal.excuse.letter_id,
+        status: status,
+        excuse: confirmModal.excuse
+      });
+      
+      // Update excuse letter status
+      const updateResponse = await apiService.updateExcuseLetterStatus(confirmModal.excuse.letter_id, {
         status: status,
         teacher_notes: teacherNotes || `${status === "approved" ? "Approved" : "Rejected"} - ${new Date().toLocaleDateString()}`
       });
+
+      console.log('Excuse letter update response:', updateResponse);
 
       if (updateResponse && updateResponse.status) {
         // If approved, record attendance as excused
         if (status === "approved") {
           try {
-                         await apiService.recordAttendance({
-               student_id: confirmModal.excuse.student_id,
-               class_id: confirmModal.excuse.class_id,
-               date: confirmModal.excuse.date_absent,
-               status: "excused"
-             });
+            const notes = `Excuse letter approved - ${teacherNotes || 'No additional notes'}`;
+            
+            console.log('Processing approved excuse letter. Checking for existing attendance...');
+            
+            // First try to update existing attendance record
+            const updatedExisting = await updateExistingAttendanceRecord(confirmModal.excuse, "Excused", notes);
+            
+            if (!updatedExisting) {
+              console.log('No existing attendance record found. Creating new excused attendance record...');
+              
+              // No existing record found, create new one
+              // Function to get current time in Philippine time
+              const getPhilippineTime = () => {
+                const now = new Date();
+                const philippineTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // Add 8 hours for UTC+8
+                return philippineTime.toISOString().split('T')[1].split('.')[0];
+              };
+
+              // Prepare complete attendance data with all required fields
+              const attendanceData = {
+                student_id: confirmModal.excuse.student_id,
+                subject_id: confirmModal.excuse.subject_id || confirmModal.excuse.subject_id_number || '1',
+                section_name: confirmModal.excuse.section_name || confirmModal.excuse.section || 'Default Section',
+                class_id: confirmModal.excuse.class_id,
+                date: confirmModal.excuse.date_absent,
+                time_in: getPhilippineTime(),
+                status: "Excused",
+                notes: notes,
+                teacher_id: confirmModal.excuse.teacher_id || localStorage.getItem('user_id') || '1'
+              };
+
+              console.log('Recording excused attendance with data:', attendanceData);
+              
+              const attendanceResponse = await apiService.recordAttendance(attendanceData);
+              console.log('Attendance recording response:', attendanceResponse);
+              
+              if (attendanceResponse && attendanceResponse.status) {
+                console.log('Successfully recorded excused attendance');
+              } else {
+                console.error('Failed to record attendance:', attendanceResponse);
+                setError("Excuse letter approved but failed to update attendance record. Please check attendance manually.");
+              }
+            } else {
+              console.log('Successfully updated existing attendance record to excused');
+            }
           } catch (attendanceErr) {
             console.error('Error recording attendance:', attendanceErr);
-            // Continue even if attendance recording fails
+            setError("Excuse letter approved but failed to update attendance record. Please check attendance manually.");
           }
         } else if (status === "rejected") {
           // If rejected, record attendance as absent
           try {
-                         await apiService.recordAttendance({
-               student_id: confirmModal.excuse.student_id,
-               class_id: confirmModal.excuse.class_id,
-               date: confirmModal.excuse.date_absent,
-               status: "absent"
-             });
+            const notes = `Excuse letter rejected - ${teacherNotes || 'No additional notes'}`;
+            
+            console.log('Processing rejected excuse letter. Checking for existing attendance...');
+            
+            // First try to update existing attendance record
+            const updatedExisting = await updateExistingAttendanceRecord(confirmModal.excuse, "Absent", notes);
+            
+            if (!updatedExisting) {
+              console.log('No existing attendance record found. Creating new absent attendance record...');
+              
+              // No existing record found, create new one
+              // Function to get current time in Philippine time
+              const getPhilippineTime = () => {
+                const now = new Date();
+                const philippineTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // Add 8 hours for UTC+8
+                return philippineTime.toISOString().split('T')[1].split('.')[0];
+              };
+
+              // Prepare complete attendance data with all required fields
+              const attendanceData = {
+                student_id: confirmModal.excuse.student_id,
+                subject_id: confirmModal.excuse.subject_id || confirmModal.excuse.subject_id_number || '1',
+                section_name: confirmModal.excuse.section_name || confirmModal.excuse.section || 'Default Section',
+                class_id: confirmModal.excuse.class_id,
+                date: confirmModal.excuse.date_absent,
+                time_in: getPhilippineTime(),
+                status: "Absent",
+                notes: notes,
+                teacher_id: confirmModal.excuse.teacher_id || localStorage.getItem('user_id') || '1'
+              };
+
+              console.log('Recording absent attendance with data:', attendanceData);
+              
+              const attendanceResponse = await apiService.recordAttendance(attendanceData);
+              console.log('Attendance recording response:', attendanceResponse);
+              
+              if (attendanceResponse && attendanceResponse.status) {
+                console.log('Successfully recorded absent attendance');
+              } else {
+                console.error('Failed to record attendance:', attendanceResponse);
+                setError("Excuse letter rejected but failed to update attendance record. Please check attendance manually.");
+              }
+            } else {
+              console.log('Successfully updated existing attendance record to absent');
+            }
           } catch (attendanceErr) {
             console.error('Error recording attendance:', attendanceErr);
-            // Continue even if attendance recording fails
+            setError("Excuse letter rejected but failed to update attendance record. Please check attendance manually.");
           }
         }
 
-                 // Update local state
-         setExcuses(excuses.map(e =>
-           e.letter_id === confirmModal.excuse.letter_id ? { ...e, status: status } : e
-         ));
+        // Update local state
+        setExcuses(excuses.map(e =>
+          e.letter_id === confirmModal.excuse.letter_id ? { ...e, status: status } : e
+        ));
         
         setConfirmModal({ open: false, excuse: null, action: null });
         setTeacherNotes("");
+        setSuccessMessage(`Excuse letter status updated to ${status}. Attendance for this date has been automatically updated.`);
+        
+        // Refresh the excuse letters list to show updated status
+        setTimeout(() => {
+          loadExcuseLetters();
+        }, 1000);
+        
+        setTimeout(() => {
+          setSuccessMessage("");
+          setError(""); // Also clear any errors
+        }, 5000); // Clear success message after 5 seconds
       } else {
+        console.error('Failed to update excuse letter status:', updateResponse);
         setError("Failed to update excuse letter status");
       }
     } catch (err) {
@@ -196,102 +348,20 @@ const ExcuseManagement = () => {
 
   return (
     <>
-      {/* Transparent Header */}
-      <div className="header bg-gradient-info pb-8 pt-5 pt-md-8" style={{ 
-        background: 'linear-gradient(87deg, #11cdef 0, #1171ef 100%)',
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: '200px',
-        paddingTop: '3rem',
-        paddingBottom: '4rem',
-        zIndex: 1000,
-        display: 'block',
-        width: '100%',
-        marginTop: '0',
-        marginBottom: '0'
-      }}>
-        {/* Background Pattern */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-          opacity: 0.3,
-          pointerEvents: 'none'
-        }}></div>
-        
-        {/* Header Content */}
-        <div className="container-fluid" style={{ position: 'relative', zIndex: 1001 }}>
-          <div className="header-body">
-            <div className="row align-items-center py-5">
-              <div className="col-lg-6 col-7">
-                <h1 className="text-white d-inline-block mb-0" style={{ fontSize: '2.5rem', fontWeight: '700', margin: '0' }}>EXCUSE MANAGEMENT</h1>
-                <nav aria-label="breadcrumb" className="d-none d-md-inline-block ml-md-4 mt-3">
-                  <ol className="breadcrumb breadcrumb-links breadcrumb-dark">
-                    <li className="breadcrumb-item">
-                      <a href="#pablo" onClick={(e) => e.preventDefault()}>
-                        <i className="fas fa-home"></i>
-                      </a>
-                    </li>
-                    <li className="breadcrumb-item">
-                      <a href="#pablo" onClick={(e) => e.preventDefault()}>Pages</a>
-                    </li>
-                    <li className="breadcrumb-item active" aria-current="page">
-                      Excuse Management
-                    </li>
-                  </ol>
-                </nav>
-              </div>
-              <div className="col-lg-6 col-5 text-right">
-                <div className="d-flex align-items-center justify-content-end">
-                  <div className="search-container mr-4">
-                    <div className="input-group input-group-alternative">
-                      <div className="input-group-prepend">
-                        <span className="input-group-text">
-                          <i className="fas fa-search"></i>
-                        </span>
-                      </div>
-                      <input
-                        className="form-control"
-                        placeholder="Search"
-                        type="text"
-                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white' }}
-                      />
-                    </div>
-                  </div>
-                  <div className="avatar-group">
-                                         <div className="avatar avatar-lg rounded-circle bg-white shadow">
-                       <div 
-                         className="rounded-circle d-flex align-items-center justify-content-center"
-                         style={{ 
-                           width: '48px', 
-                           height: '48px', 
-                           background: 'linear-gradient(87deg, #11cdef 0, #1171ef 100%)',
-                           color: 'white',
-                           fontSize: '18px',
-                           fontWeight: 'bold'
-                         }}
-                       >
-                         JQ
-                       </div>
-                     </div>
-                    <span className="text-white ml-3 font-weight-bold" style={{ fontSize: '1.1rem' }}>Joel Quiambao</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="container mt-4" style={{ position: 'relative', zIndex: 1001 }}>
+      <div className="container mt-4">
         {/* Error Alert */}
         {error && (
           <Alert color="danger" className="mb-4">
             {error}
             <Button close onClick={() => setError("")} />
+          </Alert>
+        )}
+
+        {/* Success Message Alert */}
+        {successMessage && (
+          <Alert color="success" className="mb-4">
+            {successMessage}
+            <Button close onClick={() => setSuccessMessage("")} />
           </Alert>
         )}
 
@@ -610,10 +680,16 @@ const ExcuseManagement = () => {
             </FormGroup>
             <small className="text-muted">
               {confirmModal.action === "approve" 
-                ? "Approving will mark the student as excused for this date."
-                : "Rejecting will mark the student as absent for this date."
+                ? "Approving will mark the student as excused for this date and automatically update their attendance record."
+                : "Rejecting will mark the student as absent for this date and automatically update their attendance record."
               }
             </small>
+            <div className="mt-2 p-2 bg-light rounded">
+              <small className="text-info">
+                <i className="fas fa-info-circle mr-1"></i>
+                <strong>Automatic Attendance Update:</strong> The system will automatically update the student's attendance record for {confirmModal.excuse?.date_absent} to reflect this decision.
+              </small>
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button color={confirmModal.action === "approve" ? "success" : "danger"} onClick={confirmReview}>

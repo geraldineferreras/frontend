@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Task Creation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .link-input {
+            margin: 5px 0;
+            padding: 5px;
+            width: 300px;
+        }
+        .link-type-select {
+            margin: 5px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teacher Task Creation Test</h1>
+    <p>This page tests the teacher task creation functionality with multiple file attachments and external links.</p>
+
+    <div class="test-section">
+        <h2>Method 1: Multiple Files with Same Field Name (attachment[])</h2>
+        <p>Test creating a task with multiple files using the same field name.</p>
+        
+        <div class="file-input">
+            <label>Select Files:</label><br>
+            <input type="file" id="method1-files" multiple>
+        </div>
+        
+        <button class="test-button" onclick="testMethod1()">Test Method 1</button>
+        <div id="method1-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Method 2: Multiple Files with Different Field Names (attachment1, attachment2, etc.)</h2>
+        <p>Test creating a task with multiple files using different field names.</p>
+        
+        <div class="file-input">
+            <label>Select Files:</label><br>
+            <input type="file" id="method2-files" multiple>
+        </div>
+        
+        <button class="test-button" onclick="testMethod2()">Test Method 2</button>
+        <div id="method2-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Method 3: JSON Array of External Links</h2>
+        <p>Test creating a task with external links using JSON payload.</p>
+        
+        <div>
+            <label>Link Name:</label>
+            <input type="text" id="link-name" class="link-input" placeholder="Research Paper">
+        </div>
+        <div>
+            <label>Link URL:</label>
+            <input type="text" id="link-url" class="link-input" placeholder="https://drive.google.com/file/d/1234567890/view">
+        </div>
+        <div>
+            <label>Link Type:</label>
+            <select id="link-type" class="link-type-select">
+                <option value="link">Link</option>
+                <option value="google_drive">Google Drive</option>
+                <option value="youtube">YouTube</option>
+            </select>
+        </div>
+        <button class="test-button" onclick="addExternalLink()">Add Link</button>
+        <button class="test-button" onclick="testMethod3()">Test Method 3</button>
+        
+        <div id="external-links-list"></div>
+        <div id="method3-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Method 4: Mixed Files and External Links</h2>
+        <p>Test creating a task with both files and external links.</p>
+        
+        <div class="file-input">
+            <label>Select Files:</label><br>
+            <input type="file" id="method4-files" multiple>
+        </div>
+        
+        <button class="test-button" onclick="testMethod4()">Test Method 4</button>
+        <div id="method4-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        let externalLinks = [];
+
+        // Get token from localStorage (assuming user is logged in)
+        function getToken() {
+            return localStorage.getItem('token');
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function testMethod1() {
+            const files = document.getElementById('method1-files').files;
+            if (files.length === 0) {
+                showResult('method1-result', 'Please select at least one file.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            
+            // Add task data
+            formData.append('title', 'Research Paper Assignment');
+            formData.append('type', 'assignment');
+            formData.append('points', '100');
+            formData.append('instructions', 'Write a comprehensive research paper on Object-Oriented Programming concepts.');
+            formData.append('class_codes', JSON.stringify(['J56NHD']));
+            formData.append('allow_comments', '1');
+            formData.append('is_draft', '0');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('due_date', '2025-01-25 23:59:00');
+            formData.append('attachment_type', 'file');
+            formData.append('attachment_url', '');
+            formData.append('assignment_type', 'classroom');
+            formData.append('assigned_students', JSON.stringify([]));
+            
+            // Add multiple files with same field name
+            for (let i = 0; i < files.length; i++) {
+                formData.append('attachment', files[i]);
+            }
+
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}:`, value);
+            }
+
+            fetch(`${API_BASE}/tasks/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult('method1-result', `Success!\nResponse: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('method1-result', `Error: ${error.message}`, 'error');
+            });
+        }
+
+        function testMethod2() {
+            const files = document.getElementById('method2-files').files;
+            if (files.length === 0) {
+                showResult('method2-result', 'Please select at least one file.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            
+            // Add task data
+            formData.append('title', 'Research Paper Assignment');
+            formData.append('type', 'assignment');
+            formData.append('points', '100');
+            formData.append('instructions', 'Write a comprehensive research paper on Object-Oriented Programming concepts.');
+            formData.append('class_codes', JSON.stringify(['J56NHD']));
+            formData.append('allow_comments', '1');
+            formData.append('is_draft', '0');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('due_date', '2025-01-25 23:59:00');
+            formData.append('attachment_type', 'file');
+            formData.append('attachment_url', '');
+            formData.append('assignment_type', 'classroom');
+            formData.append('assigned_students', JSON.stringify([]));
+            
+            // Add files with different field names
+            for (let i = 0; i < files.length; i++) {
+                formData.append(`attachment${i + 1}`, files[i]);
+            }
+
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}:`, value);
+            }
+
+            fetch(`${API_BASE}/tasks/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult('method2-result', `Success!\nResponse: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('method2-result', `Error: ${error.message}`, 'error');
+            });
+        }
+
+        function addExternalLink() {
+            const name = document.getElementById('link-name').value;
+            const url = document.getElementById('link-url').value;
+            const type = document.getElementById('link-type').value;
+
+            if (!name || !url) {
+                alert('Please enter both name and URL');
+                return;
+            }
+
+            externalLinks.push({
+                file_name: name,
+                original_name: name,
+                attachment_type: type,
+                attachment_url: url,
+                file_size: 0,
+                mime_type: 'application/octet-stream'
+            });
+
+            updateExternalLinksList();
+            
+            // Clear inputs
+            document.getElementById('link-name').value = '';
+            document.getElementById('link-url').value = '';
+        }
+
+        function updateExternalLinksList() {
+            const list = document.getElementById('external-links-list');
+            list.innerHTML = '<h4>Added Links:</h4>';
+            
+            externalLinks.forEach((link, index) => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <span>${link.file_name} (${link.attachment_type}) - ${link.attachment_url}</span>
+                    <button onclick="removeExternalLink(${index})" style="margin-left: 10px;">Remove</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function removeExternalLink(index) {
+            externalLinks.splice(index, 1);
+            updateExternalLinksList();
+        }
+
+        function testMethod3() {
+            if (externalLinks.length === 0) {
+                showResult('method3-result', 'Please add at least one external link.', 'error');
+                return;
+            }
+
+            const payload = {
+                title: 'Research Paper Assignment',
+                type: 'assignment',
+                points: 100,
+                instructions: 'Write a comprehensive research paper on Object-Oriented Programming concepts.',
+                class_codes: ['J56NHD'],
+                allow_comments: true,
+                is_draft: false,
+                is_scheduled: false,
+                scheduled_at: null,
+                due_date: '2025-01-25 23:59:00',
+                attachment_type: 'link',
+                attachment_url: '',
+                assignment_type: 'classroom',
+                assigned_students: [],
+                attachments: externalLinks
+            };
+
+            console.log('JSON payload:', payload);
+
+            fetch(`${API_BASE}/tasks/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult('method3-result', `Success!\nResponse: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('method3-result', `Error: ${error.message}`, 'error');
+            });
+        }
+
+        function testMethod4() {
+            const files = document.getElementById('method4-files').files;
+            if (files.length === 0 && externalLinks.length === 0) {
+                showResult('method4-result', 'Please select files or add external links.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            
+            // Add task data
+            formData.append('title', 'Research Paper Assignment');
+            formData.append('type', 'assignment');
+            formData.append('points', '100');
+            formData.append('instructions', 'Write a comprehensive research paper on Object-Oriented Programming concepts.');
+            formData.append('class_codes', JSON.stringify(['J56NHD']));
+            formData.append('allow_comments', '1');
+            formData.append('is_draft', '0');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('due_date', '2025-01-25 23:59:00');
+            formData.append('attachment_type', 'file');
+            formData.append('attachment_url', '');
+            formData.append('assignment_type', 'classroom');
+            formData.append('assigned_students', JSON.stringify([]));
+            
+            // Add external links as JSON string
+            if (externalLinks.length > 0) {
+                formData.append('external_links', JSON.stringify(externalLinks));
+            }
+            
+            // Add files
+            for (let i = 0; i < files.length; i++) {
+                formData.append('attachment', files[i]);
+            }
+
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}:`, value);
+            }
+
+            fetch(`${API_BASE}/tasks/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult('method4-result', `Success!\nResponse: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('method4-result', `Error: ${error.message}`, 'error');
+            });
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Teacher Task Creation Test Page Loaded');
+            console.log('Make sure you are logged in and have a valid token in localStorage');
+        });
+    </script>
+</body>
+</html>

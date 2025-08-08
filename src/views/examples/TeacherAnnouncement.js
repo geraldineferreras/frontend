@@ -211,7 +211,7 @@ const TeacherAnnouncement = () => {
                   <span className="text-muted small ml-2">{a.time}</span>
                   <Badge color={a.target === "Class" ? "info" : "warning"} className="ml-3" pill>{a.target}</Badge>
                 </div>
-                <Button color="link" size="sm" style={{ color: '#f5365c' }} title="React" onClick={() => handleReact(a.id)}><FaRegThumbsUp /> {a.reactions.like}</Button>
+                {/* Like button removed for teacher view */}
               </CardHeader>
               <CardBody>
                 <div style={{ fontSize: 17, marginBottom: 8 }}>{a.content}</div>

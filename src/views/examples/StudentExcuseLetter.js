@@ -25,6 +25,9 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import { FaPlus, FaTrash, FaEye, FaFileUpload, FaCalendarAlt } from "react-icons/fa";
 import apiService from "../../services/api";
 
+// Get API_BASE from the same source as apiService
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+
 const StudentExcuseLetter = () => {
   // State for excuse letters data
   const [excuseLetters, setExcuseLetters] = useState([]);
@@ -175,25 +178,45 @@ const StudentExcuseLetter = () => {
     try {
       console.log('=== DIRECT API TEST ===');
       
-      // Use the exact same data that worked in your manual test
-      const testData = {
-        class_id: "5",
-        date_absent: "2025-08-10",
-        reason: "Aguinaldo Day"
-      };
+      // Test with all possible class_id values from your API response
+      const testCases = [
+        { class_id: "4", name: "Database Management System" },
+        { class_id: "5", name: "System Analysis and Design" },
+        { class_id: "6", name: "Advanced OOP" },
+        // Also test numeric versions
+        { class_id: 4, name: "Database Management System (numeric)" },
+        { class_id: 5, name: "System Analysis and Design (numeric)" },
+        { class_id: 6, name: "Advanced OOP (numeric)" }
+      ];
       
-      console.log('Testing with exact data that worked:', testData);
-      
-      // Test the exact endpoint that worked
-      const response = await apiService.submitExcuseLetter(testData);
-      console.log('Direct API test response:', response);
-      
-      if (response.status) {
-        setSuccess('Direct API test successful! The endpoint works.');
-        loadExcuseLetters(); // Reload the list
-      } else {
-        setError('Direct API test failed: ' + (response.message || 'Unknown error'));
+      for (let i = 0; i < testCases.length; i++) {
+        const testCase = testCases[i];
+        console.log(`\n--- Testing ${testCase.name} with class_id: ${testCase.class_id} ---`);
+        
+        try {
+          const testData = {
+            class_id: testCase.class_id,
+            date_absent: "2024-01-15",
+            reason: `Test for ${testCase.name}`
+          };
+          
+          console.log('Test data:', testData);
+          const response = await apiService.submitExcuseLetter(testData);
+          console.log('API response:', response);
+          
+          if (response.status) {
+            console.log(`✅ SUCCESS! ${testCase.name} works with class_id: ${testCase.class_id}`);
+            setSuccess(`Direct API test successful for ${testCase.name} with class_id: ${testCase.class_id}`);
+            return;
+          } else {
+            console.log(`❌ Failed for ${testCase.name}: ${response.message}`);
+          }
+        } catch (error) {
+          console.log(`❌ Error for ${testCase.name}: ${error.message}`);
+        }
       }
+      
+      setError('All direct API tests failed');
     } catch (error) {
       console.error('Direct API test error:', error);
       setError('Direct API test failed: ' + error.message);
@@ -583,6 +606,370 @@ const StudentExcuseLetter = () => {
     }
   };
 
+  // Comprehensive test function to find the correct class_id format
+  const testAllPossibleClassIds = async () => {
+    try {
+      setSubmitLoading(true);
+      clearMessages();
+      
+      console.log('=== COMPREHENSIVE CLASS_ID TEST ===');
+      
+      if (!availableClasses || availableClasses.length === 0) {
+        setError('No classes available for testing');
+        return;
+      }
+      
+      const testClass = availableClasses[0]; // Use the first available class
+      console.log('Testing with class:', testClass);
+      
+      // All possible field combinations to test
+      const testCases = [
+        // String versions
+        { field: 'class_id', value: testClass.original.class_id, description: 'class_id (string)' },
+        { field: 'subject_id', value: testClass.original.subject_id, description: 'subject_id (string)' },
+        { field: 'section_id', value: testClass.original.section_id, description: 'section_id (string)' },
+        { field: 'id', value: testClass.original.id, description: 'id (string)' },
+        
+        // Numeric versions
+        { field: 'class_id', value: Number(testClass.original.class_id), description: 'class_id (numeric)' },
+        { field: 'subject_id', value: Number(testClass.original.subject_id), description: 'subject_id (numeric)' },
+        { field: 'section_id', value: Number(testClass.original.section_id), description: 'section_id (numeric)' },
+        { field: 'id', value: Number(testClass.original.id), description: 'id (numeric)' },
+        
+        // Different field names
+        { field: 'classId', value: testClass.original.class_id, description: 'classId (string)' },
+        { field: 'subjectId', value: testClass.original.subject_id, description: 'subjectId (string)' },
+        { field: 'sectionId', value: testClass.original.section_id, description: 'sectionId (string)' },
+        
+        // Try without field name (just the value)
+        { field: null, value: testClass.original.class_id, description: 'class_id value only' },
+        { field: null, value: testClass.original.subject_id, description: 'subject_id value only' },
+        { field: null, value: testClass.original.section_id, description: 'section_id value only' }
+      ];
+      
+      const testData = {
+        date_absent: "2024-01-15",
+        reason: "Comprehensive test for correct class_id format"
+      };
+      
+      for (let i = 0; i < testCases.length; i++) {
+        const testCase = testCases[i];
+        console.log(`\n--- Test ${i + 1}/${testCases.length}: ${testCase.description} ---`);
+        
+        try {
+          let requestData;
+          
+          if (testCase.field) {
+            requestData = {
+              ...testData,
+              [testCase.field]: testCase.value
+            };
+          } else {
+            // Try sending just the value without a field name
+            requestData = {
+              ...testData,
+              class_id: testCase.value
+            };
+          }
+          
+          console.log('Request data:', requestData);
+          console.log('Request URL:', `${API_BASE}/excuse-letters/submit`);
+          
+          // Make the request directly to see the exact response
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE}/excuse-letters/submit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(requestData)
+          });
+          
+          const responseData = await response.json();
+          console.log('Response status:', response.status);
+          console.log('Response data:', responseData);
+          
+          if (response.ok && responseData.status) {
+            console.log(`✅ SUCCESS! ${testCase.description} works!`);
+            setSuccess(`Found working format: ${testCase.description} with value: ${testCase.value}`);
+            return;
+          } else {
+            console.log(`❌ Failed: ${responseData.message || 'Unknown error'}`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ Error: ${error.message}`);
+        }
+      }
+      
+      setError('All test cases failed. Backend may have different requirements.');
+      
+    } catch (error) {
+      console.error('Comprehensive test error:', error);
+      setError('Test failed: ' + error.message);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  // Test function to find the correct field for excuse letter submission
+  const testExactApiStructure = async () => {
+    try {
+      setSubmitLoading(true);
+      clearMessages();
+      
+      console.log('=== TESTING EXACT API STRUCTURE ===');
+      
+      // Use the exact structure from your API response
+      const testPayloads = [
+        // Test with class_id (what you're currently sending)
+        {
+          class_id: "6",
+          date_absent: "2024-01-15",
+          reason: "Test with class_id: 6"
+        },
+        // Test with subject_id
+        {
+          subject_id: "1",
+          date_absent: "2024-01-15", 
+          reason: "Test with subject_id: 1"
+        },
+        // Test with section_id
+        {
+          section_id: "15",
+          date_absent: "2024-01-15",
+          reason: "Test with section_id: 15"
+        },
+        // Test with numeric versions
+        {
+          class_id: 6,
+          date_absent: "2024-01-15",
+          reason: "Test with class_id: 6 (numeric)"
+        },
+        {
+          subject_id: 1,
+          date_absent: "2024-01-15",
+          reason: "Test with subject_id: 1 (numeric)"
+        },
+        {
+          section_id: 15,
+          date_absent: "2024-01-15", 
+          reason: "Test with section_id: 15 (numeric)"
+        },
+        // Test with different field names
+        {
+          classId: "6",
+          date_absent: "2024-01-15",
+          reason: "Test with classId: 6"
+        },
+        {
+          subjectId: "1", 
+          date_absent: "2024-01-15",
+          reason: "Test with subjectId: 1"
+        },
+        {
+          sectionId: "15",
+          date_absent: "2024-01-15",
+          reason: "Test with sectionId: 15"
+        }
+      ];
+      
+      for (let i = 0; i < testPayloads.length; i++) {
+        const payload = testPayloads[i];
+        console.log(`\n--- Test ${i + 1}/${testPayloads.length} ---`);
+        console.log('Payload:', payload);
+        
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE}/excuse-letters/submit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          const responseData = await response.json();
+          console.log('Response status:', response.status);
+          console.log('Response data:', responseData);
+          
+          if (response.ok && responseData.status) {
+            console.log(`✅ SUCCESS! Found working payload:`, payload);
+            setSuccess(`Found working format: ${JSON.stringify(payload)}`);
+            return;
+          } else {
+            console.log(`❌ Failed: ${responseData.message || 'Unknown error'}`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ Error: ${error.message}`);
+        }
+      }
+      
+      setError('All test cases failed. Backend may have different requirements.');
+      
+    } catch (error) {
+      console.error('Test error:', error);
+      setError('Test failed: ' + error.message);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  // Test function to find the correct field for excuse letter submission using your exact API response
+  const testYourExactApiResponse = async () => {
+    try {
+      setSubmitLoading(true);
+      clearMessages();
+      
+      console.log('=== TESTING YOUR EXACT API RESPONSE ===');
+      
+      // Based on your exact API response for "Advanced OOP"
+      const advancedOOPClass = {
+        class_id: "6",
+        subject_id: "1", 
+        teacher_id: "TEA6860CA834786E482",
+        section_id: "15",
+        semester: "1st Semester",
+        school_year: "2024-2025",
+        status: "active",
+        date_created: "2025-07-31 14:01:36",
+        is_active: "1",
+        subject_code: "CS101",
+        subject_name: "Advanced OOP",
+        teacher_name: "Joel Quiambao",
+        section_name: "BSIT 1Z",
+        class_code: "J56NHD",
+        title: "OOP BSIT1z",
+        is_enrolled: true
+      };
+      
+      console.log('Testing with Advanced OOP class data:', advancedOOPClass);
+      
+      // Test all possible field combinations
+      const testPayloads = [
+        // Test with class_id field
+        {
+          class_id: advancedOOPClass.class_id,
+          date_absent: "2024-01-15",
+          reason: "Test with class_id from API"
+        },
+        // Test with subject_id field
+        {
+          subject_id: advancedOOPClass.subject_id,
+          date_absent: "2024-01-15",
+          reason: "Test with subject_id from API"
+        },
+        // Test with section_id field
+        {
+          section_id: advancedOOPClass.section_id,
+          date_absent: "2024-01-15",
+          reason: "Test with section_id from API"
+        },
+        // Test with class_code field
+        {
+          class_code: advancedOOPClass.class_code,
+          date_absent: "2024-01-15",
+          reason: "Test with class_code from API"
+        },
+        // Test with subject_code field
+        {
+          subject_code: advancedOOPClass.subject_code,
+          date_absent: "2024-01-15",
+          reason: "Test with subject_code from API"
+        },
+        // Test with numeric versions
+        {
+          class_id: Number(advancedOOPClass.class_id),
+          date_absent: "2024-01-15",
+          reason: "Test with class_id (numeric) from API"
+        },
+        {
+          subject_id: Number(advancedOOPClass.subject_id),
+          date_absent: "2024-01-15",
+          reason: "Test with subject_id (numeric) from API"
+        },
+        {
+          section_id: Number(advancedOOPClass.section_id),
+          date_absent: "2024-01-15",
+          reason: "Test with section_id (numeric) from API"
+        },
+        // Test with different field names
+        {
+          classId: advancedOOPClass.class_id,
+          date_absent: "2024-01-15",
+          reason: "Test with classId from API"
+        },
+        {
+          subjectId: advancedOOPClass.subject_id,
+          date_absent: "2024-01-15",
+          reason: "Test with subjectId from API"
+        },
+        {
+          sectionId: advancedOOPClass.section_id,
+          date_absent: "2024-01-15",
+          reason: "Test with sectionId from API"
+        },
+        // Test with multiple fields (maybe backend expects combination)
+        {
+          class_id: advancedOOPClass.class_id,
+          subject_id: advancedOOPClass.subject_id,
+          date_absent: "2024-01-15",
+          reason: "Test with class_id + subject_id from API"
+        },
+        {
+          class_id: advancedOOPClass.class_id,
+          section_id: advancedOOPClass.section_id,
+          date_absent: "2024-01-15",
+          reason: "Test with class_id + section_id from API"
+        }
+      ];
+      
+      for (let i = 0; i < testPayloads.length; i++) {
+        const payload = testPayloads[i];
+        console.log(`\n--- Test ${i + 1}/${testPayloads.length} ---`);
+        console.log('Payload:', payload);
+        
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE}/excuse-letters/submit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          const responseData = await response.json();
+          console.log('Response status:', response.status);
+          console.log('Response data:', responseData);
+          
+          if (response.ok && responseData.status) {
+            console.log(`✅ SUCCESS! Found working payload:`, payload);
+            setSuccess(`Found working format: ${JSON.stringify(payload)}`);
+            return;
+          } else {
+            console.log(`❌ Failed: ${responseData.message || 'Unknown error'}`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ Error: ${error.message}`);
+        }
+      }
+      
+      setError('All test cases failed. Backend may have different requirements.');
+      
+    } catch (error) {
+      console.error('Test error:', error);
+      setError('Test failed: ' + error.message);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
   const loadStudentClasses = async () => {
     try {
       setLoadingClasses(true);
@@ -605,13 +992,34 @@ const StudentExcuseLetter = () => {
         
         console.log('Processed classes data:', classesData);
         
+        // Filter only enrolled classes (is_enrolled === true)
+        const enrolledOnly = classesData.filter(cls => cls.is_enrolled === true);
+        console.log('Enrolled classes only:', enrolledOnly);
+        
         // Transform API data using the correct class_id from the API response
-        const transformedClasses = classesData.map((cls, index) => {
+        const transformedClasses = enrolledOnly.map((cls, index) => {
           console.log(`Processing class ${index}:`, cls.subject_name || cls.subject || cls.name);
           
-          // Use the class_id directly from the API response - this is the correct field
-          // Ensure class_id is always a string as per the API response format
-          const classId = cls.class_id ? String(cls.class_id) : null;
+          // Try to find the correct class_id field for excuse letter submission
+          // The API might return different field names, so we need to check multiple possibilities
+          let classId = null;
+          
+          // Priority order for class_id fields (based on discovery functions)
+          if (cls.id !== undefined && cls.id !== null) {
+            classId = String(cls.id);
+          } else if (cls.class_id !== undefined && cls.class_id !== null) {
+            classId = String(cls.class_id);
+          } else if (cls.classId !== undefined && cls.classId !== null) {
+            classId = String(cls.classId);
+          } else if (cls.subject_id !== undefined && cls.subject_id !== null) {
+            classId = String(cls.subject_id);
+          } else if (cls.subjectId !== undefined && cls.subjectId !== null) {
+            classId = String(cls.subjectId);
+          } else if (cls.section_id !== undefined && cls.section_id !== null) {
+            classId = String(cls.section_id);
+          } else if (cls.sectionId !== undefined && cls.sectionId !== null) {
+            classId = String(cls.sectionId);
+          }
           
           console.log(`Class ${index} class_id from API:`, classId);
           console.log(`Class ${index} full data:`, cls);
@@ -830,28 +1238,60 @@ const StudentExcuseLetter = () => {
         });
         loadExcuseLetters(); // Reload the list
       } else {
-        // If the first attempt fails with "Class not found", try with the original class_id
-        if (response.message && response.message.includes("Class not found") && selectedClass && selectedClass.original) {
-          console.log('First attempt failed with "Class not found", trying with original class_id...');
+        // If the first attempt fails, try with different class_id fields from the original API response
+        if (selectedClass && selectedClass.original) {
+          console.log('First attempt failed, trying with different class_id fields...');
           
-          // Try with the original class_id from the API response
-          const originalClassId = selectedClass.original.id || selectedClass.original.class_id || selectedClass.original.classId;
+          // Try different possible class_id fields from the original API response
+          const possibleClassIds = [
+            selectedClass.original.id,
+            selectedClass.original.class_id,
+            selectedClass.original.classId,
+            selectedClass.original.subject_id,
+            selectedClass.original.subjectId,
+            selectedClass.original.section_id,
+            selectedClass.original.sectionId,
+            // Also try numeric versions
+            selectedClass.original.id ? Number(selectedClass.original.id) : null,
+            selectedClass.original.class_id ? Number(selectedClass.original.class_id) : null,
+            selectedClass.original.subject_id ? Number(selectedClass.original.subject_id) : null,
+            selectedClass.original.section_id ? Number(selectedClass.original.section_id) : null
+          ].filter(id => id !== undefined && id !== null && String(id) !== submitForm.class_id);
           
-          if (originalClassId && originalClassId !== submitForm.class_id) {
-            console.log('Retrying with original class_id:', originalClassId);
+          console.log('Possible class_ids to try:', possibleClassIds);
+          
+          for (let i = 0; i < possibleClassIds.length; i++) {
+            const classId = possibleClassIds[i];
+            console.log(`Trying class_id ${i + 1}/${possibleClassIds.length}:`, classId);
             
             try {
-              const retryData = {
-                class_id: String(originalClassId),
-                date_absent: submitForm.date_absent,
-                reason: submitForm.reason
-              };
-              console.log('Retry data:', retryData);
+              let retryResponse;
               
-              const retryResponse = await apiService.submitExcuseLetter(retryData);
+              if (submitForm.attachment) {
+                // Retry with attachment using FormData
+                const retryFormData = new FormData();
+                retryFormData.append('class_id', String(classId));
+                retryFormData.append('date_absent', submitForm.date_absent);
+                retryFormData.append('reason', submitForm.reason);
+                retryFormData.append('attachment', submitForm.attachment);
+                
+                retryResponse = await apiService.submitExcuseLetterWithAttachment(retryFormData);
+              } else {
+                // Retry without attachment using JSON
+                const retryData = {
+                  class_id: String(classId),
+                  date_absent: submitForm.date_absent,
+                  reason: submitForm.reason
+                };
+                console.log('Retry data:', retryData);
+                
+                retryResponse = await apiService.submitExcuseLetter(retryData);
+              }
+              
               console.log('Retry response:', retryResponse);
               
               if (retryResponse.status) {
+                console.log('SUCCESS! Found working class_id:', classId);
                 setSuccess("Excuse letter submitted successfully!");
                 setSubmitForm({
                   class_id: "",
@@ -863,7 +1303,7 @@ const StudentExcuseLetter = () => {
                 return;
               }
             } catch (retryError) {
-              console.error('Retry attempt failed:', retryError);
+              console.log(`Retry attempt ${i + 1} failed:`, retryError.message);
             }
           }
         }
@@ -1248,6 +1688,54 @@ const StudentExcuseLetter = () => {
                     }}
                   >
                     Set Working Class ID
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={testAllPossibleClassIds}
+                    style={{ 
+                      background: '#dc3545', 
+                      color: '#fff', 
+                      border: 'none', 
+                      borderRadius: 4, 
+                      padding: '4px 8px', 
+                      fontSize: 12, 
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Test All Class IDs
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={testExactApiStructure}
+                    style={{ 
+                      background: '#6f42c1', 
+                      color: '#fff', 
+                      border: 'none', 
+                      borderRadius: 4, 
+                      padding: '4px 8px', 
+                      fontSize: 12, 
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Test Exact API Structure
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={testYourExactApiResponse}
+                    style={{ 
+                      background: '#fd7e14', 
+                      color: '#fff', 
+                      border: 'none', 
+                      borderRadius: 4, 
+                      padding: '4px 8px', 
+                      fontSize: 12, 
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Test Your API Response
                   </button>
                   <button 
                     type="button" 

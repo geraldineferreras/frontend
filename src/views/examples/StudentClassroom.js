@@ -40,20 +40,25 @@ const StudentClassroom = () => {
       const response = await apiService.getStudentClasses();
       if (response.status && response.data) {
         console.log('Student classes fetched:', response.data);
-                 // Transform API data to match our expected format
-         const transformedClasses = response.data.map((cls, index) => ({
-           id: cls.class_id || index + 1,
-           name: cls.subject_name,
-           section: cls.section_name,
-           subject: cls.subject_name,
-           code: cls.class_code || cls.class_id, // Use class_code if available, fallback to class_id
-           semester: cls.semester,
-           schoolYear: cls.school_year,
-           teacherName: cls.teacher_name,
-           enrolledAt: cls.date_created,
-           studentCount: 0, // API doesn't provide student count for students
-           theme: colorThemes[index % colorThemes.length]
-         }));
+        
+        // Filter only enrolled classes (is_enrolled === true)
+        const enrolledOnly = response.data.filter(cls => cls.is_enrolled === true);
+        console.log('Enrolled classes only:', enrolledOnly);
+        
+        // Transform API data to match our expected format
+        const transformedClasses = enrolledOnly.map((cls, index) => ({
+          id: cls.class_id || index + 1,
+          name: cls.subject_name,
+          section: cls.section_name,
+          subject: cls.subject_name,
+          code: cls.class_code || cls.class_id, // Use class_code if available, fallback to class_id
+          semester: cls.semester,
+          schoolYear: cls.school_year,
+          teacherName: cls.teacher_name,
+          enrolledAt: cls.date_created,
+          studentCount: 0, // API doesn't provide student count for students
+          theme: colorThemes[index % colorThemes.length]
+        }));
         setEnrolledClasses(transformedClasses);
       } else {
         setError('No data received from server');
@@ -108,8 +113,8 @@ const StudentClassroom = () => {
         {enrolledClasses.length === 0 ? (
           <div className="text-center py-5">
             <i className="ni ni-books text-muted" style={{ fontSize: "4rem" }}></i>
-            <h4 className="mt-3 text-muted">No classes enrolled</h4>
-            <p className="text-muted">You haven't joined any classes yet</p>
+            <h4 className="mt-3 text-muted">No enrolled classes</h4>
+            <p className="text-muted">You haven't enrolled in any classes yet. Join a class to get started!</p>
             <Button color="primary" size="lg" onClick={() => navigate('/student/join-class')}>
               <i className="ni ni-fat-add mr-2"></i>
               Join a Class

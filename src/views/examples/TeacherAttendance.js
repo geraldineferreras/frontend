@@ -635,6 +635,25 @@ const TeacherAttendance = () => {
                </CardBody>
              </Card>
            </Col>
+           <Col xs={12} sm={3} className="mb-3">
+             <Card className="shadow border-0">
+               <CardBody className="py-3">
+                 <Row className="align-items-center">
+                   <Col>
+                     <h6 className="text-uppercase text-muted ls-1 mb-1">Excused</h6>
+                     <h5 className="h3 mb-0 text-info">
+                       {attendanceRecords.filter(r => r.status === 'Excused').length}
+                     </h5>
+                   </Col>
+                   <Col className="col-auto">
+                     <div className="icon icon-shape bg-gradient-info text-white rounded-circle shadow">
+                       <FaUndo />
+                     </div>
+                   </Col>
+                 </Row>
+               </CardBody>
+             </Card>
+           </Col>
          </Row>
 
         {/* Main Controls */}

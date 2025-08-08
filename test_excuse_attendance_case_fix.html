@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Excuse Attendance Case Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { margin: 5px; padding: 10px 15px; cursor: pointer; }
+        .log { background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 3px; font-family: monospace; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Test Excuse Attendance Case Fix</h1>
+    
+    <div class="section info">
+        <h3>Problem Description</h3>
+        <p><strong>Issue:</strong> The excuse letter approval system was setting attendance status to "excused" (lowercase) but the TeacherAttendance view expects "Excused" (capitalized).</p>
+        <p><strong>Fix Applied:</strong> Updated all attendance status values to use proper capitalization: "Present", "Late", "Absent", "Excused".</p>
+    </div>
+
+    <div class="section">
+        <h3>Test 1: Check Current Excuse Letters</h3>
+        <button onclick="checkExcuseLetters()">Get All Excuse Letters</button>
+        <div id="excuseLettersResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>Test 2: Check Current Attendance Records</h3>
+        <button onclick="checkAttendanceRecords()">Get All Attendance Records</button>
+        <div id="attendanceRecordsResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>Test 3: Test Excuse Letter Approval with Proper Case</h3>
+        <div>
+            <label>Letter ID:</label>
+            <input type="text" id="letterId" placeholder="Enter letter ID">
+        </div>
+        <div>
+            <label>Student ID:</label>
+            <input type="text" id="studentId" placeholder="Enter student ID">
+        </div>
+        <div>
+            <label>Date Absent:</label>
+            <input type="date" id="dateAbsent" placeholder="Enter date absent">
+        </div>
+        <div>
+            <label>Class ID:</label>
+            <input type="text" id="classId" placeholder="Enter class ID">
+        </div>
+        <button onclick="testApprovalWithProperCase()">Test Approval with Proper Case</button>
+        <div id="approvalResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>Test 4: Verify Attendance Status After Approval</h3>
+        <button onclick="verifyAttendanceStatus()">Check Attendance Status</button>
+        <div id="verificationResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>Test 5: Test Manual Attendance Update with Proper Case</h3>
+        <div>
+            <label>Attendance ID:</label>
+            <input type="text" id="attendanceId" placeholder="Enter attendance ID">
+        </div>
+        <button onclick="testManualUpdateWithProperCase()">Test Manual Update</button>
+        <div id="manualUpdateResult" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        let lastApprovedLetter = null;
+
+        // Helper function to make API calls
+        async function makeApiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                };
+
+                const config = {
+                    method: method,
+                    headers: headers
+                };
+
+                if (data && method !== 'GET') {
+                    config.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, config);
+                const result = await response.json();
+                
+                return {
+                    status: response.ok,
+                    data: result,
+                    statusCode: response.status
+                };
+            } catch (error) {
+                return {
+                    status: false,
+                    error: error.message,
+                    data: null
+                };
+            }
+        }
+
+        // Test 1: Check current excuse letters
+        async function checkExcuseLetters() {
+            const resultDiv = document.getElementById('excuseLettersResult');
+            resultDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await makeApiCall('/excuse-letters/teacher');
+                resultDiv.innerHTML = `
+                    <h4>Excuse Letters Response:</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+                
+                if (response.status && response.data && response.data.data) {
+                    const excuses = response.data.data;
+                    if (excuses.length > 0) {
+                        // Auto-fill form with first excuse letter
+                        const firstExcuse = excuses[0];
+                        document.getElementById('letterId').value = firstExcuse.letter_id || '';
+                        document.getElementById('studentId').value = firstExcuse.student_id || '';
+                        document.getElementById('dateAbsent').value = firstExcuse.date_absent || '';
+                        document.getElementById('classId').value = firstExcuse.class_id || '';
+                    }
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test 2: Check current attendance records
+        async function checkAttendanceRecords() {
+            const resultDiv = document.getElementById('attendanceRecordsResult');
+            resultDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await makeApiCall('/attendance/records');
+                resultDiv.innerHTML = `
+                    <h4>Attendance Records Response:</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+                
+                if (response.status && response.data && response.data.data) {
+                    const records = response.data.data;
+                    const excusedRecords = records.filter(r => r.status === 'Excused');
+                    const absentRecords = records.filter(r => r.status === 'Absent');
+                    
+                    resultDiv.innerHTML += `
+                        <div class="info">
+                            <h5>Status Analysis:</h5>
+                            <p>Total Records: ${records.length}</p>
+                            <p>Excused Records: ${excusedRecords.length}</p>
+                            <p>Absent Records: ${absentRecords.length}</p>
+                            <p>Other Statuses: ${records.filter(r => r.status !== 'Excused' && r.status !== 'Absent').length}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test 3: Test approval with proper case
+        async function testApprovalWithProperCase() {
+            const resultDiv = document.getElementById('approvalResult');
+            resultDiv.innerHTML = 'Testing approval with proper case...';
+            
+            const letterId = document.getElementById('letterId').value;
+            const studentId = document.getElementById('studentId').value;
+            const dateAbsent = document.getElementById('dateAbsent').value;
+            const classId = document.getElementById('classId').value;
+            
+            if (!letterId || !studentId || !dateAbsent || !classId) {
+                resultDiv.innerHTML = '<div class="error">Please fill in all required fields</div>';
+                return;
+            }
+
+            try {
+                // First, check if attendance record exists for this student/date/class
+                const attendanceCheck = await makeApiCall(`/attendance/records?student_id=${studentId}&date=${dateAbsent}&class_id=${classId}`);
+                
+                resultDiv.innerHTML = `
+                    <h4>Step 1: Checking existing attendance records</h4>
+                    <pre>${JSON.stringify(attendanceCheck, null, 2)}</pre>
+                `;
+
+                // Now approve the excuse letter
+                const approvalData = {
+                    status: 'approved',
+                    teacher_notes: 'Test approval with proper case - Fixed attendance status'
+                };
+
+                const approvalResponse = await makeApiCall(`/excuse-letters/update/${letterId}`, 'PUT', approvalData);
+                
+                resultDiv.innerHTML += `
+                    <h4>Step 2: Excuse letter approval response</h4>
+                    <pre>${JSON.stringify(approvalResponse, null, 2)}</pre>
+                `;
+
+                if (approvalResponse.status) {
+                    lastApprovedLetter = { letterId, studentId, dateAbsent, classId };
+                    resultDiv.innerHTML += '<div class="success">✓ Excuse letter approved successfully</div>';
+                } else {
+                    resultDiv.innerHTML += '<div class="error">✗ Failed to approve excuse letter</div>';
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test 4: Verify attendance status after approval
+        async function verifyAttendanceStatus() {
+            const resultDiv = document.getElementById('verificationResult');
+            resultDiv.innerHTML = 'Verifying attendance status...';
+            
+            if (!lastApprovedLetter) {
+                resultDiv.innerHTML = '<div class="error">No approved letter found. Please run Test 3 first.</div>';
+                return;
+            }
+
+            try {
+                const { studentId, dateAbsent, classId } = lastApprovedLetter;
+                
+                // Check attendance records for this specific student/date/class
+                const response = await makeApiCall(`/attendance/records?student_id=${studentId}&date=${dateAbsent}&class_id=${classId}`);
+                
+                resultDiv.innerHTML = `
+                    <h4>Attendance Records After Approval:</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+
+                if (response.status && response.data && response.data.data) {
+                    const records = response.data.data;
+                    const excusedRecord = records.find(r => r.status === 'Excused');
+                    
+                    if (excusedRecord) {
+                        resultDiv.innerHTML += '<div class="success">✓ Found excused attendance record with proper case!</div>';
+                        resultDiv.innerHTML += `
+                            <div class="info">
+                                <h5>Record Details:</h5>
+                                <p>Status: ${excusedRecord.status}</p>
+                                <p>Notes: ${excusedRecord.notes}</p>
+                                <p>Time: ${excusedRecord.time_in}</p>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML += '<div class="error">✗ No excused attendance record found</div>';
+                        
+                        // Check what statuses are present
+                        const statuses = records.map(r => r.status);
+                        resultDiv.innerHTML += `
+                            <div class="info">
+                                <h5>Available Statuses:</h5>
+                                <p>${statuses.join(', ')}</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test 5: Test manual attendance update with proper case
+        async function testManualUpdateWithProperCase() {
+            const resultDiv = document.getElementById('manualUpdateResult');
+            resultDiv.innerHTML = 'Testing manual attendance update with proper case...';
+            
+            const attendanceId = document.getElementById('attendanceId').value;
+            
+            if (!attendanceId) {
+                resultDiv.innerHTML = '<div class="error">Please enter an attendance ID</div>';
+                return;
+            }
+
+            try {
+                const updateData = {
+                    status: 'Excused',
+                    notes: 'Manual update with proper case - Fixed attendance status'
+                };
+
+                const response = await makeApiCall(`/attendance/update/${attendanceId}`, 'PUT', updateData);
+                
+                resultDiv.innerHTML = `
+                    <h4>Manual Attendance Update Response:</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+
+                if (response.status) {
+                    resultDiv.innerHTML += '<div class="success">✓ Attendance record updated successfully with proper case</div>';
+                } else {
+                    resultDiv.innerHTML += '<div class="error">✗ Failed to update attendance record</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run initial checks when page loads
+        window.onload = function() {
+            console.log('Case fix test tool loaded. Please run Test 1 to begin testing.');
+        };
+    </script>
+</body>
+</html>

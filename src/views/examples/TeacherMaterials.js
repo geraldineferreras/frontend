@@ -379,7 +379,7 @@ const TeacherMaterials = () => {
                   </div>
                 )}
                 <div className="d-flex align-items-center mb-3">
-                  <Button color="link" style={{ color: '#f5365c', fontSize: 22, padding: 8 }} aria-label="Like" onClick={() => handleReact(previewMaterial.id)}><FaRegThumbsUp /> {previewMaterial.reactions.like}</Button>
+                  {/* Like button removed for teacher view */}
                   <Button color="link" style={{ color: '#fb6340', fontSize: 22, padding: 8 }} aria-label={previewMaterial.status === "active" ? "Deactivate" : "Activate"} onClick={() => handleDeactivate(previewMaterial.id)}>{previewMaterial.status === "active" ? <FaTimes /> : <FaCheck />}</Button>
                   <Button color="link" style={{ color: '#d9534f', fontSize: 22, padding: 8 }} aria-label="Delete" onClick={() => { handleDelete(previewMaterial.id); setPreviewMaterial(null); }}><FaTrash /></Button>
                 </div>

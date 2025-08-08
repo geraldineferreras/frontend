@@ -214,7 +214,7 @@ const SectionManagement = () => {
       const [coursesData, teachersData, studentsData] = await Promise.all([
         apiService.getCourses(),
         apiService.getAvailableTeachers(),
-        apiService.getAvailableStudents()
+        apiService.getAvailableStudentsForSections()
       ]);
 
       // Validate and clean sections data

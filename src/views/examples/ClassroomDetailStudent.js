@@ -5,6 +5,7 @@ import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip,
 
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/api';
+import axios from "axios";
 
 // Mock data removed - now using real API data
 
@@ -121,12 +122,7 @@ const teachers = [
   { name: "Christian S. Mallari", avatar: "https://randomuser.me/api/portraits/men/75.jpg" }
 ];
 
-const classmates = [
-  { name: "Dabu, Justine Roman T.", avatar: "https://randomuser.me/api/portraits/men/76.jpg" },
-  { name: "Dela Rosa, Lorenz Andre G.", avatar: null },
-  { name: "Jerico Madla", avatar: null }
-  // ...add more classmates as needed
-];
+// Classroom members will be fetched from API
 
 const tabList = [
   { key: "stream", label: "Stream", icon: "ni ni-chat-round" },
@@ -138,33 +134,7 @@ const tabList = [
 const gradeFilters = ["All", "Assigned", "Returned", "Missing"];
 
 // Add mock announcements for student stream tab (similar to teacher)
-const mockAnnouncements = [
-  {
-    id: 1,
-    title: "Welcome to the new semester!",
-    content: "I'm excited to start this journey with all of you. Let's make this semester productive and engaging.",
-    author: "Prof. Smith",
-    date: "2024-01-15T09:00:00.000Z",
-    isPinned: true,
-    reactions: { like: 2, likedBy: ["Prof. Smith", "John Doe"] },
-    comments: [
-      { text: "Looking forward to this semester!", author: "Prof. Smith", date: "2024-01-15T10:30:00.000Z" },
-      { text: "Thank you for the warm welcome!", author: "John Doe", date: "2024-01-15T11:15:00.000Z" }
-    ]
-  },
-  {
-    id: 2,
-    title: "Assignment #1 Due Date Extended",
-    content: "Due to technical difficulties, the deadline for Assignment #1 has been extended to Friday, January 20th.",
-    author: "Prof. Smith",
-    date: "2024-01-14T14:00:00.000Z",
-    isPinned: false,
-    reactions: { like: 0, likedBy: [] },
-    comments: [
-      { text: "Great news! I was having trouble with the submission system.", author: "Jane Smith", date: "2024-01-14T14:20:00.000Z" }
-    ]
-  }
-];
+// const mockAnnouncements = [ ... ];
 
 // Helper to format relative time
 function formatRelativeTime(dateString) {
@@ -231,6 +201,7 @@ const ClassroomDetailStudent = () => {
   // Add emoji picker state and emoji list
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef();
+
   const emojiList = [
     "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗", "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😟", "😤", "😢", "😭", "😦", "😧", "😨", "😩", "🤯", "😬", "😰", "😱", "🥵", "🥶", "😳", "🤪", "😵", "😡", "😠", "🤬", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "😇", "🥳", "🥺", "🤠", "🥸", "😈", "👿", "👹", "👺", "💀", "👻", "👽", "🤖", "💩", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
     // Heart emojis
@@ -490,7 +461,7 @@ const ClassroomDetailStudent = () => {
   function handleCommentEdit(announcementId, idx) {
     setOpenCommentMenu({});
     setEditingComment({ announcementId, idx });
-    const ann = [...studentAnnouncements, ...mockAnnouncements].find(a => a.id === announcementId);
+    const ann = [...studentAnnouncements, ...apiAnnouncements].find(a => a.id === announcementId);
     setEditCommentValue(ann.comments[idx].text);
   }
   function handleCommentEditSave(announcementId, idx) {
@@ -498,7 +469,7 @@ const ClassroomDetailStudent = () => {
     if (studentAnnouncements.some(a => a.id === announcementId)) {
       setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.map((c, i) => i === idx ? { ...c, text: editCommentValue } : c) } : a));
     } else {
-      const ann = mockAnnouncements.find(a => a.id === announcementId);
+      const ann = apiAnnouncements.find(a => a.id === announcementId);
       if (ann) ann.comments[idx].text = editCommentValue;
     }
     setEditingComment({});
@@ -513,34 +484,77 @@ const ClassroomDetailStudent = () => {
     if (studentAnnouncements.some(a => a.id === announcementId)) {
       setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.filter((_, i) => i !== idx) } : a));
     } else {
-      const ann = mockAnnouncements.find(a => a.id === announcementId);
+      const ann = apiAnnouncements.find(a => a.id === announcementId);
       if (ann) ann.comments.splice(idx, 1);
     }
   }
 
-  // Helper to post a new announcement as student
-  const handleStudentPostAnnouncement = (e) => {
+  // Helper to post a new announcement as student with smart notifications
+  const handleStudentPostAnnouncement = async (e) => {
     e.preventDefault();
     if (!studentAnnouncement.trim()) return;
-    const newAnn = {
-      id: Date.now(),
-      title: announcementTitle,
-      content: studentAnnouncement,
-      author: loggedInName,
-      date: new Date().toISOString(),
-      isPinned: false,
-      reactions: { like: 0, likedBy: [] },
-      comments: [],
-      allowComments: allowComments,
-      attachments: attachments
-    };
-    setStudentAnnouncements([newAnn, ...studentAnnouncements]);
-    setStudentAnnouncement("");
-    setAnnouncementTitle("");
-    setAllowComments(true);
-    setFormExpanded(false);
-    setAttachments([]);
-    setEditingDraftId(null);
+
+    try {
+      // Prepare post data
+      const postData = {
+        title: announcementTitle,
+        content: studentAnnouncement,
+        is_draft: 0,
+        is_scheduled: 0,
+        scheduled_at: "",
+        allow_comments: allowComments ? 1 : 0,
+        attachment_type: attachments.length > 0 ? "file" : null,
+        attachment_url: attachments.length > 0 ? attachments[0].url : "",
+        // Smart notification logic: if selected students are specified, use them
+        student_ids: selectedAnnouncementStudents.length > 0 ? selectedAnnouncementStudents : null
+      };
+
+      console.log('Posting student announcement with smart notifications:', postData);
+      console.log('Selected students:', selectedAnnouncementStudents);
+      console.log('Class code:', code);
+
+      // Use the new API method with smart notification logic
+      const response = await apiService.createStudentPostWithSmartNotifications(code, postData);
+
+      console.log('Post response with notifications:', response);
+
+      if (response.status) {
+        // Create local announcement object for UI
+        const newAnn = {
+          id: response.data.id,
+          title: announcementTitle,
+          content: studentAnnouncement,
+          author: loggedInName,
+          date: response.data.created_at,
+          isPinned: false,
+          reactions: { like: 0, likedBy: [] },
+          comments: [],
+          allowComments: allowComments,
+          attachments: attachments
+        };
+
+        // Add to local state
+        setStudentAnnouncements([newAnn, ...studentAnnouncements]);
+        
+        // Show success message with notification info
+        const notificationInfo = response.smartNotificationLogic;
+        console.log(`Post created successfully! Notifications sent to ${notificationInfo.totalRecipients} recipients (${notificationInfo.teacherNotified ? '1 teacher' : '0 teachers'}, ${notificationInfo.studentsNotified} students)`);
+        
+        // Reset form
+        setStudentAnnouncement("");
+        setAnnouncementTitle("");
+        setAllowComments(true);
+        setFormExpanded(false);
+        setAttachments([]);
+        setEditingDraftId(null);
+        setSelectedAnnouncementStudents([]); // Reset selected students
+      } else {
+        console.error('Failed to create post:', response.message);
+      }
+    } catch (error) {
+      console.error('Error posting announcement:', error);
+      // You could add a toast notification here
+    }
   };
 
   // Add state for comment input and emoji picker per announcement
@@ -574,17 +588,113 @@ const ClassroomDetailStudent = () => {
     if (studentAnnouncements.some(a => a.id === announcementId)) {
       setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: [...a.comments, { text: value, author: loggedInName, date: new Date().toISOString() }] } : a));
     } else {
-      const ann = mockAnnouncements.find(a => a.id === announcementId);
+      const ann = apiAnnouncements.find(a => a.id === announcementId);
       if (ann) ann.comments.push({ text: value, author: loggedInName, date: new Date().toISOString() });
     }
     setCommentInputs(inputs => ({ ...inputs, [announcementId]: "" }));
   }
 
   // Before rendering the announcements list:
-  const sortedAnnouncements = [...studentAnnouncements, ...mockAnnouncements].sort((a, b) => {
+  const [apiAnnouncements, setApiAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [errorAnnouncements, setErrorAnnouncements] = useState(null);
+
+  useEffect(() => {
+    async function fetchAnnouncements() {
+      setLoadingAnnouncements(true);
+      setErrorAnnouncements(null);
+      console.log("Fetching announcements for class:", code);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error("No authentication token found");
+        setErrorAnnouncements("Authentication required. Please login.");
+        setLoadingAnnouncements(false);
+        return;
+      }
+      
+      try {
+        const res = await axios.get(
+          `http://localhost/scms_new_backup/index.php/api/student/classroom/${code}/stream`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        console.log("API response:", res.data);
+        if (res.data.status && Array.isArray(res.data.data)) {
+          // Map API data to UI structure
+          const mapped = res.data.data.map((item) => {
+            let attachments = [];
+            // Handle multiple attachments (JSON array string)
+            if (item.attachment_type === "multiple" && item.attachment_url) {
+              try {
+                const arr = JSON.parse(item.attachment_url);
+                attachments = arr.map((f) => ({
+                  type: "file",
+                  name: f.file_name,
+                  url: f.file_path ? `http://localhost/scms_new_backup/${f.file_path.replace(/\\/g, "/")}` : undefined,
+                  fileType: f.file_type,
+                  size: f.file_size,
+                }));
+              } catch (e) {}
+            } else if (item.attachment_url) {
+              // Single attachment
+              attachments = [
+                {
+                  type: "file",
+                  name: item.attachment_url.split("/").pop(),
+                  url:
+                    item.attachment_serving_url ||
+                    (item.attachment_url.startsWith("http")
+                      ? item.attachment_url
+                      : `http://localhost/scms_new_backup/${item.attachment_url.replace(/\\/g, "/")}`),
+                  fileType: item.attachment_file_type,
+                },
+              ];
+            }
+            return {
+              id: item.id,
+              title: item.title || "",
+              content: item.content || "",
+              author: item.user_name || "Unknown",
+              avatar: item.user_avatar
+                ? `http://localhost/scms_new_backup/${item.user_avatar.replace(/\\/g, "/")}`
+                : undefined,
+              date: item.created_at,
+              isPinned: item.is_pinned === "1" || item.is_pinned === 1,
+              reactions: { like: item.like_count || 0, likedBy: [] },
+              comments: [], // API does not provide comments in this response
+              attachments,
+              allowComments: true, // Assume true unless API says otherwise
+            };
+          });
+          console.log("Mapped announcements:", mapped);
+          setApiAnnouncements(mapped);
+        } else {
+          console.log("No data or invalid response structure:", res.data);
+          setApiAnnouncements([]);
+        }
+      } catch (err) {
+        console.error("Error fetching announcements:", err);
+        console.error("Error response:", err.response);
+        setErrorAnnouncements("Failed to load announcements");
+        setApiAnnouncements([]);
+      } finally {
+        setLoadingAnnouncements(false);
+      }
+    }
+    fetchAnnouncements();
+  }, []);
+
+  const sortedAnnouncements = [
+    ...studentAnnouncements,
+    ...apiAnnouncements
+  ].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
-    // If both are pinned or both are not pinned, sort by date descending
     return new Date(b.date) - new Date(a.date);
   });
 
@@ -593,7 +703,18 @@ const ClassroomDetailStudent = () => {
   const [studentSearch, setStudentSearch] = useState("");
   const [tempSelectedStudents, setTempSelectedStudents] = useState([]); // array of student names or ids
   const [selectedAnnouncementStudents, setSelectedAnnouncementStudents] = useState([]); // for the post
-  const getAvatarForUser = (user) => user.avatar || "https://randomuser.me/api/portraits/men/75.jpg";
+  
+  // Add state for classroom members (replacing hardcoded classmates)
+  const [classroomMembers, setClassroomMembers] = useState([]);
+  const [loadingClassroomMembers, setLoadingClassroomMembers] = useState(false);
+  const [classroomMembersError, setClassroomMembersError] = useState(null);
+  
+  const getAvatarForUser = (user) => {
+    if (user.profile_pic) {
+      return `http://localhost/scms_new_backup/${user.profile_pic.replace(/\\/g, "/")}`;
+    }
+    return "https://randomuser.me/api/portraits/men/75.jpg";
+  };
 
   // Add state for 3-dots dropdown
   const [showPostOptionsDropdown, setShowPostOptionsDropdown] = useState(false);
@@ -806,6 +927,60 @@ const ClassroomDetailStudent = () => {
     
     fetchCurrentClass();
   }, [code]);
+
+  // Fetch classroom members when current class is loaded
+  useEffect(() => {
+    const fetchClassroomMembers = async () => {
+      if (!currentClass || !currentClass.code) return;
+      
+      setLoadingClassroomMembers(true);
+      setClassroomMembersError(null);
+      
+      try {
+        const response = await apiService.getClassroomMembers(currentClass.code);
+        console.log('Classroom members response:', response);
+        
+        if (response.status && response.data) {
+          // Transform the API response to match the expected format
+          const members = [];
+          
+          // Add teacher if present
+          if (response.data.teacher) {
+            members.push({
+              ...response.data.teacher,
+              name: response.data.teacher.full_name,
+              role: 'teacher'
+            });
+          }
+          
+          // Add students if present
+          if (response.data.students && Array.isArray(response.data.students)) {
+            response.data.students.forEach(student => {
+              members.push({
+                ...student,
+                name: student.full_name,
+                role: 'student'
+              });
+            });
+          }
+          
+          setClassroomMembers(members);
+          console.log('Classroom members loaded:', members);
+        } else {
+          console.error('Invalid response format for classroom members');
+          setClassroomMembers([]);
+        }
+      } catch (error) {
+        console.error('Error fetching classroom members:', error);
+        setClassroomMembersError('Failed to load classroom members');
+        setClassroomMembers([]);
+      } finally {
+        setLoadingClassroomMembers(false);
+      }
+    };
+    
+    fetchClassroomMembers();
+  }, [currentClass]);
 
   // Fetch real assignments for Classwork tab
   useEffect(() => {
@@ -1102,10 +1277,14 @@ const ClassroomDetailStudent = () => {
             {activeStreamTab === 'scheduled' && (
               <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: 'none', marginBottom: 24, marginTop: 0, padding: '2rem 2rem 1.5rem', maxWidth: '100%' }}>
                 <div style={{ fontWeight: 700, color: '#2d3559', marginBottom: 8 }}>Scheduled Announcements</div>
-                {scheduledAnnouncements.length === 0 ? (
-                  <div style={{ color: '#888' }}>No scheduled announcements.</div>
+                {loadingAnnouncements ? (
+                  <div style={{ color: '#888' }}>Loading announcements...</div>
+                ) : errorAnnouncements ? (
+                  <div style={{ color: '#ff0000' }}>{errorAnnouncements}</div>
+                ) : apiAnnouncements.length === 0 ? (
+                  <div style={{ color: '#888' }}>No announcements available.</div>
                 ) : (
-                  scheduledAnnouncements.map((announcement) => (
+                  apiAnnouncements.map((announcement) => (
                     <div key={announcement.id} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px' }}>
                       <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{announcement.title}</div>
                       <div style={{ color: '#444', fontSize: 13, marginBottom: 10 }}>{announcement.content}</div>
@@ -3027,16 +3206,16 @@ const ClassroomDetailStudent = () => {
                 <div style={{ position: 'relative', width: '100%', marginBottom: 18 }}>
                   <i className="fa fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#b0b7c3', fontSize: 16, pointerEvents: 'none' }} />
                   <input
-                    placeholder="Search students..."
+                    placeholder="Search class members..."
                     value={studentSearch}
                     onChange={e => setStudentSearch(e.target.value)}
                     style={{ background: '#f7f8fa', borderRadius: 8, border: '1px solid #e9ecef', fontSize: 15, color: '#232b3b', padding: '8px 14px 8px 40px', boxShadow: '0 1px 2px rgba(44,62,80,0.03)', minWidth: 0, width: '100%' }}
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Students ({tempSelectedStudents.length})</span>
+                  <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Class Members ({tempSelectedStudents.length})</span>
                   {(() => {
-                    const filtered = classmates.filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()));
+                    const filtered = classroomMembers.filter(s => (!studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase())));
                     const allSelected = filtered.length > 0 && filtered.every(s => tempSelectedStudents.includes(s.name));
                     return (
                       <button
@@ -3056,10 +3235,12 @@ const ClassroomDetailStudent = () => {
                   })()}
                 </div>
                 <div style={{ maxHeight: 220, overflowY: 'auto', border: 'none', borderRadius: 12, background: '#f9fafd', padding: '0 8px 0 0', marginBottom: 8 }}>
-                  {classmates.filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 ? (
-                    <div className="text-center text-muted py-5">No students found</div>
+                  {loadingClassroomMembers ? (
+                    <div className="text-center text-muted py-5">Loading class members...</div>
+                  ) : classroomMembers.filter(s => (!studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()))).length === 0 ? (
+                    <div className="text-center text-muted py-5">No class members found</div>
                   ) : (
-                    classmates.filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase())).map((s) => {
+                    classroomMembers.filter(s => (!studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()))).map((s) => {
                       const isSelected = tempSelectedStudents.includes(s.name);
                       return (
                         <div
@@ -3077,7 +3258,9 @@ const ClassroomDetailStudent = () => {
                           <img src={getAvatarForUser(s)} alt={s.name} style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover', border: '1px solid #e9ecef' }} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: 14, color: '#2d3748', textTransform: 'none' }}>{s.name}</div>
-                            <div style={{ fontSize: 12, color: '#7b8a9b', fontWeight: 400 }}>{s.email || ''}</div>
+                            <div style={{ fontSize: 12, color: '#7b8a9b', fontWeight: 400 }}>
+                              {s.email || ''} {s.role === 'teacher' && <span style={{ color: '#6366f1', fontWeight: 600 }}>(Teacher)</span>}
+                            </div>
                           </div>
                           <input
                             type="checkbox"
@@ -3107,13 +3290,15 @@ const ClassroomDetailStudent = () => {
                     </div>
                   ) : (
                     tempSelectedStudents.map(name => {
-                      const s = classmates.find(stu => stu.name === name);
+                      const s = classroomMembers.find(stu => stu.name === name);
                       return s ? (
                         <span key={name} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 9, padding: '1px 6px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 22 }}>
                           <img src={getAvatarForUser(s)} alt={s.name} style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, objectFit: 'cover', border: '1px solid #fff' }} />
                           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 5, lineHeight: 1.1 }}>
                             <span style={{ fontWeight: 600, fontSize: 10, color: '#2d3748', textTransform: 'none' }}>{s.name}</span>
-                            <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9 }}>{s.email || ''}</span>
+                            <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9 }}>
+                              {s.email || ''} {s.role === 'teacher' && <span style={{ color: '#6366f1', fontWeight: 600, fontSize: 8 }}>(Teacher)</span>}
+                            </span>
                           </span>
                           <span style={{ flex: 1 }} />
                           <i

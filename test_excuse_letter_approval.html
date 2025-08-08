@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excuse Letter Approval Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .response.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .response.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Excuse Letter Approval System Test</h1>
+        <p class="info">This test verifies that excuse letter approval automatically updates attendance records.</p>
+
+        <div class="test-section">
+            <h3>Test 1: Approve Excuse Letter</h3>
+            <p>This test will approve an excuse letter and verify that attendance is automatically marked as "excused".</p>
+            <button onclick="testApproveExcuse()">Test Approve Excuse Letter</button>
+            <div id="approve-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Reject Excuse Letter</h3>
+            <p>This test will reject an excuse letter and verify that attendance is automatically marked as "absent".</p>
+            <button onclick="testRejectExcuse()">Test Reject Excuse Letter</button>
+            <div id="reject-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Check Attendance Records</h3>
+            <p>This test will check the attendance records to verify the automatic updates.</p>
+            <button onclick="checkAttendanceRecords()">Check Attendance Records</button>
+            <div id="attendance-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>System Status</h3>
+            <div id="status">
+                <p class="info">Ready to test excuse letter approval system...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        
+        // Helper function to make API calls
+        async function makeApiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        // Test 1: Approve Excuse Letter
+        async function testApproveExcuse() {
+            const responseDiv = document.getElementById('approve-response');
+            responseDiv.innerHTML = 'Testing excuse letter approval...';
+            responseDiv.className = 'response info';
+            
+            try {
+                // First, get a pending excuse letter
+                const excuseResponse = await makeApiCall('/excuse-letters/teacher');
+                
+                if (excuseResponse.error) {
+                    responseDiv.innerHTML = `Error: ${excuseResponse.error}`;
+                    responseDiv.className = 'response error';
+                    return;
+                }
+                
+                const pendingExcuses = excuseResponse.data?.filter(e => e.status === 'pending') || [];
+                
+                if (pendingExcuses.length === 0) {
+                    responseDiv.innerHTML = 'No pending excuse letters found for testing.';
+                    responseDiv.className = 'response info';
+                    return;
+                }
+                
+                const testExcuse = pendingExcuses[0];
+                
+                // Approve the excuse letter
+                const approveData = {
+                    status: 'approved',
+                    teacher_notes: 'Test approval - Automatic attendance update test'
+                };
+                
+                const approveResponse = await makeApiCall(`/excuse-letters/update/${testExcuse.letter_id}`, 'PUT', approveData);
+                
+                if (approveResponse.status) {
+                    responseDiv.innerHTML = `✅ SUCCESS: Excuse letter approved!\n\n` +
+                        `Letter ID: ${testExcuse.letter_id}\n` +
+                        `Student: ${testExcuse.student_name}\n` +
+                        `Date: ${testExcuse.date_absent}\n` +
+                        `Status: ${approveResponse.data?.status || 'approved'}\n\n` +
+                        `The system should have automatically updated the attendance record for this date.`;
+                    responseDiv.className = 'response success';
+                } else {
+                    responseDiv.innerHTML = `❌ FAILED: ${approveResponse.message || 'Unknown error'}`;
+                    responseDiv.className = 'response error';
+                }
+                
+            } catch (error) {
+                responseDiv.innerHTML = `❌ ERROR: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        // Test 2: Reject Excuse Letter
+        async function testRejectExcuse() {
+            const responseDiv = document.getElementById('reject-response');
+            responseDiv.innerHTML = 'Testing excuse letter rejection...';
+            responseDiv.className = 'response info';
+            
+            try {
+                // First, get a pending excuse letter
+                const excuseResponse = await makeApiCall('/excuse-letters/teacher');
+                
+                if (excuseResponse.error) {
+                    responseDiv.innerHTML = `Error: ${excuseResponse.error}`;
+                    responseDiv.className = 'response error';
+                    return;
+                }
+                
+                const pendingExcuses = excuseResponse.data?.filter(e => e.status === 'pending') || [];
+                
+                if (pendingExcuses.length === 0) {
+                    responseDiv.innerHTML = 'No pending excuse letters found for testing.';
+                    responseDiv.className = 'response info';
+                    return;
+                }
+                
+                const testExcuse = pendingExcuses[0];
+                
+                // Reject the excuse letter
+                const rejectData = {
+                    status: 'rejected',
+                    teacher_notes: 'Test rejection - Automatic attendance update test'
+                };
+                
+                const rejectResponse = await makeApiCall(`/excuse-letters/update/${testExcuse.letter_id}`, 'PUT', rejectData);
+                
+                if (rejectResponse.status) {
+                    responseDiv.innerHTML = `✅ SUCCESS: Excuse letter rejected!\n\n` +
+                        `Letter ID: ${testExcuse.letter_id}\n` +
+                        `Student: ${testExcuse.student_name}\n` +
+                        `Date: ${testExcuse.date_absent}\n` +
+                        `Status: ${rejectResponse.data?.status || 'rejected'}\n\n` +
+                        `The system should have automatically updated the attendance record for this date.`;
+                    responseDiv.className = 'response success';
+                } else {
+                    responseDiv.innerHTML = `❌ FAILED: ${rejectResponse.message || 'Unknown error'}`;
+                    responseDiv.className = 'response error';
+                }
+                
+            } catch (error) {
+                responseDiv.innerHTML = `❌ ERROR: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        // Test 3: Check Attendance Records
+        async function checkAttendanceRecords() {
+            const responseDiv = document.getElementById('attendance-response');
+            responseDiv.innerHTML = 'Checking attendance records...';
+            responseDiv.className = 'response info';
+            
+            try {
+                // Get attendance records
+                const attendanceResponse = await makeApiCall('/attendance/all');
+                
+                if (attendanceResponse.error) {
+                    responseDiv.innerHTML = `Error: ${attendanceResponse.error}`;
+                    responseDiv.className = 'response error';
+                    return;
+                }
+                
+                const records = attendanceResponse.data?.attendance_records || [];
+                
+                // Filter for excused and absent records (from excuse letter approvals)
+                const excuseRelatedRecords = records.filter(record => 
+                    record.status === 'excused' || record.status === 'absent'
+                ).filter(record => 
+                    record.notes && record.notes.includes('Excuse letter')
+                );
+                
+                if (excuseRelatedRecords.length > 0) {
+                    responseDiv.innerHTML = `✅ Found ${excuseRelatedRecords.length} attendance records updated by excuse letter approvals:\n\n` +
+                        excuseRelatedRecords.map(record => 
+                            `📅 Date: ${record.date}\n` +
+                            `👤 Student: ${record.student_name}\n` +
+                            `📊 Status: ${record.status}\n` +
+                            `📝 Notes: ${record.notes}\n` +
+                            `---`
+                        ).join('\n');
+                    responseDiv.className = 'response success';
+                } else {
+                    responseDiv.innerHTML = 'ℹ️ No attendance records found that were updated by excuse letter approvals.';
+                    responseDiv.className = 'response info';
+                }
+                
+            } catch (error) {
+                responseDiv.innerHTML = `❌ ERROR: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        // Check if user is logged in
+        window.onload = function() {
+            const token = localStorage.getItem('token');
+            const statusDiv = document.getElementById('status');
+            
+            if (!token) {
+                statusDiv.innerHTML = '<p class="error">❌ Not logged in. Please log in to the system first.</p>';
+            } else {
+                statusDiv.innerHTML = '<p class="success">✅ Logged in. Ready to test excuse letter approval system.</p>';
+            }
+        };
+    </script>
+</body>
+</html>

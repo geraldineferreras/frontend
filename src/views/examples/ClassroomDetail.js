@@ -50,6 +50,7 @@ import userDefault from '../../assets/img/theme/user-default.svg';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from './utils/cropImage'; // We'll add this helper next
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 //stream new
 
@@ -471,6 +472,8 @@ const ClassroomDetail = () => {
 
   // Add state to track if user is a student
   const [isStudent, setIsStudent] = useState(false);
+  // Add state to track user role
+  const [userRole, setUserRole] = useState('teacher');
 
   // Add new state for modals and forms
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -489,6 +492,16 @@ const ClassroomDetail = () => {
   // Drafts and scheduled tasks loading states
   const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [loadingScheduled, setLoadingScheduled] = useState(false);
+  
+  // Export functionality state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [gradingBreakdown, setGradingBreakdown] = useState({
+    attendance: 10,
+    activity: 30,
+    assignment: 30,
+    majorExam: 30
+  });
 
   // Save students to localStorage whenever they change
   useEffect(() => {
@@ -902,6 +915,9 @@ const ClassroomDetail = () => {
     submitted: false
   });
   const [taskAttachments, setTaskAttachments] = useState([]);
+  const [taskExternalLinks, setTaskExternalLinks] = useState([]);
+  const [showTaskLinkInput, setShowTaskLinkInput] = useState(false);
+  const [newTaskLink, setNewTaskLink] = useState({ name: '', url: '', type: 'link' });
   const [taskAssignedStudents, setTaskAssignedStudents] = useState([]);
   const [taskDrafts, setTaskDrafts] = useState([]);
   const [taskScheduled, setTaskScheduled] = useState([]);
@@ -1493,7 +1509,7 @@ useEffect(() => {
   const handlePostAnnouncement = async (e) => {
     e.preventDefault();
 
-    // Build the JSON data (do NOT include attachment_url)
+    // Build the data object that matches backend expectations
     const postData = {
       title: newAnnouncementTitle,
       content: newAnnouncement,
@@ -1504,31 +1520,45 @@ useEffect(() => {
       student_ids: selectedAnnouncementStudents,
     };
 
-    // Prepare FormData
-    const formData = new FormData();
-    if (attachments.length > 0 && attachments[0].file) {
-      formData.append('attachment', attachments[0].file); // attachments[0].file should be a File object
+    console.log("Posting announcement with data:", postData);
+    console.log("Attachments:", attachments);
+    
+    // Check if any required fields are missing or invalid
+    if (!newAnnouncement.trim()) {
+      alert('Please enter announcement content');
+      return;
     }
-    formData.append('data', JSON.stringify(postData));
+
+    // Handle file attachment if present
+    if (attachments.length > 0 && attachments[0].file) {
+      // For now, we'll need to handle file upload separately
+      // or modify the backend to accept multipart form data
+      console.log("File attachment detected:", attachments[0]);
+      // You might need to upload the file first and get the URL
+      // For now, let's send without file attachment
+    }
 
     try {
-      await axios.post(
+      const response = await axios.post(
         `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
-        formData,
+        postData,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': 'application/json',
           },
         }
       );
+      console.log("Success response:", response.data);
       setNewAnnouncement("");
       setNewAnnouncementTitle("");
       setAttachments([]);
       setSelectedAnnouncementStudents([]);
       fetchStreamPosts();
     } catch (err) {
-      alert('Failed to post announcement: ' + (err.message || err));
+      console.error("Error posting announcement:", err);
+      console.error("Error response:", err.response?.data);
+      alert('Failed to post announcement: ' + (err.response?.data?.message || err.message || err));
     }
   };
 
@@ -1656,6 +1686,9 @@ useEffect(() => {
         console.error('Error parsing user data:', error);
       }
     }
+    
+    // Set the user role state
+    setUserRole(userRole);
 
     if (userRole === 'student') {
       // For students, try to find the class in their enrolled classes
@@ -3269,6 +3302,124 @@ useEffect(() => {
     setOnlineAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // Export grades function
+  const handleExportGrades = async () => {
+    if (!gradesData || !gradesData.students) {
+      alert('No grades data available to export');
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      
+      // Prepare data for export
+      const exportData = [];
+      
+      // Add header information
+      exportData.push(['SCMS - Student Course Management System']);
+      exportData.push(['Class Record']);
+      exportData.push(['']);
+      exportData.push(['Class Information:']);
+      exportData.push(['Class Code:', gradesData.classroom?.class_code || 'N/A']);
+      exportData.push(['Title:', gradesData.classroom?.title || 'N/A']);
+      exportData.push(['Semester:', gradesData.classroom?.semester || 'N/A']);
+      exportData.push(['School Year:', gradesData.classroom?.school_year || 'N/A']);
+      exportData.push(['']);
+      exportData.push(['Grading Breakdown:']);
+      exportData.push(['Attendance:', `${gradingBreakdown.attendance}%`]);
+      exportData.push(['Activity:', `${gradingBreakdown.activity}%`]);
+      exportData.push(['Assignment/Quiz:', `${gradingBreakdown.assignment}%`]);
+      exportData.push(['Major Exam:', `${gradingBreakdown.majorExam}%`]);
+      exportData.push(['Total:', '100%']);
+      exportData.push(['']);
+      
+      // Create headers for the table
+      const headers = ['Student Name', 'Student ID', 'Attendance'];
+      
+      // Add assignment headers
+      gradesData.tasks?.forEach(task => {
+        headers.push(task.title);
+      });
+      
+      headers.push('Total Points', 'Average Grade', 'Final Grade');
+      
+      exportData.push(headers);
+      
+      // Add student data
+      gradesData.students?.forEach(student => {
+        const row = [
+          student.student_name,
+          student.student_num,
+          student.attendance ? `${student.attendance.total_earned_score}/${student.attendance.max_possible_total} (${student.attendance.attendance_percentage}%)` : 'N/A'
+        ];
+        
+        // Add assignment scores
+        gradesData.tasks?.forEach(task => {
+          const assignment = student.assignments?.find(a => a.task_id === task.task_id);
+          if (assignment) {
+            row.push(`${assignment.grade}/${assignment.points} (${assignment.grade_percentage}%)`);
+          } else {
+            row.push('N/A');
+          }
+        });
+        
+        // Add totals and calculated grades
+        row.push(`${student.total_earned}/${student.total_points}`);
+        row.push(`${student.average_grade}%`);
+        
+        // Calculate final grade based on custom breakdown
+        const attendanceScore = student.attendance ? (student.attendance.attendance_percentage / 100) * gradingBreakdown.attendance : 0;
+        const activityScore = (student.average_grade / 100) * gradingBreakdown.activity;
+        const assignmentScore = (student.average_grade / 100) * gradingBreakdown.assignment;
+        const examScore = (student.average_grade / 100) * gradingBreakdown.majorExam;
+        
+        const finalGrade = Math.round(attendanceScore + activityScore + assignmentScore + examScore);
+        row.push(`${finalGrade}%`);
+        
+        exportData.push(row);
+      });
+      
+      // Create worksheet
+      const ws = XLSX.utils.aoa_to_sheet(exportData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 25 }, // Student Name
+        { wch: 15 }, // Student ID
+        { wch: 20 }, // Attendance
+      ];
+      
+      // Add widths for assignments
+      gradesData.tasks?.forEach(() => {
+        colWidths.push({ wch: 18 });
+      });
+      
+      colWidths.push({ wch: 15 }, { wch: 15 }, { wch: 15 }); // Total, Average, Final
+      
+      ws['!cols'] = colWidths;
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Grades');
+      
+      // Generate filename
+      const fileName = `SCMS_Grades_${gradesData.classroom?.class_code || 'Class'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Save file
+      XLSX.writeFile(wb, fileName);
+      
+      setShowExportModal(false);
+      alert('Grades exported successfully!');
+      
+    } catch (error) {
+      console.error('Error exporting grades:', error);
+      alert('Error exporting grades. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleOnlineSetupCreate = (e) => {
     e.preventDefault();
     if (!quickGradeForm.type || !quickGradeForm.points) return;
@@ -3353,7 +3504,7 @@ useEffect(() => {
         is_draft: false,
         is_scheduled: false,
         scheduled_at: null,
-        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null,
+        due_date: formatDueDate(taskForm.dueDate),
         attachment_type: taskAttachments.length > 0 ? 'file' : null,
         attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
         assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
@@ -3366,43 +3517,47 @@ useEffect(() => {
         }) : []
       };
       
-      // If there are file attachments, use FormData
+      // Enhanced task creation with multiple files and external links
       let response;
-      if (taskAttachments.length > 0) {
-        const formData = new FormData();
-        
-        // Add each task field individually to FormData
-        formData.append('title', taskData.title);
-        formData.append('type', taskData.type);
-        formData.append('points', taskData.points);
-        formData.append('instructions', taskData.instructions);
-        formData.append('class_codes', JSON.stringify(taskData.class_codes));
-        formData.append('allow_comments', taskData.allow_comments ? '1' : '0');
-        formData.append('is_draft', taskData.is_draft ? '1' : '0');
-        formData.append('is_scheduled', taskData.is_scheduled ? '1' : '0');
-        formData.append('scheduled_at', taskData.scheduled_at || '');
-        formData.append('due_date', taskData.due_date || '');
-        formData.append('attachment_type', taskData.attachment_type || '');
-        formData.append('attachment_url', taskData.attachment_url || '');
-        formData.append('assignment_type', taskData.assignment_type);
-        formData.append('assigned_students', JSON.stringify(taskData.assigned_students));
-        
-        // Add the first file attachment (backend expects single file)
-        if (taskAttachments.length > 0 && taskAttachments[0].file) {
-          formData.append('attachment', taskAttachments[0].file);
+      if (taskAttachments.length > 0 || taskExternalLinks.length > 0) {
+        if (taskAttachments.length > 0 && taskExternalLinks.length > 0) {
+          // Both files and external links - use FormData with external links as JSON
+          const formData = new FormData();
+          
+          // Add all task data fields
+          Object.keys(taskData).forEach(key => {
+            if (key === 'class_codes' || key === 'assigned_students') {
+              formData.append(key, JSON.stringify(taskData[key]));
+            } else if (typeof taskData[key] === 'boolean') {
+              formData.append(key, taskData[key] ? '1' : '0');
+            } else {
+              formData.append(key, taskData[key] || '');
+            }
+          });
+          
+          // Add external links as JSON string
+          formData.append('external_links', JSON.stringify(taskExternalLinks));
+          
+          // Add all file attachments
+          taskAttachments.forEach((attachment, index) => {
+            if (attachment.file) {
+              formData.append('attachment', attachment.file);
+            }
+          });
+          
+          console.log('Sending FormData with files and external links:', { taskAttachments, taskExternalLinks });
+          response = await apiService.createTask(formData);
+        } else if (taskAttachments.length > 0) {
+          // Files only - use multiple files method
+          const files = taskAttachments.map(att => att.file).filter(Boolean);
+          response = await apiService.createTaskWithMultipleFiles(taskData, files);
+        } else {
+          // External links only - use external links method
+          response = await apiService.createTaskWithExternalLinks(taskData, taskExternalLinks);
         }
-        
-        console.log('Sending FormData with files:', taskAttachments);
-        console.log('FormData task data:', taskData);
-        console.log('FormData contents:');
-        for (let [key, value] of formData.entries()) {
-          console.log(`${key}:`, value);
-        }
-        response = await apiService.createTask(formData);
       } else {
-        // No files, send as JSON
+        // No attachments, send as JSON
         console.log('Sending JSON data:', taskData);
-        console.log('JSON stringified:', JSON.stringify(taskData, null, 2));
         response = await apiService.createTask(taskData);
       }
       
@@ -3443,6 +3598,7 @@ useEffect(() => {
           submitted: false
         });
         setTaskAttachments([]);
+        setTaskExternalLinks([]);
         setTaskAssignedStudents([]);
         setCurrentDraftId(null);
         
@@ -3487,7 +3643,7 @@ useEffect(() => {
         scheduled_at: null,
         attachment_type: taskAttachments.length > 0 ? 'file' : null,
         attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
-        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null
+        due_date: formatDueDate(taskForm.dueDate)
       };
 
 
@@ -3637,7 +3793,7 @@ useEffect(() => {
         scheduled_at: scheduledDateTime,
         attachment_type: taskAttachments.length > 0 ? 'file' : null,
         attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
-        due_date: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString().slice(0, 19).replace('T', ' ') : null
+        due_date: formatDueDate(taskForm.dueDate)
       };
 
       console.log('Scheduling task with data:', taskData);
@@ -3755,9 +3911,10 @@ useEffect(() => {
       postToClassrooms: ['current'],
       submitted: false
     });
-    setTaskAttachments([]);
-    setTaskAssignedStudents([]);
-    setCurrentDraftId(null); // <-- reset after cancel
+            setTaskAttachments([]);
+        setTaskExternalLinks([]);
+        setTaskAssignedStudents([]);
+        setCurrentDraftId(null); // <-- reset after cancel
   };
 
   const handleTaskFileChange = (e) => {
@@ -3788,6 +3945,45 @@ useEffect(() => {
 
   const handleRemoveEditTaskAttachment = (idx) => {
     setEditTaskAttachments(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // External link handlers for task creation
+  const handleAddTaskExternalLink = () => {
+    if (newTaskLink.name && newTaskLink.url) {
+      setTaskExternalLinks(prev => [...prev, { ...newTaskLink }]);
+      setNewTaskLink({ name: '', url: '', type: 'link' });
+      setShowTaskLinkInput(false);
+    }
+  };
+
+  const handleRemoveTaskExternalLink = (index) => {
+    setTaskExternalLinks(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTaskLinkTypeChange = (type) => {
+    setNewTaskLink(prev => ({ ...prev, type }));
+  };
+
+  // Helper function to format due date correctly in local timezone
+  const formatDueDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // Parse the date string and ensure it's treated as local time
+    const [datePart, timePart] = dateString.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart ? timePart.split(':').map(Number) : [23, 59];
+    
+    // Create date in local timezone
+    const localDate = new Date(year, month - 1, day, hours, minutes);
+    
+    // Format as YYYY-MM-DD HH:MM:SS in local timezone
+    const yearStr = localDate.getFullYear();
+    const monthStr = String(localDate.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(localDate.getDate()).padStart(2, '0');
+    const hoursStr = String(localDate.getHours()).padStart(2, '0');
+    const minutesStr = String(localDate.getMinutes()).padStart(2, '0');
+    
+    return `${yearStr}-${monthStr}-${dayStr} ${hoursStr}:${minutesStr}:00`;
   };
   const handleLikeTask = (taskId) => {
     setTasks(prev => prev.map(task => 
@@ -5132,14 +5328,17 @@ useEffect(() => {
                         <div style={{ padding: '0.75rem 1rem', position: 'relative' }}>
                           {/* Like and menu group in upper right */}
                           <div style={{ position: 'absolute', top: 16, right: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0'), fontWeight: 600, fontSize: 16, cursor: 'pointer' }}
-                              onClick={() => handleLikeAnnouncement(announcement.id)}
-                              title={'Like'}
-                            >
-                              <i className="fa fa-thumbs-up" style={{ color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0'), fontSize: 18 }} />
-                              <span style={{ color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0') }}>{announcement.reactions?.like || 0}</span>
-                            </div>
+                            {/* Only show like button for students */}
+                            {userRole === 'student' && (
+                              <div
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0'), fontWeight: 600, fontSize: 16, cursor: 'pointer' }}
+                                onClick={() => handleLikeAnnouncement(announcement.id)}
+                                title={'Like'}
+                              >
+                                <i className="fa fa-thumbs-up" style={{ color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0'), fontSize: 18 }} />
+                                <span style={{ color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0') }}>{announcement.reactions?.like || 0}</span>
+                              </div>
+                            )}
                             <div style={{ position: 'relative' }}>
                               <i
                                 className="fa fa-ellipsis-v"
@@ -6804,13 +7003,16 @@ useEffect(() => {
                           )}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <button
-                              onClick={() => handleLikeTask(task.id)}
-                                style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 6, color: task.isLiked ? '#e74c3c' : '#666', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-                              >
-                                <i className={`ni ${task.isLiked ? 'ni-favourite-28' : 'ni-like-2'}`} />
-                                {task.likes > 0 && task.likes}
-                              </button>
+                              {/* Only show like button for students */}
+                              {userRole === 'student' && (
+                                <button
+                                onClick={() => handleLikeTask(task.id)}
+                                  style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 6, color: task.isLiked ? '#e74c3c' : '#666', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+                                >
+                                  <i className={`ni ${task.isLiked ? 'ni-favourite-28' : 'ni-like-2'}`} />
+                                  {task.likes > 0 && task.likes}
+                                </button>
+                              )}
                               {task.allowComments && (
                                 <button
                                   onClick={() => setTaskCommentsOpen(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
@@ -6822,7 +7024,7 @@ useEffect(() => {
                               )}
                             </div>
                             <div style={{ fontSize: 13, color: '#8898AA' }}>
-                              {task.type} • {task.points} pts • Due {task.dueDate}
+                              {task.type} • {task.points} pts • Due {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
                             </div>
                           </div>
                           {task.allowComments && taskCommentsOpen[task.id] && (
@@ -7151,8 +7353,13 @@ useEffect(() => {
                     {/* Students Grades Table */}
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <h4 className="mb-0">Student Grades</h4>
-                      <Button color="primary" size="sm" style={{ borderRadius: "8px" }} onClick={() => setShowAddGradeModal(true)}>
-                        <i className="ni ni-fat-add mr-1"></i> Add Grade
+                      <Button 
+                        color="success" 
+                        size="sm" 
+                        style={{ borderRadius: "8px" }} 
+                        onClick={() => setShowExportModal(true)}
+                      >
+                        <i className="ni ni-chart-bar-32 mr-1"></i> Export Grades
                       </Button>
                     </div>
                     
@@ -7160,6 +7367,7 @@ useEffect(() => {
                       <thead>
                         <tr>
                           <th>Student</th>
+                          <th>Attendance</th>
                           {gradesData.tasks?.map(task => (
                             <th key={task.task_id}>{task.title}</th>
                           ))}
@@ -7190,6 +7398,28 @@ useEffect(() => {
                                   <small className="text-muted">{student.student_num}</small>
                                 </div>
                               </div>
+                            </td>
+                            <td>
+                              {student.attendance ? (
+                                <div>
+                                  <div className="font-weight-bold">
+                                    {student.attendance.total_earned_score}/{student.attendance.max_possible_total}
+                                  </div>
+                                  <small className="text-muted">
+                                    {student.attendance.attendance_percentage}%
+                                  </small>
+                                  <div className="mt-1">
+                                    <small className="text-muted">
+                                      P: {student.attendance.present_sessions} | 
+                                      L: {student.attendance.late_sessions} | 
+                                      A: {student.attendance.absent_sessions} | 
+                                      E: {student.attendance.excused_sessions}
+                                    </small>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
                             </td>
                             {gradesData.tasks?.map(task => {
                               const assignment = student.assignments?.find(a => a.task_id === task.task_id);
@@ -8395,6 +8625,121 @@ useEffect(() => {
           >
             <i className="ni ni-time-alarm" style={{ marginRight: 6 }} />
             Schedule Task
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Export Grades Modal */}
+      <Modal isOpen={showExportModal} toggle={() => setShowExportModal(false)} size="lg">
+        <ModalHeader toggle={() => setShowExportModal(false)}>
+          <i className="ni ni-chart-bar-32 mr-2"></i>
+          Export Grades with Custom Grading Breakdown
+        </ModalHeader>
+        <ModalBody>
+          <div className="mb-4">
+            <h5>Grading Breakdown Configuration</h5>
+            <p className="text-muted">Customize the percentage weights for each grading category:</p>
+            
+            <div className="row">
+              <div className="col-md-6">
+                <FormGroup>
+                  <Label for="attendance">Attendance (%)</Label>
+                  <Input
+                    type="number"
+                    id="attendance"
+                    value={gradingBreakdown.attendance}
+                    onChange={(e) => setGradingBreakdown({
+                      ...gradingBreakdown,
+                      attendance: parseInt(e.target.value) || 0
+                    })}
+                    min="0"
+                    max="100"
+                  />
+                </FormGroup>
+              </div>
+              <div className="col-md-6">
+                <FormGroup>
+                  <Label for="activity">Activity (%)</Label>
+                  <Input
+                    type="number"
+                    id="activity"
+                    value={gradingBreakdown.activity}
+                    onChange={(e) => setGradingBreakdown({
+                      ...gradingBreakdown,
+                      activity: parseInt(e.target.value) || 0
+                    })}
+                    min="0"
+                    max="100"
+                  />
+                </FormGroup>
+              </div>
+            </div>
+            
+            <div className="row">
+              <div className="col-md-6">
+                <FormGroup>
+                  <Label for="assignment">Assignment/Quiz (%)</Label>
+                  <Input
+                    type="number"
+                    id="assignment"
+                    value={gradingBreakdown.assignment}
+                    onChange={(e) => setGradingBreakdown({
+                      ...gradingBreakdown,
+                      assignment: parseInt(e.target.value) || 0
+                    })}
+                    min="0"
+                    max="100"
+                  />
+                </FormGroup>
+              </div>
+              <div className="col-md-6">
+                <FormGroup>
+                  <Label for="majorExam">Major Exam (%)</Label>
+                  <Input
+                    type="number"
+                    id="majorExam"
+                    value={gradingBreakdown.majorExam}
+                    onChange={(e) => setGradingBreakdown({
+                      ...gradingBreakdown,
+                      majorExam: parseInt(e.target.value) || 0
+                    })}
+                    min="0"
+                    max="100"
+                  />
+                </FormGroup>
+              </div>
+            </div>
+            
+            <div className="mt-3 p-3 bg-light rounded">
+              <strong>Total: {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam}%</strong>
+              {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam !== 100 && (
+                <div className="text-warning mt-1">
+                  <small>⚠️ Total should equal 100%</small>
+                </div>
+              )}
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowExportModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            color="success" 
+            onClick={handleExportGrades}
+            disabled={exportLoading || gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam !== 100}
+          >
+            {exportLoading ? (
+              <>
+                <i className="ni ni-spin ni-spinner mr-2"></i>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <i className="ni ni-chart-bar-32 mr-2"></i>
+                Export to XLSX
+              </>
+            )}
           </Button>
         </ModalFooter>
       </Modal>

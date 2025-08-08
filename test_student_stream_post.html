@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Stream Post Test - Smart Notifications</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .notification-logic {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Student Stream Post Test - Smart Notification Logic</h1>
+        
+        <div class="notification-logic">
+            <h3>📋 Smart Notification Logic:</h3>
+            <ul>
+                <li><strong>With student_ids:</strong> Only notifies the teacher + specified students</li>
+                <li><strong>Without student_ids:</strong> Notifies the teacher + all other students in class</li>
+                <li><strong>Validation:</strong> Ensures provided student_ids are actually enrolled in the class</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Case 1: Post to All Students</h2>
+            <form id="testForm1">
+                <div class="form-group">
+                    <label for="title1">Title:</label>
+                    <input type="text" id="title1" value="STUDENT" required>
+                </div>
+                <div class="form-group">
+                    <label for="content1">Content:</label>
+                    <textarea id="content1" rows="3" required>Please pass your assignment 2 on time!</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="studentIds1">Student IDs (leave empty for all students):</label>
+                    <input type="text" id="studentIds1" placeholder="e.g., STU123,STU456">
+                </div>
+                <button type="submit">Test Post to All Students</button>
+            </form>
+            <div id="result1" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Case 2: Post to Specific Students</h2>
+            <form id="testForm2">
+                <div class="form-group">
+                    <label for="title2">Title:</label>
+                    <input type="text" id="title2" value="STUDENT" required>
+                </div>
+                <div class="form-group">
+                    <label for="content2">Content:</label>
+                    <textarea id="content2" rows="3" required>Please pass your assignment 2 on time!</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="studentIds2">Student IDs (comma-separated):</label>
+                    <input type="text" id="studentIds2" value="STU685651BF9DDCF988" placeholder="e.g., STU123,STU456">
+                </div>
+                <button type="submit">Test Post to Specific Students</button>
+            </form>
+            <div id="result2" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Case 3: Post with Attachment</h2>
+            <form id="testForm3">
+                <div class="form-group">
+                    <label for="title3">Title:</label>
+                    <input type="text" id="title3" value="STUDENT" required>
+                </div>
+                <div class="form-group">
+                    <label for="content3">Content:</label>
+                    <textarea id="content3" rows="3" required>Please pass your assignment 2 on time!</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="attachment3">Attachment URL:</label>
+                    <input type="text" id="attachment3" value="uploads/announcements/exam.pdf">
+                </div>
+                <button type="submit">Test Post with Attachment</button>
+            </form>
+            <div id="result3" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        const CLASS_CODE = 'J56NHD';
+
+        // Helper function to make API calls
+        async function makeApiCall(endpoint, data) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer YOUR_TOKEN_HERE' // Replace with actual token
+                    },
+                    body: JSON.stringify(data)
+                });
+                return await response.json();
+            } catch (error) {
+                throw new Error(`API Error: ${error.message}`);
+            }
+        }
+
+        // Test Case 1: Post to All Students
+        document.getElementById('testForm1').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result1');
+            
+            try {
+                const data = {
+                    title: document.getElementById('title1').value,
+                    content: document.getElementById('content1').value,
+                    is_draft: 0,
+                    is_scheduled: 0,
+                    scheduled_at: "",
+                    allow_comments: 1,
+                    attachment_type: null,
+                    attachment_url: "",
+                    student_ids: null // This will trigger "notify all students" logic
+                };
+
+                resultDiv.innerHTML = '🔄 Making API call...';
+                resultDiv.className = 'result info';
+                resultDiv.style.display = 'block';
+
+                const response = await makeApiCall(`/student/classroom/${CLASS_CODE}/stream`, data);
+                
+                resultDiv.innerHTML = `✅ Success!\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n📧 Smart Notification Logic:\n- Teacher will be notified\n- All other students in class will be notified\n- Current student (poster) will NOT be notified`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        });
+
+        // Test Case 2: Post to Specific Students
+        document.getElementById('testForm2').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result2');
+            
+            try {
+                const studentIds = document.getElementById('studentIds2').value
+                    .split(',')
+                    .map(id => id.trim())
+                    .filter(id => id.length > 0);
+
+                const data = {
+                    title: document.getElementById('title2').value,
+                    content: document.getElementById('content2').value,
+                    is_draft: 0,
+                    is_scheduled: 0,
+                    scheduled_at: "",
+                    allow_comments: 1,
+                    attachment_type: null,
+                    attachment_url: "",
+                    student_ids: studentIds.length > 0 ? studentIds : null
+                };
+
+                resultDiv.innerHTML = '🔄 Making API call...';
+                resultDiv.className = 'result info';
+                resultDiv.style.display = 'block';
+
+                const response = await makeApiCall(`/student/classroom/${CLASS_CODE}/stream`, data);
+                
+                resultDiv.innerHTML = `✅ Success!\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n📧 Smart Notification Logic:\n- Teacher will be notified\n- Only specified students will be notified\n- System validates that student_ids are enrolled in class`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        });
+
+        // Test Case 3: Post with Attachment
+        document.getElementById('testForm3').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result3');
+            
+            try {
+                const data = {
+                    title: document.getElementById('title3').value,
+                    content: document.getElementById('content3').value,
+                    is_draft: 0,
+                    is_scheduled: 0,
+                    scheduled_at: "",
+                    allow_comments: 1,
+                    attachment_type: "file",
+                    attachment_url: document.getElementById('attachment3').value,
+                    student_ids: null
+                };
+
+                resultDiv.innerHTML = '🔄 Making API call...';
+                resultDiv.className = 'result info';
+                resultDiv.style.display = 'block';
+
+                const response = await makeApiCall(`/student/classroom/${CLASS_CODE}/stream`, data);
+                
+                resultDiv.innerHTML = `✅ Success!\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n📧 Smart Notification Logic:\n- Teacher will be notified\n- All other students in class will be notified\n- Attachment included in notification`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        });
+
+        // Display API endpoint info
+        console.log('API Endpoint:', `${API_BASE}/student/classroom/${CLASS_CODE}/stream`);
+        console.log('Class Code:', CLASS_CODE);
+    </script>
+</body>
+</html>
