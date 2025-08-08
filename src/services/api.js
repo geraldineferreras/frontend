@@ -1287,6 +1287,22 @@ class ApiService {
     });
   }
 
+  // Get attendance records for a specific class and date
+  async getAttendanceRecordsByClassAndDate(classId, date) {
+    return this.makeRequest(`/attendance/records/${classId}/${date}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Get all classes for attendance dropdown
+  async getAttendanceClasses() {
+    return this.makeRequest(`/attendance/classes`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   // Excuse Letter methods
   async submitExcuseLetter(excuseData) {
     console.log('Submitting excuse letter with data:', excuseData);
