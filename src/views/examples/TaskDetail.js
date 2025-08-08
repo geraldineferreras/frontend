@@ -53,14 +53,22 @@ const TaskDetail = () => {
         if (response.status) {
           console.log('Task details loaded:', response.data);
           setTask(response.data);
+        }
+        
+        // Load submissions separately
+        console.log('Loading submissions for taskId:', taskId);
+        const submissionsResponse = await apiService.getTaskSubmissions(taskId);
+        
+        if (submissionsResponse.status) {
+          console.log('Submissions loaded:', submissionsResponse.data);
           
           // Set submissions from API response
-          if (response.data.submissions && Array.isArray(response.data.submissions)) {
-            setSubmissionsState(response.data.submissions);
+          if (submissionsResponse.data.submissions && Array.isArray(submissionsResponse.data.submissions)) {
+            setSubmissionsState(submissionsResponse.data.submissions);
             
             // Set first student as selected if available
-            if (response.data.submissions.length > 0 && !selectedStudentId) {
-              setSelectedStudentId(response.data.submissions[0].submission_id);
+            if (submissionsResponse.data.submissions.length > 0 && !selectedStudentId) {
+              setSelectedStudentId(submissionsResponse.data.submissions[0].submission_id);
             }
           }
           
@@ -73,29 +81,29 @@ const TaskDetail = () => {
               if (assignedStudentsResponse.status) {
                 console.log('Assigned students loaded:', assignedStudentsResponse.data);
                 
-                                 // Transform assigned students to match submissions format
-                 const assignedStudents = assignedStudentsResponse.data.map(student => {
-                   console.log('Student profile pic data:', {
-                     student_id: student.student_id,
-                     name: student.full_name,
-                     profile_pic: student.profile_pic,
-                     profile_pic_type: typeof student.profile_pic
-                   });
-                   
-                   return {
-                     submission_id: `assigned_${student.student_id}`,
-                     student_id: student.student_id,
-                     student_name: student.full_name,
-                     student_num: student.student_num,
-                     profile_pic: student.profile_pic,
-                     status: 'assigned',
-                     grade: null,
-                     feedback: '',
-                     attachment_url: null,
-                     submitted_at: null,
-                     dateGraded: null
-                   };
-                 });
+                // Transform assigned students to match submissions format
+                const assignedStudents = assignedStudentsResponse.data.map(student => {
+                  console.log('Student profile pic data:', {
+                    student_id: student.student_id,
+                    name: student.full_name,
+                    profile_pic: student.profile_pic,
+                    profile_pic_type: typeof student.profile_pic
+                  });
+                  
+                  return {
+                    submission_id: `assigned_${student.student_id}`,
+                    student_id: student.student_id,
+                    student_name: student.full_name,
+                    student_num: student.student_num,
+                    profile_pic: student.profile_pic,
+                    status: 'assigned',
+                    grade: null,
+                    feedback: '',
+                    attachments: [],
+                    submitted_at: null,
+                    dateGraded: null
+                  };
+                });
                 
                 // Merge with existing submissions, avoiding duplicates
                 setSubmissionsState(prev => {
@@ -156,6 +164,19 @@ const TaskDetail = () => {
       return profilePic;
     } else {
       return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/profile/${profilePic}`;
+    }
+  };
+
+  // Helper: get file URL for attachments
+  const getFileUrl = (filePath) => {
+    if (!filePath) return null;
+    
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return filePath;
+    } else if (filePath.startsWith('uploads/')) {
+      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${filePath}`;
+    } else {
+      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/submissions/${filePath}`;
     }
   };
 
@@ -354,7 +375,7 @@ const TaskDetail = () => {
               style={{ width: '100%', minHeight: 80, borderRadius: 8, border: '1.5px solid #e9ecef' }}
             />
           </div>
-          <div style={{ color: '#324cdd', fontWeight: 600, fontSize: 18, marginBottom: 12 }}>{modalFile.name || modalFile.attachment_url}</div>
+          <div style={{ color: '#324cdd', fontWeight: 600, fontSize: 18, marginBottom: 12 }}>{modalFile.name}</div>
           <a href={modalFile.url} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', fontWeight: 500, fontSize: 16, textDecoration: 'underline' }}>Open in new tab</a>
         </div>
       </div>
@@ -488,7 +509,7 @@ const TaskDetail = () => {
                   }}>
                     {task.points || 0} points
                   </div>
-                  {task.scheduled_at && (
+                  {task.due_date && (
                     <div style={{
                       background: 'rgba(255,255,255,0.2)',
                       padding: '8px 16px',
@@ -497,7 +518,7 @@ const TaskDetail = () => {
                       fontSize: 14,
                       fontWeight: 600
                     }}>
-                      Due {new Date(task.scheduled_at).toLocaleDateString()}
+                      Due {new Date(task.due_date).toLocaleDateString()}
                     </div>
                   )}
                 </div>
@@ -682,7 +703,7 @@ const TaskDetail = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
-                    {task.scheduled_at ? new Date(task.scheduled_at).toLocaleDateString() : 'No Due Date'}
+                    {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No Due Date'}
                   </div>
                   <div style={{ fontSize: 14, opacity: 0.9 }}>Due Date</div>
                 </div>
@@ -1020,12 +1041,16 @@ const TaskDetail = () => {
                               <div style={{ fontSize: 12, color: '#718096' }}>Score</div>
                             </div>
                             
-                            {s.attachment_url ? (
+                            {s.attachments && s.attachments.length > 0 ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  const firstAttachment = s.attachments[0];
                                   handleOpenModal(
-                                    { name: s.attachment_url.split('/').pop(), url: s.attachment_url },
+                                    { 
+                                      name: firstAttachment.original_name || firstAttachment.file_name, 
+                                      url: getFileUrl(firstAttachment.attachment_url || firstAttachment.file_path)
+                                    },
                                     s
                                   );
                                 }}
@@ -1042,7 +1067,7 @@ const TaskDetail = () => {
                                   boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
                                 }}
                               >
-                                View
+                                View ({s.attachments.length})
                               </button>
                             ) : s.status === 'assigned' ? (
                               <span style={{ 
@@ -1132,7 +1157,7 @@ const TaskDetail = () => {
                         </div>
                       )}
                       
-                      {selectedStudent.attachment_url ? (
+                      {selectedStudent.attachments && selectedStudent.attachments.length > 0 ? (
                         <div style={{ marginBottom: 24 }}>
                           <div style={{ 
                             color: '#667eea', 
@@ -1140,36 +1165,43 @@ const TaskDetail = () => {
                             fontWeight: 600, 
                             marginBottom: 8 
                           }}>
-                            Submitted File
+                            Submitted Files ({selectedStudent.attachments.length})
                           </div>
-                          <button
-                            onClick={() => handleOpenModal(
-                              { name: selectedStudent.attachment_url.split('/').pop(), url: selectedStudent.attachment_url },
-                              selectedStudent
-                            )}
-                            style={{
-                              padding: '12px 24px',
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 12,
-                              fontWeight: 600,
-                              fontSize: 14,
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                              width: '100%'
-                            }}
-                          >
-                            <i className="ni ni-single-copy-04 mr-2" />
-                            View Submission
-                          </button>
+                          {selectedStudent.attachments.map((attachment, index) => (
+                            <button
+                              key={attachment.attachment_id || index}
+                              onClick={() => handleOpenModal(
+                                { 
+                                  name: attachment.original_name || attachment.file_name, 
+                                  url: getFileUrl(attachment.attachment_url || attachment.file_path)
+                                },
+                                selectedStudent
+                              )}
+                              style={{
+                                padding: '12px 24px',
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 12,
+                                fontWeight: 600,
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                                width: '100%',
+                                marginBottom: index < selectedStudent.attachments.length - 1 ? 8 : 0
+                              }}
+                            >
+                              <i className="ni ni-single-copy-04 mr-2" />
+                              View {attachment.original_name || attachment.file_name}
+                            </button>
+                          ))}
                           <div style={{ 
                             color: '#718096', 
                             fontSize: 14, 
                             marginTop: 8 
                           }}>
-                            {selectedStudent.attachment_url.split('/').pop()}
+                            {selectedStudent.attachments.length} file{selectedStudent.attachments.length > 1 ? 's' : ''} submitted
                           </div>
                         </div>
                       ) : (

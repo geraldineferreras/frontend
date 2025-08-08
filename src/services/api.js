@@ -432,7 +432,7 @@ class ApiService {
     return { success: true, data: [] };
   }
 
-  async getAvailableStudents() {
+  async getAvailableStudentsForSections() {
     // Note: This endpoint might not exist in your backend yet
     // For now, return empty array to avoid CORS errors
     return { success: true, data: [] };
@@ -1087,6 +1087,14 @@ class ApiService {
     });
   }
 
+  // Student classroom members API
+  async getClassroomMembers(classCode) {
+    return this.makeRequest(`/student/classroom/${classCode}/people`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   // Attendance Management Methods
   async getTeacherAssignments() {
     return this.makeRequest('/attendance/teacher-assignments', {
@@ -1544,7 +1552,6 @@ class ApiService {
         response = await axios.post(`${API_BASE}/tasks/create`, taskData, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
           },
         });
       } else {
@@ -1567,6 +1574,120 @@ class ApiService {
       });
       const message = error.response?.data?.message || error.message || 'Task creation failed';
       console.error('Task creation error:', message);
+      throw new Error(message);
+    }
+  }
+
+  // Enhanced task creation methods for multiple file attachments
+  async createTaskWithMultipleFiles(taskData, files = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      const formData = new FormData();
+      
+      // Add all task data fields
+      Object.keys(taskData).forEach(key => {
+        if (key === 'class_codes' || key === 'assigned_students') {
+          formData.append(key, JSON.stringify(taskData[key]));
+        } else if (typeof taskData[key] === 'boolean') {
+          formData.append(key, taskData[key] ? '1' : '0');
+        } else {
+          formData.append(key, taskData[key] || '');
+        }
+      });
+      
+      // Add multiple files with same field name (attachment[])
+      files.forEach((file, index) => {
+        formData.append('attachment', file);
+      });
+      
+      const response = await axios.post(`${API_BASE}/tasks/create`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Task creation with multiple files error:', error);
+      const message = error.response?.data?.message || error.message || 'Task creation with multiple files failed';
+      throw new Error(message);
+    }
+  }
+
+  async createTaskWithDifferentFieldNames(taskData, files = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      const formData = new FormData();
+      
+      // Add all task data fields
+      Object.keys(taskData).forEach(key => {
+        if (key === 'class_codes' || key === 'assigned_students') {
+          formData.append(key, JSON.stringify(taskData[key]));
+        } else if (typeof taskData[key] === 'boolean') {
+          formData.append(key, taskData[key] ? '1' : '0');
+        } else {
+          formData.append(key, taskData[key] || '');
+        }
+      });
+      
+      // Add files with different field names (attachment1, attachment2, etc.)
+      files.forEach((file, index) => {
+        formData.append(`attachment${index + 1}`, file);
+      });
+      
+      const response = await axios.post(`${API_BASE}/tasks/create`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Task creation with different field names error:', error);
+      const message = error.response?.data?.message || error.message || 'Task creation with different field names failed';
+      throw new Error(message);
+    }
+  }
+
+  async createTaskWithExternalLinks(taskData, externalLinks = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      // Prepare the payload with external links
+      const payload = {
+        ...taskData,
+        attachments: externalLinks.map(link => ({
+          file_name: link.name || link.file_name,
+          original_name: link.name || link.file_name,
+          attachment_type: link.type || link.attachment_type,
+          attachment_url: link.url || link.attachment_url,
+          file_size: link.file_size || 0,
+          mime_type: link.mime_type || 'application/octet-stream'
+        }))
+      };
+      
+      const response = await axios.post(`${API_BASE}/tasks/create`, payload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Task creation with external links error:', error);
+      const message = error.response?.data?.message || error.message || 'Task creation with external links failed';
       throw new Error(message);
     }
   }
@@ -1594,8 +1715,22 @@ class ApiService {
     });
   }
 
+  async getTaskSubmissions(taskId) {
+    return this.makeRequest(`/tasks/${taskId}/submissions`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async getStudentTaskDetails(taskId) {
     return this.makeRequest(`/tasks/student/${taskId}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getTaskSubmission(taskId, classCode) {
+    return this.makeRequest(`/tasks/${taskId}/submission?class_code=${classCode}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1650,6 +1785,122 @@ class ApiService {
       body: JSON.stringify(submissionData),
       requireAuth: true,
     });
+  }
+
+  // New method for submitting tasks with multiple files
+  async submitTaskWithMultipleFiles(taskId, submissionData) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      let response;
+      
+      if (submissionData instanceof FormData) {
+        // Method 1: Multiple files with same field name (attachment[])
+        // Method 2: Multiple files with different field names (attachment1, attachment2, etc.)
+        response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, submissionData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            // Don't set Content-Type for FormData, let browser set it with boundary
+          },
+        });
+      } else {
+        // Method 3: JSON array of external files/URLs
+        response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, submissionData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Task submission error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      const message = error.response?.data?.message || error.message || 'Task submission failed';
+      console.error('Task submission error:', message);
+      throw new Error(message);
+    }
+  }
+
+  // Method 2: Submit with different field names (attachment1, attachment2, etc.)
+  async submitTaskWithDifferentFieldNames(taskId, files, submissionData = {}) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      const formData = new FormData();
+      
+      // Add basic submission data
+      if (submissionData.class_code) formData.append('class_code', submissionData.class_code);
+      if (submissionData.submission_content) formData.append('submission_content', submissionData.submission_content);
+      
+      // Add files with different field names
+      files.forEach((file, index) => {
+        formData.append(`attachment${index + 1}`, file);
+      });
+      
+      // Add external links if provided (for mixed submissions)
+      if (submissionData.external_links && submissionData.external_links.length > 0) {
+        formData.append('external_links', JSON.stringify(submissionData.external_links));
+      }
+      
+      const response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Task submission failed';
+      console.error('Task submission error:', message);
+      throw new Error(message);
+    }
+  }
+
+  // Method 3: Submit with JSON array of external files/URLs
+  async submitTaskWithExternalLinks(taskId, externalLinks, submissionData = {}) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+    
+    try {
+      const payload = {
+        ...submissionData,
+        attachments: externalLinks.map(link => ({
+          file_name: link.name,
+          original_name: link.name,
+          attachment_type: link.type || 'link',
+          attachment_url: link.url,
+          file_size: link.size || 0,
+          mime_type: link.mime_type || 'application/octet-stream'
+        }))
+      };
+      
+      const response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, payload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Task submission failed';
+      console.error('Task submission error:', message);
+      throw new Error(message);
+    }
   }
 
   async gradeSubmission(submissionId, gradeData) {
@@ -1743,6 +1994,180 @@ class ApiService {
       : `/uploads/tasks/${filename}`;
     
     return `${baseUrl}${endpoint}`;
+  }
+
+  // Student Stream Posting with Smart Notification Logic
+  async createStudentStreamPost(classCode, postData) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream`, {
+      method: 'POST',
+      body: JSON.stringify(postData),
+      requireAuth: true,
+    });
+  }
+
+  async getStudentStreamPosts(classCode) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Smart Notification Logic for Student Posts
+  async createStudentPostWithSmartNotifications(classCode, postData) {
+    try {
+      // First, create the post
+      const postResponse = await this.createStudentStreamPost(classCode, postData);
+      
+      if (!postResponse.status) {
+        throw new Error(postResponse.message || 'Failed to create post');
+      }
+
+      // Get classroom members to determine notification recipients
+      let members = [];
+      try {
+        const membersResponse = await this.getClassroomMembers(classCode);
+        console.log('Members response:', membersResponse);
+        
+        // Handle different response structures
+        if (membersResponse && membersResponse.data) {
+          members = Array.isArray(membersResponse.data) ? membersResponse.data : [];
+        } else if (Array.isArray(membersResponse)) {
+          members = membersResponse;
+        } else {
+          console.warn('Unexpected members response structure:', membersResponse);
+          members = [];
+        }
+      } catch (error) {
+        console.warn('Failed to get classroom members, proceeding without notifications:', error);
+        members = [];
+      }
+      
+      console.log('Processed members array:', members);
+      
+      // Separate teacher and students
+      const teacher = members.find(member => member.role === 'teacher');
+      const students = members.filter(member => member.role === 'student');
+      
+      // Determine notification recipients based on smart logic
+      let notificationRecipients = [];
+      
+      // Always notify the teacher
+      if (teacher) {
+        notificationRecipients.push({
+          id: teacher.user_id || teacher.id,
+          role: 'teacher',
+          name: teacher.name || teacher.user_name
+        });
+      }
+
+      // Smart notification logic for students
+      if (postData.student_ids && postData.student_ids.length > 0) {
+        // With student_ids: Only notify specified students
+        const specifiedStudents = students.filter(student => 
+          postData.student_ids.includes(student.user_id || student.id)
+        );
+        
+        // Validate that provided student_ids are actually enrolled
+        const validStudentIds = specifiedStudents.map(student => student.user_id || student.id);
+        const invalidStudentIds = postData.student_ids.filter(id => !validStudentIds.includes(id));
+        
+        if (invalidStudentIds.length > 0) {
+          console.warn('Some specified student IDs are not enrolled in this class:', invalidStudentIds);
+        }
+        
+        notificationRecipients.push(...specifiedStudents.map(student => ({
+          id: student.user_id || student.id,
+          role: 'student',
+          name: student.name || student.user_name
+        })));
+      } else {
+        // Without student_ids: Notify all other students in class
+        const currentUserId = localStorage.getItem('user_id') || 
+                            JSON.parse(localStorage.getItem('user') || '{}').id;
+        
+        const otherStudents = students.filter(student => 
+          (student.user_id || student.id) !== currentUserId
+        );
+        
+        notificationRecipients.push(...otherStudents.map(student => ({
+          id: student.user_id || student.id,
+          role: 'student',
+          name: student.name || student.user_name
+        })));
+      }
+
+      // Send notifications to all recipients
+      console.log('Notification recipients:', notificationRecipients);
+      
+      if (notificationRecipients.length > 0) {
+        const notificationPromises = notificationRecipients.map(recipient => {
+          const notificationData = {
+            recipient_id: recipient.id,
+            recipient_role: recipient.role,
+            message: `New post in ${classCode}: ${postData.title || 'Untitled'}`,
+            type: 'stream_post',
+            data: {
+              class_code: classCode,
+              post_id: postResponse.data.id,
+              post_title: postData.title,
+              post_content: postData.content,
+              author_name: JSON.parse(localStorage.getItem('user') || '{}').name || 'Unknown'
+            }
+          };
+          
+          return this.sendNotification(notificationData).catch(error => {
+            console.warn(`Failed to send notification to ${recipient.name} (${recipient.id}):`, error);
+            return null; // Don't fail the entire operation if one notification fails
+          });
+        });
+
+        await Promise.all(notificationPromises);
+      } else {
+        console.log('No notification recipients found');
+      }
+
+      return {
+        ...postResponse,
+        notificationRecipients: notificationRecipients.length,
+        smartNotificationLogic: {
+          teacherNotified: !!teacher,
+          studentsNotified: notificationRecipients.filter(r => r.role === 'student').length,
+          totalRecipients: notificationRecipients.length
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error creating student post with smart notifications:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to send notifications
+  async sendNotification(notificationData) {
+    try {
+      return await this.makeRequest('/notifications', {
+        method: 'POST',
+        body: JSON.stringify(notificationData),
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.warn('Notification API not available, skipping notification:', error);
+      return { success: false, message: 'Notification API not available' };
+    }
+  }
+
+  // Get classroom members for notification logic
+  async getClassroomMembers(classCode) {
+    try {
+      return await this.makeRequest(`/student/classroom/${classCode}/people`, {
+        method: 'GET',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.warn('Classroom members API not available:', error);
+      // Return empty array as fallback
+      return { data: [] };
+    }
   }
 }
 

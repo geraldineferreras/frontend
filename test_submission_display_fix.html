@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Submission Display Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .api-response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .student-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+        }
+        .student-name {
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+        }
+        .student-info {
+            color: #666;
+            margin: 5px 0;
+        }
+        .attachment-info {
+            background: #e3f2fd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-submitted {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        .status-assigned {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        .no-file {
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Submission Display Fix</h1>
+    
+    <div class="container">
+        <h2>API Response Analysis</h2>
+        <p>This test shows how the API response should be processed to display student submissions correctly.</p>
+        
+        <h3>API Response Structure:</h3>
+        <div class="api-response">
+{
+    "status": true,
+    "message": "Task submissions retrieved successfully",
+    "data": {
+        "task": {
+            "task_id": "58",
+            "title": "Task Testing due date",
+            "type": "exam",
+            "points": "50",
+            "due_date": "2025-08-11 04:21:00"
+        },
+        "submissions": [
+            {
+                "submission_id": "22",
+                "student_id": "STU689436695D2BD603",
+                "student_name": "CHRISTINE NOAH G. SINGIAN",
+                "student_num": "2022311852",
+                "status": "submitted",
+                "attachments": [
+                    {
+                        "attachment_id": "1",
+                        "file_name": "eae06b6ae80bd0157e8eea2abb9c5d6e.pdf",
+                        "original_name": "SCMS_sections_2025-08-02.pdf",
+                        "file_path": "uploads/submissions/eae06b6ae80bd0157e8eea2abb9c5d6e.pdf",
+                        "attachment_url": "uploads/submissions/eae06b6ae80bd0157e8eea2abb9c5d6e.pdf"
+                    }
+                ],
+                "attachment_count": 1
+            },
+            {
+                "submission_id": "23",
+                "student_id": "STU689439A21701A102",
+                "student_name": "Carll Morales",
+                "student_num": "2022548988",
+                "status": "submitted",
+                "attachments": [
+                    {
+                        "attachment_id": "2",
+                        "file_name": "11ef5f91f887702d0c59be4d082c75ce.pdf",
+                        "original_name": "Defense_Schedule.pdf",
+                        "file_path": "uploads/submissions/11ef5f91f887702d0c59be4d082c75ce.pdf",
+                        "attachment_url": "uploads/submissions/11ef5f91f887702d0c59be4d082c75ce.pdf"
+                    },
+                    {
+                        "attachment_id": "3",
+                        "file_name": "ba6820977e78ab3c724703f16b36b477.pdf",
+                        "original_name": "SCMS_sections_2025-08-02.pdf",
+                        "file_path": "uploads/submissions/ba6820977e78ab3c724703f16b36b477.pdf",
+                        "attachment_url": "uploads/submissions/ba6820977e78ab3c724703f16b36b477.pdf"
+                    }
+                ],
+                "attachment_count": 2
+            }
+        ],
+        "total_submissions": 2,
+        "submitted_count": 2
+    }
+}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Expected Display After Fix</h2>
+        <p>The following shows how students should appear in the teacher's view after the fix:</p>
+        
+        <div class="student-card">
+            <div class="student-name">CHRISTINE NOAH G. SINGIAN</div>
+            <div class="student-info">Student Number: 2022311852</div>
+            <div class="student-info">
+                Status: <span class="status-badge status-submitted">Submitted</span>
+            </div>
+            <div class="attachment-info">
+                <strong>Attachments (1):</strong><br>
+                • SCMS_sections_2025-08-02.pdf<br>
+                <em>File: eae06b6ae80bd0157e8eea2abb9c5d6e.pdf</em>
+            </div>
+            <div style="margin-top: 10px;">
+                <button style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
+                    View (1)
+                </button>
+            </div>
+        </div>
+
+        <div class="student-card">
+            <div class="student-name">Carll Morales</div>
+            <div class="student-info">Student Number: 2022548988</div>
+            <div class="student-info">
+                Status: <span class="status-badge status-submitted">Submitted</span>
+            </div>
+            <div class="attachment-info">
+                <strong>Attachments (2):</strong><br>
+                • Defense_Schedule.pdf<br>
+                • SCMS_sections_2025-08-02.pdf<br>
+                <em>Files: 11ef5f91f887702d0c59be4d082c75ce.pdf, ba6820977e78ab3c724703f16b36b477.pdf</em>
+            </div>
+            <div style="margin-top: 10px;">
+                <button style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
+                    View (2)
+                </button>
+            </div>
+        </div>
+
+        <div class="student-card">
+            <div class="student-name">France Tadeo</div>
+            <div class="student-info">Student Number: 2022456878</div>
+            <div class="student-info">
+                Status: <span class="status-badge status-assigned">Assigned</span>
+            </div>
+            <div class="no-file">Waiting</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Key Changes Made</h2>
+        <ul>
+            <li><strong>API Method:</strong> Added <code>getTaskSubmissions(taskId)</code> method to fetch submissions separately</li>
+            <li><strong>Attachment Handling:</strong> Updated to check <code>s.attachments</code> array instead of <code>s.attachment_url</code></li>
+            <li><strong>File URL Construction:</strong> Added <code>getFileUrl()</code> helper to properly construct file URLs</li>
+            <li><strong>Multiple Files:</strong> Updated UI to show attachment count and handle multiple files per submission</li>
+            <li><strong>File Names:</strong> Use <code>original_name</code> for display and <code>file_name</code> for system reference</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h2>Before vs After</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <th style="border: 1px solid #ddd; padding: 10px; background: #f8f9fa;">Before (Broken)</th>
+                <th style="border: 1px solid #ddd; padding: 10px; background: #f8f9fa;">After (Fixed)</th>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px;">
+                    • Checked <code>s.attachment_url</code> (null)<br>
+                    • Showed "No file" for all students<br>
+                    • Couldn't access submitted files
+                </td>
+                <td style="border: 1px solid #ddd; padding: 10px;">
+                    • Checks <code>s.attachments</code> array<br>
+                    • Shows "View (1)" or "View (2)" buttons<br>
+                    • Properly displays submitted files
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        // Simulate the API response processing
+        const apiResponse = {
+            status: true,
+            message: "Task submissions retrieved successfully",
+            data: {
+                submissions: [
+                    {
+                        submission_id: "22",
+                        student_name: "CHRISTINE NOAH G. SINGIAN",
+                        student_num: "2022311852",
+                        status: "submitted",
+                        attachments: [
+                            {
+                                original_name: "SCMS_sections_2025-08-02.pdf",
+                                file_name: "eae06b6ae80bd0157e8eea2abb9c5d6e.pdf",
+                                attachment_url: "uploads/submissions/eae06b6ae80bd0157e8eea2abb9c5d6e.pdf"
+                            }
+                        ],
+                        attachment_count: 1
+                    },
+                    {
+                        submission_id: "23",
+                        student_name: "Carll Morales",
+                        student_num: "2022548988",
+                        status: "submitted",
+                        attachments: [
+                            {
+                                original_name: "Defense_Schedule.pdf",
+                                file_name: "11ef5f91f887702d0c59be4d082c75ce.pdf",
+                                attachment_url: "uploads/submissions/11ef5f91f887702d0c59be4d082c75ce.pdf"
+                            },
+                            {
+                                original_name: "SCMS_sections_2025-08-02.pdf",
+                                file_name: "ba6820977e78ab3c724703f16b36b477.pdf",
+                                attachment_url: "uploads/submissions/ba6820977e78ab3c724703f16b36b477.pdf"
+                            }
+                        ],
+                        attachment_count: 2
+                    }
+                ]
+            }
+        };
+
+        // Simulate the fix logic
+        function processSubmissions(submissions) {
+            return submissions.map(submission => {
+                const hasAttachments = submission.attachments && submission.attachments.length > 0;
+                const attachmentCount = hasAttachments ? submission.attachments.length : 0;
+                
+                return {
+                    ...submission,
+                    hasFiles: hasAttachments,
+                    displayText: hasAttachments ? `View (${attachmentCount})` : 'No file',
+                    status: submission.status
+                };
+            });
+        }
+
+        console.log('Processing submissions...');
+        const processedSubmissions = processSubmissions(apiResponse.data.submissions);
+        console.log('Processed submissions:', processedSubmissions);
+        
+        // Verify the fix
+        processedSubmissions.forEach(submission => {
+            console.log(`${submission.student_name}: ${submission.displayText}`);
+        });
+    </script>
+</body>
+</html>
