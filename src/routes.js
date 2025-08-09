@@ -67,6 +67,8 @@ import TeacherFastGrade from "views/examples/TeacherFastGrade.js";
 import TaskDetail from "views/examples/TaskDetail.js";
 import TestUserData from "views/examples/TestUserData.js";
 import TestProfilePics from "views/examples/TestProfilePics.js";
+import ProfilePictureDebug from "components/ProfilePictureDebug.js";
+import SimpleProfileTest from "components/SimpleProfileTest.js";
 
 var routes = [
   {
@@ -180,6 +182,20 @@ var routes = [
     name: "Test Profile Pics",
     icon: "ni ni-image text-info",
     component: <TestProfilePics />,
+    layout: "/admin",
+  },
+  {
+    path: "/profile-picture-debug",
+    name: "Profile Picture Debug",
+    icon: "ni ni-bug text-warning",
+    component: <ProfilePictureDebug />,
+    layout: "/admin",
+  },
+  {
+    path: "/simple-profile-test",
+    name: "Simple Profile Test",
+    icon: "ni ni-chart-bar-32 text-info",
+    component: <SimpleProfileTest />,
     layout: "/admin",
   },
   {

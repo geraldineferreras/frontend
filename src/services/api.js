@@ -156,7 +156,7 @@ class ApiService {
 
   // Authenticated requests
   async getProfile() {
-    return this.makeRequest('/user', {
+    return this.makeRequest('/user/me', {
       method: 'GET',
       requireAuth: true,
     });
@@ -2004,12 +2004,44 @@ class ApiService {
   }
 
   getFilePreviewUrl(filename, isSubmission = false) {
-    const baseUrl = API_BASE.replace('/api', '');
-    const endpoint = isSubmission 
-      ? `/uploads/submissions/${filename}`
-      : `/uploads/tasks/${filename}`;
-    
+    if (!filename) return '';
+    // Pass-through absolute URLs
+    if (typeof filename === 'string' && (filename.startsWith('http://') || filename.startsWith('https://'))) {
+      return filename;
+    }
+
+    // Derive site base (strip both /index.php and /api if present)
+    const apiBase = process.env.REACT_APP_API_BASE_URL || API_BASE;
+    let baseUrl = apiBase;
+    baseUrl = baseUrl.replace('/index.php/api', '');
+    baseUrl = baseUrl.replace('/api', '');
+    baseUrl = baseUrl.replace(/\/$/, ''); // remove trailing slash
+
+    // If backend returned a relative path like "uploads/tasks/filename.pdf"
+    if (filename.startsWith('uploads/')) {
+      return `${baseUrl}/${filename}`;
+    }
+
+    // Otherwise assume bare filename
+    const endpoint = isSubmission ? `/uploads/submissions/${filename}` : `/uploads/tasks/${filename}`;
     return `${baseUrl}${endpoint}`;
+  }
+
+  // Fetch file metadata (original_name, mime, size, etc.) for task files
+  async getTaskFileInfo(filename) {
+    try {
+      if (!filename) {
+        return { status: false, message: 'No filename provided' };
+      }
+      // Endpoint: /tasks/files/info/{filename}
+      return await this.makeRequest(`/tasks/files/info/${encodeURIComponent(filename)}`, {
+        method: 'GET',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.warn('getTaskFileInfo failed:', error?.message || error);
+      return { status: false, message: error?.message || 'Failed to fetch file info' };
+    }
   }
 
   // Student Stream Posting with Smart Notification Logic

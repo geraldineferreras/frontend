@@ -1,42 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardBody, Button, Row, Col, Nav, NavItem, NavLink, Input, Badge } from "reactstrap";
 import classnames from "classnames";
+import apiService from "../../services/api";
 
-// Mock data for classes
-const enrolledClasses = [
-  { code: "ALL", name: "All classes" },
-  { code: "B7P3R9", name: "Object Oriented Programming" },
-  { code: "A1C2D3", name: "Data Structures and Algorithms" },
-  { code: "X9Y8Z7", name: "Database Management Systems" },
-  { code: "M7AGZY", name: "SAD SUBJECT" },
-  { code: "5XHJE9", name: "SAD 312" }
-];
-
-// Mock data for tasks
-const mockTasks = {
-  assigned: [
-    { id: 1, title: "FINAL GRADE", class: "B7P3R9", className: "Object Oriented Programming", posted: "Feb 3, 2022" },
-    { id: 2, title: "Gclass101", class: "A1C2D3", className: "Data Structures and Algorithms", posted: "Sep 7, 2023" },
-    { id: 3, title: "UseCase Diagram", class: "A1C2D3", className: "Data Structures and Algorithms", posted: "Feb 29, 2024" },
-    { id: 4, title: "Upload Dummy Tables", class: "X9Y8Z7", className: "Database Management Systems", posted: "May 6, 2024" },
-    { id: 5, title: "MVC: LARAVEL_ACTIVITY-01", class: "A1C2D3", className: "Data Structures and Algorithms", posted: "May 24, 2024" }
-  ],
-  missing: [],
-  done: [
-    { id: 6, title: "Software Engineering Methodologies - Activity 1.1", class: "B7P3R9", className: "Object Oriented Programming", posted: "Feb 3, 2022" },
-    { id: 7, title: "Activity 1", class: "A1C2D3", className: "Data Structures and Algorithms", posted: "Feb 29, 2024" },
-    { id: 8, title: "FINAL GRADE", class: "X9Y8Z7", className: "Database Management Systems", posted: "May 6, 2024" }
-  ]
-};
+// Enrolled classes will be fetched from API
 
 const tabList = [
   { key: "assigned", label: "Assigned" },
   { key: "missing", label: "Missing" },
-  { key: "done", label: "Done" }
+  { key: "completed", label: "Completed" }
 ];
 
-// Helper to group tasks by due date, with special groups for 'done' tab
+// Helper to group tasks by due date, with special groups for 'completed' tab
 function groupTasksByDueDate(tasks, tab) {
   const now = new Date();
   const startOfWeek = new Date(now);
@@ -48,23 +24,23 @@ function groupTasksByDueDate(tasks, tab) {
   const endOfLastWeek = new Date(startOfWeek);
   endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
-  if (tab === 'done') {
-    // Google Classroom-like grouping for Done tab
+  if (tab === 'completed') {
+    // Google Classroom-like grouping for Completed tab
     const groups = {
       'No due date': [],
-      'Done early': [],
+      'Completed early': [],
       'This week': [],
       'Last week': [],
       'Earlier': []
     };
     tasks.forEach(task => {
-      if (!task.dueDate) {
+      if (!task.due_date) {
         groups['No due date'].push(task);
       } else {
-        const due = new Date(task.dueDate);
-        // Done early: due date is after completion date (mock: posted < dueDate)
-        if (task.posted && due > new Date(task.posted)) {
-          groups['Done early'].push(task);
+        const due = new Date(task.due_date);
+        // Completed early: due date is after completion date
+        if (task.submitted_at && due > new Date(task.submitted_at)) {
+          groups['Completed early'].push(task);
         } else if (due >= startOfWeek && due <= endOfWeek) {
           groups['This week'].push(task);
         } else if (due >= startOfLastWeek && due <= endOfLastWeek) {
@@ -90,10 +66,10 @@ function groupTasksByDueDate(tasks, tab) {
       'Later': []
     };
     tasks.forEach(task => {
-      if (!task.dueDate) {
+      if (!task.due_date) {
         groups['No due date'].push(task);
       } else {
-        const due = new Date(task.dueDate);
+        const due = new Date(task.due_date);
         if (due >= startOfWeek && due <= endOfWeek) {
           groups['This week'].push(task);
         } else if (due >= startOfNextWeek && due <= endOfNextWeek) {
@@ -112,10 +88,120 @@ function groupTasksByDueDate(tasks, tab) {
 const ToDoStudent = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  
+  // State for tasks and loading
+  const [tasks, setTasks] = useState({ assigned: [], missing: [], completed: [] });
+  const [enrolledClasses, setEnrolledClasses] = useState([{ code: "ALL", name: "All classes" }]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
   // Parse tab and classCode from URL
   const pathParts = pathname.split("/");
   const tab = pathParts[2] || "assigned";
   const classCode = (pathParts[3] || "ALL").toUpperCase();
+
+  // Fetch enrolled classes
+  const fetchEnrolledClasses = async () => {
+    try {
+      const response = await apiService.getStudentClasses();
+      if (response.status && response.data) {
+        const classes = [{ code: "ALL", name: "All classes" }];
+        response.data.forEach(classInfo => {
+          classes.push({
+            code: classInfo.class_code || classInfo.code,
+            name: classInfo.subject_name || classInfo.name
+          });
+        });
+        setEnrolledClasses(classes);
+      }
+    } catch (error) {
+      console.error('Error fetching enrolled classes:', error);
+      // Keep the default "All classes" option
+    }
+  };
+
+  // Fetch tasks from API
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // First, get the student's enrolled classes
+      const classesResponse = await apiService.getStudentClasses();
+      if (!classesResponse.status || !classesResponse.data) {
+        setError('Failed to load enrolled classes');
+        setTasks({ assigned: [], missing: [], completed: [] });
+        return;
+      }
+
+      const enrolledClasses = classesResponse.data;
+      
+      // Fetch tasks for each class and combine results
+      const allAssignedTasks = [];
+      const allMissingTasks = [];
+      const allCompletedTasks = [];
+
+      // Fetch tasks for each enrolled class
+      for (const classInfo of enrolledClasses) {
+        const classCode = classInfo.class_code || classInfo.code;
+        if (!classCode) continue;
+
+        try {
+          const [assignedResponse, missingResponse, completedResponse] = await Promise.all([
+            apiService.getStudentTasks({ status: 'assigned', classCode }),
+            apiService.getStudentTasks({ status: 'missing', classCode }),
+            apiService.getStudentTasks({ status: 'completed', classCode })
+          ]);
+
+          // Add class information to each task
+          if (assignedResponse.status && assignedResponse.data) {
+            allAssignedTasks.push(...assignedResponse.data.map(task => ({
+              ...task,
+              class_code: classCode,
+              subject_name: classInfo.subject_name || classInfo.name
+            })));
+          }
+
+          if (missingResponse.status && missingResponse.data) {
+            allMissingTasks.push(...missingResponse.data.map(task => ({
+              ...task,
+              class_code: classCode,
+              subject_name: classInfo.subject_name || classInfo.name
+            })));
+          }
+
+          if (completedResponse.status && completedResponse.data) {
+            allCompletedTasks.push(...completedResponse.data.map(task => ({
+              ...task,
+              class_code: classCode,
+              subject_name: classInfo.subject_name || classInfo.name
+            })));
+          }
+        } catch (classError) {
+          console.warn(`Error fetching tasks for class ${classCode}:`, classError);
+          // Continue with other classes even if one fails
+        }
+      }
+
+      setTasks({
+        assigned: allAssignedTasks,
+        missing: allMissingTasks,
+        completed: allCompletedTasks
+      });
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      setError(error.message || 'Failed to load tasks');
+      setTasks({ assigned: [], missing: [], completed: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchEnrolledClasses();
+    fetchTasks();
+  }, []);
 
   // Tab switching
   const handleTabClick = (tabKey) => {
@@ -128,35 +214,46 @@ const ToDoStudent = () => {
     navigate(`/student/${tab}/${newClass}`);
   };
 
-  // Filter tasks by tab and class
-  const tasks = (mockTasks[tab] || []).filter(
-    t => classCode === "ALL" || t.class === classCode
-  );
+  // Get current tab tasks filtered by class if needed
+  const currentTasks = (tasks[tab] || []).filter(task => {
+    if (classCode === 'ALL') return true;
+    return task.class_code === classCode || task.classroom_code === classCode;
+  });
 
   // Add collapsible state for each group
-  const groupKeys = tab === 'done'
-    ? ['No due date', 'Done early', 'This week', 'Last week', 'Earlier']
+  const groupKeys = tab === 'completed'
+    ? ['No due date', 'Completed early', 'This week', 'Last week', 'Earlier']
     : ['No due date', 'This week', 'Next week', 'Later'];
   const [collapsed, setCollapsed] = useState(
     Object.fromEntries(groupKeys.map(k => [k, false]))
   );
 
-  // Add mock due dates to tasks for demonstration
-  const tasksWithDueDates = tasks.map((t, i) => {
-    if (i === 0) return { ...t, dueDate: null };
-    if (i === 1) return { ...t, dueDate: new Date().toISOString() };
-    if (i === 2) {
-      const d = new Date(); d.setDate(d.getDate() + 3); return { ...t, dueDate: d.toISOString() };
+  const grouped = groupTasksByDueDate(currentTasks, tab);
+
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No date';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  // Helper function to get task status badge color
+  const getStatusBadgeColor = (taskStatus) => {
+    switch (taskStatus) {
+      case 'assigned':
+        return { background: '#e6e8ff', color: '#5e72e4' };
+      case 'missing':
+        return { background: '#ffe6e6', color: '#e53e3e' };
+      case 'completed':
+        return { background: '#e6ffe6', color: '#38a169' };
+      default:
+        return { background: '#e6e8ff', color: '#5e72e4' };
     }
-    if (i === 3) {
-      const d = new Date(); d.setDate(d.getDate() + 8); return { ...t, dueDate: d.toISOString() };
-    }
-    if (i === 4) {
-      const d = new Date(); d.setDate(d.getDate() + 15); return { ...t, dueDate: d.toISOString() };
-    }
-    return t;
-  });
-  const grouped = groupTasksByDueDate(tasksWithDueDates, tab);
+  };
 
   return (
     <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
@@ -225,86 +322,128 @@ const ToDoStudent = () => {
                 display: 'inline-block',
                 borderTopLeftRadius: 0,
                 borderBottomLeftRadius: 0
-              }}>{tasks.length}</span>
+              }}>{currentTasks.length}</span>
             </div>
           </Col>
         </Row>
-        <Row>
-          <Col md="12">
-            {Object.entries(grouped).map(([group, groupTasks]) => (
-              <div key={group} style={{ marginBottom: 32 }}>
-                <div
-                  className="todo-group-header-mobile"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    color: '#444',
-                    background: '#f7fafd',
-                    borderBottom: '1px solid #e3e3e3',
-                    padding: '12px 0',
-                  }}
-                  onClick={() => setCollapsed(c => ({ ...c, [group]: !c[group] }))}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {group}
-                    <span style={{
-                      color: '#2096ff',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      background: '#e6e8ff',
-                      borderRadius: 10,
-                      padding: '2px 12px',
-                      minWidth: 28,
-                      textAlign: 'center',
-                      marginLeft: 8,
-                      display: 'inline-block',
-                    }}>{groupTasks.length}</span>
-                  </span>
-                  <span style={{ marginLeft: 12, color: '#aaa', fontSize: 15 }}>
-                    {collapsed[group] ? '▼' : '▲'}
-                  </span>
-                </div>
-                {!collapsed[group] && groupTasks.length > 0 && (
-                  <Card className="shadow-sm rounded-lg todo-task-card-mobile" style={{ border: 'none', marginTop: 0 }}>
-                    <CardBody>
-                      {groupTasks.map(task => (
-                        <div key={task.id} className="d-flex align-items-center mb-4" style={{ borderBottom: '1px solid #f0f1f6', paddingBottom: 18 }}>
-                          <div style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 16,
-                            background: '#e3f0ff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginRight: 18
-                          }}>
-                            <i className="ni ni-bullet-list-67" style={{ fontSize: 22, color: '#2096ff' }} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div className="todo-task-title-mobile" style={{ fontWeight: 700, fontSize: 16 }}>{task.title}</div>
-                            <div className="todo-task-class-mobile" style={{ color: '#888', fontSize: 13 }}>{task.className}</div>
-                            <div className="todo-task-date-mobile" style={{ color: '#aaa', fontSize: 12 }}>Posted {task.posted}</div>
-                          </div>
-                          <Badge className="todo-task-badge-mobile" color="primary" style={{ fontSize: 12, fontWeight: 500, borderRadius: 8, background: '#e6e8ff', color: '#5e72e4', padding: '6px 14px' }}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Badge>
-                        </div>
-                      ))}
-                    </CardBody>
-                  </Card>
-                )}
-                {!collapsed[group] && groupTasks.length === 0 && (
-                  <div className="text-center text-muted" style={{ fontSize: 15, margin: '32px 0' }}>
-                    No {tab} tasks for this group.
-                  </div>
-                )}
+        
+        {loading && (
+          <Row>
+            <Col md="12" className="text-center py-5">
+              <div style={{ color: '#2096ff', fontSize: 16 }}>
+                <i className="ni ni-spinner" style={{ marginRight: 8 }} />
+                Loading tasks...
               </div>
-            ))}
-          </Col>
-        </Row>
+            </Col>
+          </Row>
+        )}
+
+        {error && (
+          <Row>
+            <Col md="12" className="text-center py-5">
+              <div style={{ color: '#e53e3e', fontSize: 16 }}>
+                <i className="ni ni-alert-circle" style={{ marginRight: 8 }} />
+                {error}
+              </div>
+            </Col>
+          </Row>
+        )}
+
+        {!loading && !error && (
+          <Row>
+            <Col md="12">
+              {Object.entries(grouped).map(([group, groupTasks]) => (
+                <div key={group} style={{ marginBottom: 32 }}>
+                  <div
+                    className="todo-group-header-mobile"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: 15,
+                      color: '#444',
+                      background: '#f7fafd',
+                      borderBottom: '1px solid #e3e3e3',
+                      padding: '12px 0',
+                    }}
+                    onClick={() => setCollapsed(c => ({ ...c, [group]: !c[group] }))}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {group}
+                      <span style={{
+                        color: '#2096ff',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        background: '#e6e8ff',
+                        borderRadius: 10,
+                        padding: '2px 12px',
+                        minWidth: 28,
+                        textAlign: 'center',
+                        marginLeft: 8,
+                        display: 'inline-block',
+                      }}>{groupTasks.length}</span>
+                    </span>
+                    <span style={{ marginLeft: 12, color: '#aaa', fontSize: 15 }}>
+                      {collapsed[group] ? '▼' : '▲'}
+                    </span>
+                  </div>
+                  {!collapsed[group] && groupTasks.length > 0 && (
+                    <Card className="shadow-sm rounded-lg todo-task-card-mobile" style={{ border: 'none', marginTop: 0 }}>
+                      <CardBody>
+                        {groupTasks.map(task => (
+                          <div key={task.id} className="d-flex align-items-center mb-4" style={{ borderBottom: '1px solid #f0f1f6', paddingBottom: 18 }}>
+                            <div style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: 16,
+                              background: '#e3f0ff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 18
+                            }}>
+                              <i className="ni ni-bullet-list-67" style={{ fontSize: 22, color: '#2096ff' }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="todo-task-title-mobile" style={{ fontWeight: 700, fontSize: 16 }}>
+                                {task.title || task.task_title}
+                              </div>
+                              <div className="todo-task-class-mobile" style={{ color: '#888', fontSize: 13 }}>
+                                {task.subject_name || task.class_name || 'Unknown Class'}
+                              </div>
+                              <div className="todo-task-date-mobile" style={{ color: '#aaa', fontSize: 12 }}>
+                                Posted {formatDate(task.created_at || task.posted_date)}
+                              </div>
+                            </div>
+                            <Badge 
+                              className="todo-task-badge-mobile" 
+                              style={{ 
+                                fontSize: 12, 
+                                fontWeight: 500, 
+                                borderRadius: 8, 
+                                padding: '6px 14px',
+                                ...getStatusBadgeColor(task.status || tab)
+                              }}
+                            >
+                              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </Badge>
+                          </div>
+                        ))}
+                      </CardBody>
+                    </Card>
+                  )}
+                  {!collapsed[group] && groupTasks.length === 0 && (
+                    <div className="text-center text-muted" style={{ fontSize: 15, margin: '32px 0' }}>
+                      No {tab} tasks for this group.
+                    </div>
+                  )}
+                </div>
+              ))}
+            </Col>
+          </Row>
+        )}
       </div>
     </div>
   );

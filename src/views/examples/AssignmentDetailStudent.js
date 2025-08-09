@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Row, Col, Button, Input, Badge, Card, CardBody, Progress, Spinner, Alert } from "reactstrap";
+import { Row, Col, Button, Input, Badge, Card, CardBody, Progress, Spinner, Alert, Modal, ModalBody } from "reactstrap";
+import { Document, Page, pdfjs } from 'react-pdf';
 import apiService from "../../services/api";
 
 // Mock data removed - now using real API data
@@ -21,6 +22,14 @@ const AssignmentDetailStudent = () => {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [newLink, setNewLink] = useState({ name: '', url: '', type: 'link' });
 
+  // In-page file preview state
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerFile, setViewerFile] = useState(null); // { name, url, mime }
+  const [pdfZoom, setPdfZoom] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState(null);
+  const [resolvedAssignmentFileName, setResolvedAssignmentFileName] = useState(null);
+
   // Fetch assignment details and submission data
   useEffect(() => {
     const fetchData = async () => {
@@ -32,7 +41,60 @@ const AssignmentDetailStudent = () => {
         console.log('Raw API response:', response);
         
         if (response.status && response.data) {
-          setAssignment(response.data);
+          // Enrich assignment with original file names using file-info endpoint
+          const enrichWithOriginalNames = async (data) => {
+            const cloned = { ...data };
+            const tasksToRun = [];
+
+            const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+            const extractFilename = (p) => {
+              if (!p) return '';
+              if (p.startsWith('uploads/')) return p.split('/').pop();
+              return p.split('/').pop();
+            };
+
+            // Single attachment on task
+            if (cloned.attachment_url && !cloned.original_name && !isExternal(cloned.attachment_url)) {
+              const filename = extractFilename(cloned.attachment_url);
+              if (filename) {
+                tasksToRun.push(
+                  apiService.getTaskFileInfo(filename).then((info) => {
+                    if (info && info.status && info.data) {
+                      cloned.original_name = info.data.original_name || info.data.filename || cloned.original_name;
+                    }
+                  }).catch(() => {})
+                );
+              }
+            }
+
+            // Multiple attachments array
+            if (Array.isArray(cloned.attachments) && cloned.attachments.length > 0) {
+              cloned.attachments = cloned.attachments.map((att) => ({ ...att }));
+              cloned.attachments.forEach((att) => {
+                if (!att.original_name && att.attachment_url && !isExternal(att.attachment_url)) {
+                  const filename = extractFilename(att.attachment_url);
+                  if (filename) {
+                    tasksToRun.push(
+                      apiService.getTaskFileInfo(filename).then((info) => {
+                        if (info && info.status && info.data) {
+                          att.original_name = info.data.original_name || info.data.filename || att.original_name;
+                          att.mime_type = att.mime_type || info.data.mime_type;
+                        }
+                      }).catch(() => {})
+                    );
+                  }
+                }
+              });
+            }
+
+            if (tasksToRun.length > 0) {
+              await Promise.all(tasksToRun);
+            }
+            return cloned;
+          };
+
+          const enriched = await enrichWithOriginalNames(response.data);
+          setAssignment(enriched);
           console.log('Assignment details loaded:', response.data);
           
           // Fetch submission data using the correct endpoint
@@ -43,7 +105,41 @@ const AssignmentDetailStudent = () => {
               console.log('Submission response:', submissionResponse);
               
               if (submissionResponse.status && submissionResponse.data) {
-                setSubmission(submissionResponse.data);
+                // Enrich submission attachments with original names
+                const enrichSubmission = async (sub) => {
+                  const cloned = { ...sub };
+                  const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+                  const extractFilename = (p) => {
+                    if (!p) return '';
+                    if (p.startsWith('uploads/')) return p.split('/').pop();
+                    return p.split('/').pop();
+                  };
+                  if (Array.isArray(cloned.attachments) && cloned.attachments.length > 0) {
+                    cloned.attachments = cloned.attachments.map((a) => ({ ...a }));
+                    const jobs = [];
+                    cloned.attachments.forEach((a) => {
+                      if (!a.original_name && a.attachment_url && !isExternal(a.attachment_url)) {
+                        const filename = extractFilename(a.attachment_url);
+                        if (filename) {
+                          jobs.push(
+                            apiService.getTaskFileInfo(filename).then((info) => {
+                              if (info && info.status && info.data) {
+                                a.original_name = info.data.original_name || info.data.filename || a.original_name;
+                                a.mime_type = a.mime_type || info.data.mime_type;
+                                a.file_size = a.file_size || info.data.file_size;
+                              }
+                            }).catch(() => {})
+                          );
+                        }
+                      }
+                    });
+                    if (jobs.length > 0) await Promise.all(jobs);
+                  }
+                  return cloned;
+                };
+
+                const enrichedSubmission = await enrichSubmission(submissionResponse.data);
+                setSubmission(enrichedSubmission);
                 console.log('Submission data loaded:', submissionResponse.data);
               }
             } catch (submissionError) {
@@ -67,6 +163,40 @@ const AssignmentDetailStudent = () => {
       fetchData();
     }
   }, [assignmentId, classCode]);
+
+  // Resolve original_name for single assignment attachment quickly for UI
+  useEffect(() => {
+    if (!assignment) return;
+    setResolvedAssignmentFileName(null);
+    const path = assignment.attachment_url || '';
+    const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+    const extractFilename = (p) => {
+      if (!p) return '';
+      if (p.startsWith('uploads/')) return p.split('/').pop();
+      return p.split('/').pop();
+    };
+    if (path && !assignment.original_name && !isExternal(path)) {
+      const fname = extractFilename(path);
+      if (fname) {
+        apiService.getTaskFileInfo(fname).then((info) => {
+          if (info && info.status && info.data) {
+            setResolvedAssignmentFileName(info.data.original_name || info.data.filename || null);
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [assignment]);
+
+  // Configure pdf.js worker for PDF previews
+  try {
+    // eslint-disable-next-line no-unsafe-optional-chaining
+    if (pdfjs?.GlobalWorkerOptions) {
+      // Use the worker copied to public/ by postinstall
+      pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.js`;
+    }
+  } catch (_) {
+    // ignore if pdfjs not available
+  }
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -113,8 +243,34 @@ const AssignmentDetailStudent = () => {
     } else if (filePath.startsWith('uploads/')) {
       return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${filePath}`;
     } else {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/submissions/${filePath}`;
+      // Bare filenames are considered assignment (task) attachments by default
+      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/tasks/${filePath}`;
     }
+  };
+
+  // Determine simple mime from name when backend mime is absent
+  const inferMimeFromName = (nameOrPath = '') => {
+    const lower = nameOrPath.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.txt')) return 'text/plain';
+    if (lower.endsWith('.mp4')) return 'video/mp4';
+    return 'application/octet-stream';
+  };
+
+  const openPreview = (fileLike) => {
+    if (!fileLike) return;
+    const url = getFileUrl(fileLike.attachment_url || fileLike.file_path || fileLike.url);
+    if (!url) return;
+    const name = fileLike.original_name || fileLike.file_name || fileLike.name || 'File';
+    const mime = fileLike.mime_type || inferMimeFromName(fileLike.original_name || fileLike.file_name || fileLike.file_path || fileLike.url);
+    setViewerFile({ name, url, mime });
+    setPdfZoom(1);
+    setCurrentPage(1);
+    setNumPages(null);
+    setViewerOpen(true);
   };
 
   const handleSubmitFiles = async () => {
@@ -559,7 +715,7 @@ const AssignmentDetailStudent = () => {
                      Assignment Files
                    </h4>
                    
-                   {assignment.attachments && assignment.attachments.length > 0 ? (
+                    {assignment.attachments && assignment.attachments.length > 0 ? (
                      // Multiple attachments
                      assignment.attachments.map((attachment, index) => (
                        <div key={index} style={{
@@ -570,15 +726,10 @@ const AssignmentDetailStudent = () => {
                          padding: '16px',
                          marginBottom: '12px',
                          border: '2px solid #e2e8f0',
-                         cursor: 'pointer',
+                          cursor: 'pointer',
                          transition: 'all 0.3s ease',
                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                       }} onClick={() => {
-                         const fileUrl = getFileUrl(attachment.attachment_url || attachment.file_path);
-                         if (fileUrl) {
-                           window.open(fileUrl, '_blank', 'noopener,noreferrer');
-                         }
-                       }}>
+                        }} onClick={() => openPreview(attachment)}>
                          <div style={{
                            width: '50px',
                            height: '60px',
@@ -593,7 +744,7 @@ const AssignmentDetailStudent = () => {
                            marginRight: '16px',
                            boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
                          }}>
-                           PDF
+                            PDF
                          </div>
                          <div style={{ flex: 1 }}>
                            <div style={{
@@ -608,7 +759,7 @@ const AssignmentDetailStudent = () => {
                              color: '#718096',
                              fontSize: '14px'
                            }}>
-                             PDF Document • Click to view
+                              PDF Document • Click to preview
                            </div>
                          </div>
                          <div style={{
@@ -625,7 +776,7 @@ const AssignmentDetailStudent = () => {
                          </div>
                        </div>
                      ))
-                   ) : assignment.attachment_url ? (
+                     ) : assignment.attachment_url ? (
                      // Single attachment
                      <div style={{
                        display: 'flex',
@@ -637,12 +788,7 @@ const AssignmentDetailStudent = () => {
                        cursor: 'pointer',
                        transition: 'all 0.3s ease',
                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                     }} onClick={() => {
-                       const fileUrl = getFileUrl(assignment.attachment_url);
-                       if (fileUrl) {
-                         window.open(fileUrl, '_blank', 'noopener,noreferrer');
-                       }
-                     }}>
+                       }} onClick={() => openPreview({ attachment_url: assignment.attachment_url, original_name: (assignment.original_name || resolvedAssignmentFileName || (assignment.attachment_url.startsWith('http') ? 'External Link' : assignment.attachment_url.split('/').pop())), mime_type: inferMimeFromName(assignment.attachment_url) })}>
                        <div style={{
                          width: '50px',
                          height: '60px',
@@ -660,22 +806,22 @@ const AssignmentDetailStudent = () => {
                          {assignment.attachment_url.startsWith('http') ? 'LINK' : 'PDF'}
                        </div>
                        <div style={{ flex: 1 }}>
-                         <div style={{
+                          <div style={{
                            fontWeight: 600,
                            fontSize: '16px',
                            color: '#2d3748',
                            marginBottom: '4px'
                          }}>
-                           {assignment.attachment_url.startsWith('http') 
-                             ? 'External Link' 
-                             : assignment.attachment_url.split('/').pop()
-                           }
+                            {assignment.original_name || resolvedAssignmentFileName || (assignment.attachment_url.startsWith('http') 
+                              ? 'External Link' 
+                              : assignment.attachment_url.split('/').pop())
+                            }
                          </div>
                          <div style={{
                            color: '#718096',
                            fontSize: '14px'
                          }}>
-                           {assignment.attachment_url.startsWith('http') ? 'External Link' : 'PDF Document'} • Click to view
+                          {assignment.attachment_url.startsWith('http') ? 'External Link' : 'PDF Document'} • Click to preview
                          </div>
                        </div>
                        <div style={{
@@ -776,16 +922,17 @@ const AssignmentDetailStudent = () => {
                   {(submission && submission.attachments && submission.attachments.length > 0) ? (
                    <>
                      {/* Show submitted files from submission.attachments array */}
-                     {submission.attachments.map((file, idx) => (
-                       <div key={`file-${idx}`} style={{
+                      {submission.attachments.map((file, idx) => (
+                        <div key={`file-${idx}`} style={{
                          display: 'flex',
                          alignItems: 'center',
                          background: '#f8f9fa',
                          borderRadius: '12px',
                          padding: '12px',
                          marginBottom: '8px',
-                         border: '1px solid #e9ecef'
-                       }}>
+                          border: '1px solid #e9ecef',
+                          cursor: 'pointer'
+                        }} onClick={() => openPreview(file)}>
                          <div style={{
                            width: '40px',
                            height: '40px',
@@ -815,13 +962,13 @@ const AssignmentDetailStudent = () => {
                              {file.mime_type || 'File'} • {(file.file_size / 1024).toFixed(2)} KB
                            </div>
                          </div>
-                         <Button
+                          <Button
                            color="link"
                            style={{
                              padding: 0,
                              color: '#dc3545',
                              fontSize: '16px'
-                           }}
+                            }}
                            title="Remove file"
                          >
                            <i className="ni ni-fat-remove" />
@@ -1248,6 +1395,82 @@ const AssignmentDetailStudent = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* File Preview Modal */}
+        <Modal isOpen={viewerOpen} toggle={() => setViewerOpen(false)} size="xl" centered style={{ maxWidth: '95vw', width: '95vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
+          <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '92vh', height: '92vh', maxHeight: '95vh', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Header */}
+              <div style={{ background: '#fff', padding: '12px 20px', borderBottom: '1px solid #e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontWeight: 600, color: '#333', fontSize: 16 }}>{viewerFile?.name || 'File preview'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Button 
+                    color="secondary" 
+                    onClick={() => setViewerOpen(false)} 
+                    title="Close"
+                    aria-label="Close preview"
+                    style={{ 
+                      borderRadius: '50%', 
+                      width: 32, 
+                      height: 32, 
+                      padding: 0, 
+                      marginLeft: 8, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      fontWeight: 700, 
+                      fontSize: 18
+                    }}
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflow: 'auto' }}>
+                {viewerFile && (
+                  (() => {
+                    const isPdf = viewerFile.mime === 'application/pdf' || viewerFile.url.toLowerCase().endsWith('.pdf');
+                    const isImage = viewerFile.mime.startsWith('image/');
+                    if (isPdf) {
+                      // Prefer iframe for cross-origin safety; react-pdf if same-origin
+                      const useIframe = true;
+                      if (useIframe) {
+                        return (
+                          <iframe title="PDF Preview" src={viewerFile.url} style={{ width: '100%', height: '100%', border: 'none' }} />
+                        );
+                      }
+                      return (
+                        <Document file={viewerFile.url} onLoadSuccess={({ numPages }) => setNumPages(numPages)} loading={<Spinner />}> 
+                          <Page pageNumber={currentPage} scale={pdfZoom} width={Math.min(900, window.innerWidth * 0.85)} />
+                        </Document>
+                      );
+                    }
+                    if (isImage) {
+                      return (<img alt={viewerFile.name} src={viewerFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />);
+                    }
+                    return (
+                      <div style={{ textAlign: 'center', color: '#666' }}>
+                        <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
+                        <Button color="primary" onClick={() => window.open(viewerFile.url, '_blank', 'noopener,noreferrer')}>Open in new tab</Button>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* PDF pagination for react-pdf mode (hidden with iframe) */}
+              {viewerFile && (viewerFile.mime === 'application/pdf' || viewerFile.url.toLowerCase().endsWith('.pdf')) && false && numPages && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, padding: 12, background: '#fff' }}>
+                  <Button color="primary" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}>Prev</Button>
+                  <span style={{ fontWeight: 600 }}>Page {currentPage} of {numPages}</span>
+                  <Button color="primary" size="sm" onClick={() => setCurrentPage(p => Math.min(numPages || 1, p + 1))} disabled={currentPage >= (numPages || 1)}>Next</Button>
+                </div>
+              )}
+            </div>
+          </ModalBody>
+        </Modal>
 
       </div>
     </div>

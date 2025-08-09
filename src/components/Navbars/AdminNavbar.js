@@ -15,8 +15,11 @@
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 */
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import ApiService from "../../services/api";
 // reactstrap components
 import {
   DropdownMenu,
@@ -39,6 +42,48 @@ const AdminNavbar = (props) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const isUserManagement = location.pathname === "/admin/user-management";
+  
+  // State for fetched user profile data
+  const [userProfile, setUserProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Fetch user profile data from backend using the correct endpoint
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        setProfileLoading(true);
+        console.log('Fetching user profile from /user/me endpoint...');
+        
+        const response = await ApiService.getProfile();
+        console.log('Profile response:', response);
+        
+        if (response && response.status && response.data) {
+          setUserProfile(response.data);
+          console.log('✅ Profile fetched successfully:', response.data);
+          console.log('Profile picture:', response.data.profile_pic);
+        } else {
+          console.warn('❌ Failed to fetch profile:', response);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [user]);
+
+  // Use fetched profile data if available, otherwise fall back to auth context user
+  const currentUser = userProfile || user;
+  
+  // Get profile picture URL and fallback data
+  const profilePictureUrl = getProfilePictureUrl(currentUser);
+  const userInitials = getUserInitials(currentUser);
+  const avatarColor = getAvatarColor(currentUser);
+
   return (
     <>
       <Navbar
@@ -78,22 +123,61 @@ const AdminNavbar = (props) => {
             <UncontrolledDropdown nav>
               <DropdownToggle className="pr-0" nav>
                 <Media className="align-items-center">
-                  <span className="avatar avatar-sm rounded-circle">
-                    <img
-                      alt="..."
-                      src={require("../../assets/img/theme/team-4-800x800.jpg")}
-                    />
+                  {/* Profile Picture Circle */}
+                  <span 
+                    className="avatar avatar-sm rounded-circle mr-2"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: avatarColor,
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      border: '2px solid rgba(255,255,255,0.3)'
+                    }}
+                  >
+                    {profilePictureUrl ? (
+                      <img
+                        alt="Profile"
+                        src={profilePictureUrl}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span 
+                      style={{
+                        display: profilePictureUrl ? 'none' : 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%'
+                      }}
+                    >
+                      {userInitials}
+                    </span>
                   </span>
-                  <Media className="ml-2 d-none d-lg-block">
+                  <Media className="d-none d-lg-block">
                     <span className="mb-0 text-sm font-weight-bold">
-                      {user?.full_name || user?.name || 'Admin User'}
+                      {currentUser?.full_name || currentUser?.name || 'Admin User'}
                     </span>
                   </Media>
                 </Media>
               </DropdownToggle>
               <DropdownMenu className="dropdown-menu-arrow" right>
                 <DropdownItem className="noti-title" header tag="div">
-                  <h6 className="text-overflow m-0">Welcome, {user?.full_name || user?.name || 'User'}!</h6>
+                  <h6 className="text-overflow m-0">Welcome, {currentUser?.full_name || currentUser?.name || 'User'}!</h6>
                 </DropdownItem>
                 <DropdownItem to="/admin/user-profile" tag={Link}>
                   <i className="ni ni-single-02" />

@@ -28,6 +28,7 @@ const TaskDetail = () => {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [qrGradingMode, setQrGradingMode] = useState(false);
+  const [resolvedTaskFileName, setResolvedTaskFileName] = useState(null);
   
   // Loading and error states
   const [loading, setLoading] = useState(true);
@@ -52,7 +53,62 @@ const TaskDetail = () => {
         
         if (response.status) {
           console.log('Task details loaded:', response.data);
-          setTask(response.data);
+
+          // Enrich task with original file names via file-info endpoint
+          const enrichWithOriginalNames = async (data) => {
+            const cloned = { ...data };
+            const tasks = [];
+            const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+            const extractFilename = (p) => {
+              if (!p) return '';
+              if (p.startsWith('uploads/')) return p.split('/').pop();
+              return p.split('/').pop();
+            };
+            const pickPath = (att) => att?.attachment_url || att?.file_path || att?.url || att?.file_name || '';
+
+            // Task-level attachment
+            if (cloned.attachment_url && !cloned.original_name && !isExternal(cloned.attachment_url)) {
+              const filename = extractFilename(cloned.attachment_url);
+              if (filename) {
+                tasks.push(
+                  apiService.getTaskFileInfo(filename).then((info) => {
+                    if (info && info.status && info.data) {
+                      cloned.original_name = info.data.original_name || info.data.filename || cloned.original_name;
+                    }
+                  }).catch(() => {})
+                );
+              }
+            }
+
+            // Attachments array
+            if (Array.isArray(cloned.attachments) && cloned.attachments.length > 0) {
+              cloned.attachments = cloned.attachments.map((att) => ({ ...att }));
+              cloned.attachments.forEach((att) => {
+                const path = pickPath(att);
+                if (!att.original_name && path && !isExternal(path)) {
+                  const filename = extractFilename(path);
+                  if (filename) {
+                    tasks.push(
+                      apiService.getTaskFileInfo(filename).then((info) => {
+                        if (info && info.status && info.data) {
+                          att.original_name = info.data.original_name || info.data.filename || att.original_name;
+                          att.mime_type = att.mime_type || info.data.mime_type;
+                        }
+                      }).catch(() => {})
+                    );
+                  }
+                }
+              });
+            }
+
+            if (tasks.length > 0) {
+              await Promise.all(tasks);
+            }
+            return cloned;
+          };
+
+          const enriched = await enrichWithOriginalNames(response.data);
+          setTask(enriched);
         }
         
         // Load submissions separately
@@ -130,6 +186,85 @@ const TaskDetail = () => {
 
     loadTaskDetails();
   }, [taskId]);
+
+  // Resolve top-level task attachment original_name quickly for UI label
+  useEffect(() => {
+    if (!task) return;
+    setResolvedTaskFileName(null);
+    const path = task.attachment_url || '';
+    const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+    const extractFilename = (p) => {
+      if (!p) return '';
+      if (p.startsWith('uploads/')) return p.split('/').pop();
+      return p.split('/').pop();
+    };
+    if (path && !task.original_name && !isExternal(path)) {
+      const fname = extractFilename(path);
+      if (fname) {
+        apiService.getTaskFileInfo(fname).then((info) => {
+          if (info && info.status && info.data) {
+            setResolvedTaskFileName(info.data.original_name || info.data.filename || null);
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [task]);
+
+  // Safety net: if original names are still missing after initial load, resolve them here
+  useEffect(() => {
+    if (!task) return;
+    (async () => {
+      const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+      const extractFilename = (p) => {
+        if (!p) return '';
+        if (p.startsWith('uploads/')) return p.split('/').pop();
+        return p.split('/').pop();
+      };
+      const pickPath = (att) => att?.attachment_url || att?.file_path || att?.url || att?.file_name || '';
+
+      const jobs = [];
+      // Top-level attachment
+      if (task.attachment_url && !task.original_name && !isExternal(task.attachment_url)) {
+        const fname = extractFilename(task.attachment_url);
+        if (fname) {
+          jobs.push(
+            apiService.getTaskFileInfo(fname).then((info) => {
+              if (info && info.status && info.data) {
+                setTask((prev) => ({ ...prev, original_name: info.data.original_name || info.data.filename || prev.original_name }));
+              }
+            }).catch(() => {})
+          );
+        }
+      }
+
+      // Attachments array
+      if (Array.isArray(task.attachments) && task.attachments.length > 0) {
+        task.attachments.forEach((att, idx) => {
+          const path = pickPath(att);
+          if (!att.original_name && path && !isExternal(path)) {
+            const fname = extractFilename(path);
+            if (fname) {
+              jobs.push(
+                apiService.getTaskFileInfo(fname).then((info) => {
+                  if (info && info.status && info.data) {
+                    setTask((prev) => {
+                      if (!Array.isArray(prev.attachments)) return prev;
+                      const next = prev.attachments.map((a, i) => i === idx ? ({ ...a, original_name: info.data.original_name || info.data.filename || a.original_name, mime_type: a.mime_type || info.data.mime_type }) : a);
+                      return { ...prev, attachments: next };
+                    });
+                  }
+                }).catch(() => {})
+              );
+            }
+          }
+        });
+      }
+
+      if (jobs.length > 0) {
+        await Promise.all(jobs);
+      }
+    })();
+  }, [task]);
 
   // Modern container styles
   const outerStyle = {
@@ -272,21 +407,19 @@ const TaskDetail = () => {
     window.open(fileUrl, '_blank');
   };
   
-  // Open PDF modal
-  const openPdfModal = (filename, isSubmission = false) => {
-    // Handle different types of file URLs
+  // Open file preview modal (PDFs/images inline like student view)
+  const openPdfModal = (filename, isSubmission = false, displayName) => {
     let fileUrl;
-    let fileName = filename;
-    
-    if (filename.startsWith('http')) {
-      // External link (Google Drive, etc.)
+    let fileName = displayName || filename || 'Document';
+
+    // Build an absolute URL when a bare filename or relative path is provided
+    if (!filename) return;
+    if (filename.startsWith('http://') || filename.startsWith('https://')) {
       fileUrl = filename;
-      fileName = filename.split('/').pop() || 'Document';
     } else {
-      // Local file
       fileUrl = apiService.getFilePreviewUrl(filename, isSubmission);
     }
-    
+
     setPdfModalFile({ name: fileName, url: fileUrl });
     setPdfModalOpen(true);
     setPdfZoom(1);
@@ -297,46 +430,19 @@ const TaskDetail = () => {
   const renderModalContent = () => {
     if (!modalFile || !modalStudent) return null;
     return (
-      <div style={{ display: 'flex', minHeight: '70vh', width: '100vw', maxWidth: '100vw' }}>
+      <div style={{ display: 'flex', minHeight: '90vh', width: '100vw', maxWidth: '100vw' }}>
         {/* File preview */}
-        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '0', minWidth: 0, minHeight: 0, height: '70vh' }}>
-          {isPDF(modalFile) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, justifyContent: 'center' }}>
-              <Button color="primary" size="sm" style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} onClick={() => setPdfZoom(z => Math.max(0.5, z - 0.1))} disabled={pdfZoom <= 0.5}>-</Button>
-              <span style={{ fontWeight: 600, fontSize: 18, color: '#6366f1', minWidth: 60, textAlign: 'center' }}>{Math.round(pdfZoom * 100)}%</span>
-              <Button color="primary" size="sm" style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} onClick={() => setPdfZoom(z => Math.min(2, z + 0.1))} disabled={pdfZoom >= 2}>+</Button>
-            </div>
-          )}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '0', minWidth: 0, minHeight: 0, height: '90vh' }}>
           {isImage(modalFile) ? (
             <img src={modalFile.url} alt={modalFile.name} style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 12, boxShadow: '0 2px 8px #324cdd22' }} />
           ) : isPDF(modalFile) ? (
-            <div style={{ width: '100%', height: '68vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: '#fff', borderRadius: 12 }}>
-              <Document
-                file={modalFile.url}
-                onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                loading={<div style={{ color: '#888', fontSize: 18, marginTop: 32 }}>Loading PDF...</div>}
-                error={<div style={{ color: 'red', fontSize: 18, marginTop: 32 }}>Failed to load PDF.</div>}
-              >
-                <Page
-                  pageNumber={currentPage}
-                  scale={pdfZoom}
-                  width={Math.min(900, window.innerWidth * 0.7)}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                />
-              </Document>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, justifyContent: 'center' }}>
-                <Button color="primary" size="sm" style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}>Prev</Button>
-                <span style={{ fontWeight: 600, fontSize: 16, color: '#6366f1', minWidth: 60, textAlign: 'center' }}>{currentPage} / {numPages || 1}</span>
-                <Button color="primary" size="sm" style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} onClick={() => setCurrentPage(p => Math.min(numPages || 1, p + 1))} disabled={currentPage >= (numPages || 1)}>Next</Button>
-              </div>
-            </div>
+            <iframe title="PDF Preview" src={modalFile.url} style={{ width: '100%', height: '100%', border: 'none', background: '#fff', borderRadius: 12 }} />
           ) : (
             <div style={{ color: '#888', fontSize: 18 }}>No preview available</div>
           )}
         </div>
         {/* Sidebar */}
-        <div style={{ flex: 1, background: '#fff', borderLeft: '1.5px solid #e9ecef', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 320, height: '70vh' }}>
+        <div style={{ flex: 1, background: '#fff', borderLeft: '1.5px solid #e9ecef', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 320, height: '90vh' }}>
                      <img src={getProfilePicUrl(modalStudent.profile_pic) || `https://ui-avatars.com/api/?name=${modalStudent.student_name}&background=random`} alt={modalStudent.student_name} style={{ width: 70, height: 70, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e9ecef', marginBottom: 18 }} />
           <div style={{ fontWeight: 700, fontSize: 24, marginBottom: 8 }}>{modalStudent.student_name}</div>
           <div style={{ color: '#888', fontWeight: 500, fontSize: 17, marginBottom: 18 }}>{modalStudent.status}</div>
@@ -730,7 +836,59 @@ const TaskDetail = () => {
                 }}>
                   Attachments
                 </h3>
-                {task.attachment_url ? (
+                {(task.attachments && task.attachments.length > 0) ? (
+                  task.attachments.map((att, idx) => (
+                    <div key={att.attachment_id || idx} style={{
+                      background: '#fff',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 20,
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                      marginBottom: 12
+                    }} onClick={() => openPdfModal(att.attachment_url || att.file_path || att.url || '', false, att.original_name || att.file_name)}>
+                      <div style={{ 
+                        width: 60, 
+                        height: 80, 
+                        background: 'linear-gradient(135deg, #e53e3e 0%, #c53030 100%)', 
+                        borderRadius: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 14,
+                        boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
+                      }}>
+                        {(att.attachment_url || att.file_path || '').startsWith('http') ? 'LINK' : 'PDF'}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 16, marginBottom: 4 }}>
+                          {att.original_name || att.file_name || (att.attachment_url ? att.attachment_url.split('/').pop() : 'Attachment')}
+                        </div>
+                        <div style={{ color: '#718096', fontSize: 14 }}>
+                          {(att.attachment_url || '').startsWith('http') ? 'External Link' : (att.mime_type || 'File')} • Click to preview
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 40,
+                        height: 40,
+                        background: '#f7fafc',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#4a5568'
+                      }}>
+                        <i className="ni ni-bold-right" style={{ fontSize: 16 }} />
+                      </div>
+                    </div>
+                  ))
+                ) : task.attachment_url ? (
                   <div style={{
                     background: '#fff',
                     border: '2px solid #e2e8f0',
@@ -742,7 +900,7 @@ const TaskDetail = () => {
                     transition: 'all 0.3s ease',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                  }} onClick={() => openPdfModal(task.attachment_url, false)}>
+                  }} onClick={() => openPdfModal(task.attachment_url, false, task.original_name || resolvedTaskFileName)}>
                     <div style={{ 
                       width: 60, 
                       height: 80, 
@@ -760,9 +918,9 @@ const TaskDetail = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 16, marginBottom: 4 }}>
-                        {task.attachment_url.startsWith('http') 
+                        {task.original_name || resolvedTaskFileName || (task.attachment_url.startsWith('http') 
                           ? 'External Link' 
-                          : task.attachment_url.split('/').pop()
+                          : task.attachment_url.split('/').pop())
                         }
                       </div>
                       <div style={{ color: '#718096', fontSize: 14 }}>
@@ -1242,7 +1400,7 @@ const TaskDetail = () => {
             </div>
             {/* Modal for file preview */}
             <Modal isOpen={modalOpen} toggle={() => setModalOpen(false)} size="xl" centered style={{ maxWidth: '98vw', width: '98vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
-              <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '70vh', height: '70vh', maxHeight: '90vh', width: '100vw', maxWidth: '100vw' }}>
+              <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100vw', maxWidth: '100vw' }}>
                 <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
                   {renderModalContent()}
                   <Button color="secondary" onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 18, right: 24, zIndex: 10, borderRadius: 20, fontWeight: 700, fontSize: 24, padding: '2px 20px', background: '#fff', color: '#222', border: 'none', boxShadow: '0 2px 8px #324cdd22' }}>×</Button>
@@ -1253,8 +1411,8 @@ const TaskDetail = () => {
          </TabContent>
          
          {/* PDF Preview Modal */}
-         <Modal isOpen={pdfModalOpen} toggle={() => setPdfModalOpen(false)} size="xl" centered style={{ maxWidth: '95vw', width: '95vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
-           <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '80vh', height: '80vh', maxHeight: '90vh', width: '100%' }}>
+          <Modal isOpen={pdfModalOpen} toggle={() => setPdfModalOpen(false)} size="xl" centered style={{ maxWidth: '95vw', width: '95vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
+            <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100%' }}>
              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                {/* Header */}
                <div style={{ 
@@ -1288,110 +1446,33 @@ const TaskDetail = () => {
                      <div style={{ color: '#666', fontSize: 12 }}>PDF Document</div>
                    </div>
                  </div>
-                                   {pdfModalFile && !pdfModalFile.url.startsWith('http') && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Button 
-                        color="primary" 
-                        size="sm" 
-                        style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} 
-                        onClick={() => setPdfZoom(z => Math.max(0.5, z - 0.1))} 
-                        disabled={pdfZoom <= 0.5}
-                      >
-                        -
-                      </Button>
-                      <span style={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: 14, minWidth: 60, textAlign: 'center' }}>
-                        {Math.round(pdfZoom * 100)}%
-                      </span>
-                      <Button 
-                        color="primary" 
-                        size="sm" 
-                        style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} 
-                        onClick={() => setPdfZoom(z => Math.min(2, z + 0.1))} 
-                        disabled={pdfZoom >= 2}
-                      >
-                        +
-                      </Button>
-                    </div>
-                  )}
+                  {/* Zoom controls are hidden when using iframe preview */}
                </div>
                
-                               {/* PDF Content */}
-                <div style={{ flex: 1, background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
-                  {pdfModalFile && (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      {pdfModalFile.url.startsWith('http') ? (
-                        // External link - show iframe or redirect
-                        <div style={{ textAlign: 'center', width: '100%' }}>
-                          <div style={{ marginBottom: 20, color: '#666', fontSize: 16 }}>
-                            This is an external link that will open in a new tab.
-                          </div>
-                          <Button 
-                            color="primary" 
-                            size="lg"
-                            onClick={() => window.open(pdfModalFile.url, '_blank')}
-                            style={{ fontWeight: 700, borderRadius: 16, padding: '12px 24px', background: '#6366f1', border: 'none' }}
-                          >
-                            Open External Link
-                          </Button>
-                          <div style={{ marginTop: 12, color: '#888', fontSize: 14 }}>
-                            {pdfModalFile.url}
-                          </div>
-                        </div>
-                      ) : (
-                        // Local PDF file
-                        <Document
-                          file={pdfModalFile.url}
-                          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                          loading={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><Spinner /></div>}
-                          error={<div style={{ color: 'red', fontSize: 18, textAlign: 'center' }}>Failed to load PDF.</div>}
-                        >
-                          <Page 
-                            pageNumber={currentPage} 
-                            scale={pdfZoom}
-                            width={Math.min(800, window.innerWidth * 0.8)}
-                            loading={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><Spinner /></div>}
-                          />
-                        </Document>
-                      )}
-                     
-                                           {!pdfModalFile.url.startsWith('http') && numPages && (
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'center', 
-                          alignItems: 'center', 
-                          gap: 12, 
-                          padding: '16px 0',
-                          background: '#fff',
-                          borderRadius: 8,
-                          marginTop: 16,
-                          boxShadow: '0 2px 8px #324cdd11'
-                        }}>
-                          <Button 
-                            color="primary" 
-                            size="sm" 
-                            style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} 
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
-                            disabled={currentPage <= 1}
-                          >
-                            Prev
-                          </Button>
-                          <span style={{ fontWeight: 600, fontSize: 14, minWidth: 80, textAlign: 'center' }}>
-                            Page {currentPage} of {numPages}
-                          </span>
-                          <Button 
-                            color="primary" 
-                            size="sm" 
-                            style={{ fontWeight: 700, borderRadius: 16, padding: '2px 18px', background: '#6366f1', border: 'none' }} 
-                            onClick={() => setCurrentPage(p => Math.min(numPages || 1, p + 1))} 
-                            disabled={currentPage >= (numPages || 1)}
-                          >
-                            Next
-                          </Button>
-                        </div>
-                      )}
-                   </div>
-                 )}
-               </div>
+                {/* File Content */}
+                <div style={{ flex: 1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
+                  {pdfModalFile && (() => {
+                    const url = (pdfModalFile.url || '').toLowerCase();
+                    const isPdf = url.endsWith('.pdf');
+                    const isImage = /\.(png|jpg|jpeg|gif|webp)$/.test(url);
+                    if (isPdf) {
+                      return (
+                        <iframe title="PDF Preview" src={pdfModalFile.url} style={{ width: '100%', height: '100%', border: 'none' }} />
+                      );
+                    }
+                    if (isImage) {
+                      return (
+                        <img alt={pdfModalFile.name} src={pdfModalFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />
+                      );
+                    }
+                    return (
+                      <div style={{ textAlign: 'center', color: '#666' }}>
+                        <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
+                        <Button color="primary" onClick={() => window.open(pdfModalFile.url, '_blank', 'noopener,noreferrer')}>Open in new tab</Button>
+                      </div>
+                    );
+                  })()}
+                </div>
                
                {/* Close button */}
                <Button 

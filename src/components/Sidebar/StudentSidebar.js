@@ -16,7 +16,7 @@
 
 */
 /*eslint-disable*/
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, NavLink as NavLinkRRD, useLocation } from "react-router-dom";
 import { PropTypes } from "prop-types";
 import {
@@ -48,22 +48,58 @@ import {
   Row,
   Col,
 } from "reactstrap";
+import apiService from "../../services/api";
 
 var ps;
 
 const StudentSidebar = (props) => {
   const [collapseOpen, setCollapseOpen] = useState();
   const [enrolledOpen, setEnrolledOpen] = useState(false);
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const location = useLocation();
+  
   const activeRoute = (routeName) => {
     return props.location.pathname.indexOf(routeName) > -1 ? "active" : "";
   };
+  
   const toggleCollapse = () => {
     setCollapseOpen((data) => !data);
   };
+  
   const closeCollapse = () => {
     setCollapseOpen(false);
   };
+
+  // Fetch enrolled classes from API
+  const fetchEnrolledClasses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await apiService.getStudentClasses();
+      
+      if (response.status && response.data) {
+        setEnrolledClasses(response.data);
+      } else {
+        setEnrolledClasses([]);
+        console.warn('No enrolled classes found or invalid response format');
+      }
+    } catch (error) {
+      console.error('Error fetching enrolled classes:', error);
+      setError(error.message || 'Failed to load enrolled classes');
+      setEnrolledClasses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load enrolled classes on component mount
+  useEffect(() => {
+    fetchEnrolledClasses();
+  }, []);
+
   // Only use studentModules for sidebar links
   const studentModules = [
     { name: "Dashboard", icon: "ni ni-tv-2 text-primary", path: "/index" },
@@ -72,40 +108,6 @@ const StudentSidebar = (props) => {
     { name: "Attendance", icon: "ni ni-check-bold text-green", path: "/attendance" },
     { name: "Excuse Letters", icon: "ni ni-single-copy-04 text-pink", path: "/excuse-letters" },
     { name: "Notifications", icon: "ni ni-notification-70 text-info", path: "/notifications" },
-  ];
-
-  // Mock enrolled classes (replace with real data/fetch in production)
-  const enrolledClasses = [
-    {
-      id: 1,
-      subject: "Object Oriented Programming",
-      code: "B7P3R9",
-      section: "BSIT 3A"
-    },
-    {
-      id: 2,
-      subject: "Data Structures and Algorithms",
-      code: "A1C2D3",
-      section: "BSIT 2B"
-    },
-    {
-      id: 3,
-      subject: "Database Management Systems",
-      code: "X9Y8Z7",
-      section: "BSIT 3C"
-    },
-    {
-      id: 4,
-      subject: "SAD SUBJECT",
-      code: "M7AGZY",
-      section: "BSIT 3C"
-    },
-    {
-      id: 5,
-      subject: "SAD 312",
-      code: "5XHJE9",
-      section: "BSIT 3C"
-    }
   ];
 
   const createLinks = () => {
@@ -183,15 +185,29 @@ const StudentSidebar = (props) => {
                     </NavLink>
                   </NavItem>
                   {/* Enrolled classes list */}
-                  {enrolledClasses.length === 0 ? (
+                  {loading ? (
+                    <NavItem>
+                      <span className="text-muted" style={{ padding: "0.5rem 1rem", display: "block" }}>
+                        <i className="ni ni-spinner text-info" style={{ marginRight: 8 }} />
+                        Loading classes...
+                      </span>
+                    </NavItem>
+                  ) : error ? (
+                    <NavItem>
+                      <span className="text-danger" style={{ padding: "0.5rem 1rem", display: "block", fontSize: "0.85rem" }}>
+                        <i className="ni ni-alert-circle" style={{ marginRight: 8 }} />
+                        {error}
+                      </span>
+                    </NavItem>
+                  ) : enrolledClasses.length === 0 ? (
                     <NavItem>
                       <span className="text-muted" style={{ padding: "0.5rem 1rem", display: "block" }}>No classes joined</span>
                     </NavItem>
                   ) : (
                     enrolledClasses.map(cls => (
-                      <NavItem key={cls.id}>
+                      <NavItem key={cls.id || cls.class_id}>
                         <NavLink
-                          to={`/student/classroom/${cls.code}`}
+                          to={`/student/classroom/${cls.class_code || cls.code}`}
                           tag={NavLinkRRD}
                           onClick={closeCollapse}
                           style={{
@@ -204,7 +220,7 @@ const StudentSidebar = (props) => {
                           }}
                         >
                           <i className="ni ni-hat-3 mr-2 text-info" />
-                          {cls.subject} <span className="text-muted" style={{ fontSize: "0.85em", marginLeft: 6 }}>({cls.section})</span>
+                          {cls.subject_name || cls.subject} <span className="text-muted" style={{ fontSize: "0.85em", marginLeft: 6 }}>({cls.section_name || cls.section})</span>
                         </NavLink>
                       </NavItem>
                     ))
@@ -218,6 +234,7 @@ const StudentSidebar = (props) => {
     });
     return links;
   };
+  
   const { bgColor, logo } = props;
   let navbarBrandProps;
   if (logo && logo.innerLink) {
