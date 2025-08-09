@@ -168,7 +168,7 @@ const TeacherAttendance = () => {
         };
 
         // Prepare attendance data for database
-        const attendanceData = {
+        const newAttendanceRecord = {
           student_id: enrolledStudent.student_id,
           subject_id: attendanceData.classroom.subject_id,
           section_name: attendanceData.classroom.section_name,
@@ -181,7 +181,7 @@ const TeacherAttendance = () => {
         };
 
         // Save to database using the attendance record endpoint
-        const response = await apiService.recordAttendance(attendanceData);
+        const response = await apiService.recordAttendance(newAttendanceRecord);
         
         if (response.status) {
           // Reload attendance records
@@ -236,7 +236,7 @@ const TeacherAttendance = () => {
         };
 
         // Create new record
-        const attendanceData = {
+        const newAttendanceRecord = {
           student_id: studentId,
           subject_id: attendanceData.classroom.subject_id,
           section_name: attendanceData.classroom.section_name,
@@ -248,7 +248,7 @@ const TeacherAttendance = () => {
           teacher_id: attendanceData.classroom.teacher_id
         };
 
-        const response = await apiService.recordAttendance(attendanceData);
+        const response = await apiService.recordAttendance(newAttendanceRecord);
         
         if (response.status) {
           await loadAttendanceRecords();
