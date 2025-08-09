@@ -831,7 +831,47 @@ const ClassroomDetail = () => {
       if (response.status) {
         console.log('API Response:', response);
         console.log('Tasks data:', response.data);
-        setTasks(response.data || []);
+
+        // Normalize tasks to always include an attachments array
+        const normalizeTasks = async (rawTasks = []) => {
+          const tasks = Array.isArray(rawTasks) ? rawTasks : [];
+          const enriched = await Promise.all(tasks.map(async (t) => {
+            let attachments = Array.isArray(t.attachments) ? [...t.attachments] : [];
+
+            // If the API provided only a single top-level attachment, convert it to array form
+            if ((!attachments || attachments.length === 0) && t.attachment_url) {
+              const att = {
+                attachment_url: t.attachment_url,
+                attachment_type: t.attachment_type || 'file',
+                name: t.original_name || (typeof t.attachment_url === 'string' ? t.attachment_url.split('/').pop() : 'Attachment'),
+                file_name: t.file_name,
+                original_name: t.original_name,
+              };
+
+              // Try to resolve original_name if missing using the file-info endpoint
+              try {
+                const p = att.attachment_url;
+                if (typeof p === 'string' && !(p.startsWith('http://') || p.startsWith('https://'))) {
+                  const filename = p.includes('/') ? p.split('/').pop() : p;
+                  if (filename && !att.original_name) {
+                    const info = await apiService.getTaskFileInfo(filename);
+                    if (info && info.status && info.data) {
+                      att.original_name = info.data.original_name || info.data.filename || att.original_name;
+                    }
+                  }
+                }
+              } catch (_) {}
+
+              attachments = [att];
+            }
+
+            return { ...t, attachments };
+          }));
+          return enriched;
+        };
+
+        const normalized = await normalizeTasks(response.data || []);
+        setTasks(normalized);
       } else {
         setTaskError(response.message || 'Failed to load tasks');
       }
@@ -842,6 +882,9 @@ const ClassroomDetail = () => {
       setLoadingTasks(false);
     }
   };
+
+  // Collapsed state for Class Tasks list (default collapsed)
+  const [collapsedTasks, setCollapsedTasks] = useState({});
 
   const loadTaskComments = async (taskId) => {
     console.log('Loading comments for taskId:', taskId);
@@ -5594,7 +5637,8 @@ useEffect(() => {
                                   <div
                                     key={idx}
                                     style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12, minWidth: 180, maxWidth: 320, width: '100%', cursor: isLink ? 'pointer' : 'pointer' }}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       if (isLink && att.url) {
                                         window.open(att.url, '_blank', 'noopener,noreferrer');
                                       } else {
@@ -6945,17 +6989,48 @@ useEffect(() => {
                                   </DropdownItem>
                                 </DropdownMenu>
                               </UncontrolledDropdown>
+                              {/* Expand/Collapse toggle under 3-dots */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const key = task.id || task.task_id || task._id || task.taskId;
+                                  setCollapsedTasks(prev => ({ ...prev, [key]: (prev[key] === false) ? true : false }));
+                                }}
+                                aria-label="Toggle details"
+                                title="Toggle details"
+                                style={{
+                                  background: '#f7fafc',
+                                  border: '1px solid #e9ecef',
+                                  borderRadius: 8,
+                                  width: 28,
+                                  height: 28,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#4a5568',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {(collapsedTasks[task.id || task.task_id || task._id || task.taskId] !== false) ? '˅' : '^'}
+                              </button>
                             </div>
                           </div>
-                          {task.title && (
-                            <h5 style={{ fontWeight: 700, fontSize: 18, color: '#232b3b', marginBottom: 12 }}>
-                              {task.title}
+                          {/* Task title */}
+                          <div style={{ marginBottom: 12 }}>
+                            <h5 style={{ fontWeight: 700, fontSize: 18, color: '#232b3b', margin: 0 }}>
+                              {task.title || 'Untitled Task'}
                             </h5>
-                          )}
-                          <div style={{ fontSize: 15, color: '#232b3b', lineHeight: 1.6, marginBottom: 16 }}>
-                            {task.instructions || task.text}
                           </div>
-                          {task.points && (
+
+                          {/* Collapsible details */}
+                          {(collapsedTasks[task.id || task.task_id || task._id || task.taskId] === false) && (
+                            <>
+                              <div style={{ fontSize: 15, color: '#232b3b', lineHeight: 1.6, marginBottom: 16 }}>
+                                {task.instructions || task.text}
+                              </div>
+                            </>
+                          )}
+                          {(collapsedTasks[task.id || task.task_id || task._id || task.taskId] === false) && task.points && (
                             <div style={{ marginBottom: 16 }}>
                               <Badge color="info" style={{ fontSize: 12, padding: '4px 8px' }}>
                                 <i className="ni ni-chart-bar-32" style={{ marginRight: 4 }} />
@@ -6963,7 +7038,7 @@ useEffect(() => {
                               </Badge>
                             </div>
                           )}
-                          {task.attachments && task.attachments.length > 0 && (
+                          {(collapsedTasks[task.id || task.task_id || task._id || task.taskId] === false) && task.attachments && task.attachments.length > 0 && (
                             <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                               {task.attachments.map((att, idx) => {
                                 const { preview, type, color } = getFileTypeIconOrPreview(att);
@@ -6972,9 +7047,19 @@ useEffect(() => {
                                   url = URL.createObjectURL(att.file);
                                 } else if (att.url) {
                                   url = att.url;
+                                } else if (att.attachment_url) {
+                                  const p = att.attachment_url;
+                                  if (typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'))) {
+                                    url = p;
+                                  } else if (typeof p === 'string') {
+                                    const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup').replace(/\/$/, '');
+                                    url = p.startsWith('uploads/') ? `${base}/${p}` : `${base}/uploads/tasks/${p}`;
+                                  }
                                 }
-                                const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
-                                const displayName = isLink ? att.url : att.name;
+                                const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || (att.attachment_type && String(att.attachment_type).toLowerCase() !== 'file');
+                                const displayName = isLink
+                                  ? (att.name || att.url)
+                                  : (att.original_name || att.file_name || att.name || (att.attachment_url ? att.attachment_url.split('/').pop() : 'Attachment'));
                                 return (
                                   <div
                                     key={idx}
@@ -6989,10 +7074,10 @@ useEffect(() => {
                                   >
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
+                                      <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }} title={displayName}>{displayName}</div>
                                       <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                         {type}
-                                        {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                        {url && <>&bull; <a href={url} download={(att.original_name || att.file_name || att.name)} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
                                         {isLink && <>&bull; <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                 </div>
                                     </div>
