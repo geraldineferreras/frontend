@@ -51,6 +51,7 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from './utils/cropImage'; // We'll add this helper next
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
 
 //stream new
 
@@ -1572,26 +1573,71 @@ useEffect(() => {
       return;
     }
 
-    // Handle file attachment if present
-    if (attachments.length > 0 && attachments[0].file) {
-      // For now, we'll need to handle file upload separately
-      // or modify the backend to accept multipart form data
-      console.log("File attachment detected:", attachments[0]);
-      // You might need to upload the file first and get the URL
-      // For now, let's send without file attachment
-    }
-
     try {
-      const response = await axios.post(
-        `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
-        postData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
+      let response;
+
+      // Collect any file attachments and link attachments
+      const fileAttachments = (attachments || []).filter(att => att && att.file);
+      const firstLinkAttachment = (attachments || []).find(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+
+      if (fileAttachments.length > 0) {
+        // Use multipart/form-data for file uploads (supports multiple files with distinct keys)
+        const formData = new FormData();
+        formData.append('title', postData.title || '');
+        formData.append('content', postData.content || '');
+        formData.append('allow_comments', postData.allow_comments ? '1' : '0');
+        formData.append('is_draft', postData.is_draft ? '1' : '0');
+        formData.append('is_scheduled', postData.is_scheduled ? '1' : '0');
+        formData.append('scheduled_at', postData.scheduled_at || '');
+        if (Array.isArray(postData.student_ids)) {
+          formData.append('student_ids', JSON.stringify(postData.student_ids));
         }
-      );
+        // Append files: first key must be 'attachment', subsequent as 'file2', 'file3', ...
+        fileAttachments.forEach((att, idx) => {
+          const key = idx === 0 ? 'attachment' : `file${idx + 1}`;
+          formData.append(key, att.file);
+        });
+
+        response = await axios.post(
+          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
+          formData,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              // Content-Type automatically set for FormData
+            },
+          }
+        );
+      } else if (firstLinkAttachment) {
+        // Send JSON payload including link details
+        const payload = {
+          ...postData,
+          attachment_type: 'link',
+          attachment_url: firstLinkAttachment.url,
+        };
+        response = await axios.post(
+          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      } else {
+        // No attachments
+        response = await axios.post(
+          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
+          postData,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
       console.log("Success response:", response.data);
       setNewAnnouncement("");
       setNewAnnouncementTitle("");
@@ -1677,6 +1723,7 @@ useEffect(() => {
       const response = await apiService.getClassroomStream(code);
       if (response.status && response.data) {
         // Transform API data to match the expected format
+        const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup').replace(/\/$/, '');
         const transformedPosts = response.data.map(post => ({
           id: post.id,
           title: post.title,
@@ -1690,11 +1737,13 @@ useEffect(() => {
           },
           comments: [],
           user_avatar: post.user_avatar,
-          attachments: post.attachment_url
+          attachments: post.attachment_url || post.attachment_serving_url
             ? [{
-                name: post.attachment_url.split('/').pop(),
-                url: post.attachment_url.startsWith('http') ? post.attachment_url : `http://localhost/scms_new/${post.attachment_url}`,
-                type: post.attachment_type || ''
+                name: (post.original_name || (post.attachment_url || post.attachment_serving_url || '').split('/').pop()),
+                url: post.attachment_serving_url
+                  ? post.attachment_serving_url
+                  : (post.attachment_url && (post.attachment_url.startsWith('http') ? post.attachment_url : `${base}/${post.attachment_url}`)),
+                type: post.attachment_type || post.attachment_file_type || 'file'
               }]
             : []
         }));
@@ -5459,16 +5508,37 @@ useEffect(() => {
                           {/* Author info, date, and pinned badge */}
                           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4 }}>
-                                <img 
-                                  src={announcement.user_avatar ? `http://localhost/scms_new/${announcement.user_avatar}` : userDefault} 
-                                  alt="avatar" 
-                                  style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }} 
-                                  onError={(e) => {
-                                    e.target.src = userDefault;
-                                  }}
-                                />
-                              </div>
+                              {(() => {
+                                const authorUser = {
+                                  profile_pic: announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
+                                  profile_picture: announcement.profile_picture,
+                                  name: announcement.author,
+                                  full_name: announcement.author,
+                                };
+                                const avatarUrl = getProfilePictureUrl(authorUser);
+                                const bgColor = getAvatarColor(authorUser);
+                                const initials = getUserInitials(authorUser);
+                                return (
+                                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarUrl ? '#e9ecef' : bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4, color: '#fff', fontWeight: 600 }}>
+                                    {avatarUrl ? (
+                                      <img
+                                        src={avatarUrl}
+                                        alt="avatar"
+                                        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                          if (e.target.nextSibling) {
+                                            e.target.nextSibling.style.display = 'flex';
+                                          }
+                                        }}
+                                      />
+                                    ) : null}
+                                    <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                      {initials}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <div style={{ fontWeight: 600, color: '#111', fontSize: 14 }}>{announcement.author}</div>
@@ -5917,7 +5987,27 @@ useEffect(() => {
                                   }
                                 }}
                               >
-                                <img src={s.avatar || 'https://randomuser.me/api/portraits/men/75.jpg'} alt={s.name} style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover', border: '1px solid #e9ecef' }} />
+                                {(() => {
+                                  const avatarUrl = getProfilePictureUrl(s);
+                                  const bgColor = getAvatarColor(s);
+                                  const initials = getUserInitials(s);
+                                  return (
+                                    <div style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                                      {avatarUrl ? (
+                                        <img
+                                          src={avatarUrl}
+                                          alt={s.name}
+                                          style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                    </div>
+                                  );
+                                })()}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontWeight: 600, fontSize: 14, color: '#2d3748', textTransform: 'none' }}>{s.name}</div>
                                   <div style={{ fontSize: 12, color: '#7b8a9b', fontWeight: 400 }}>{s.email || ''}</div>
@@ -5953,7 +6043,27 @@ useEffect(() => {
                                 const s = students.find(stu => stu.id === id);
                                 return s ? (
                                   <span key={id} style={{ display: 'inline-flex', alignItems: 'center', background: '#e9ecef', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 600, color: '#2d3748', minHeight: 22, minWidth: 120, maxWidth: 180, marginRight: 6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    <img src={s.avatar || 'https://randomuser.me/api/portraits/men/75.jpg'} alt={s.name} style={{ width: 16, height: 16, borderRadius: '50%', marginRight: 5, objectFit: 'cover', border: '1px solid #fff' }} />
+                                    {(() => {
+                                      const avatarUrl = getProfilePictureUrl(s);
+                                      const bgColor = getAvatarColor(s);
+                                      const initials = getUserInitials(s);
+                                      return (
+                                        <div style={{ width: 16, height: 16, borderRadius: '50%', marginRight: 5, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 9 }}>
+                                          {avatarUrl ? (
+                                            <img
+                                              src={avatarUrl}
+                                              alt={s.name}
+                                              style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                              onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                              }}
+                                            />
+                                          ) : null}
+                                          <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                        </div>
+                                      );
+                                    })()}
                                     <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 6, lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
                                       <span style={{ fontWeight: 600, fontSize: 11, color: '#2d3748', textTransform: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                                       <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.email || ''}</span>
