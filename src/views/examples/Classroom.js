@@ -21,7 +21,7 @@ import {
   Alert
 } from "reactstrap";
 import "./Classroom.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import apiService from "../../services/api";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -98,6 +98,7 @@ const Classroom = () => {
   const [successModal, setSuccessModal] = useState(false);
   const [createdClassData, setCreatedClassData] = useState(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
+  const location = useLocation();
 
   // Fetch classrooms from API
   useEffect(() => {
@@ -156,6 +157,15 @@ const Classroom = () => {
 
     fetchClassrooms();
   }, []);
+
+  // Open create modal if navigated with ?create=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') === '1') {
+      handleModalOpen();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   // Function to fetch real student count for a classroom
   const fetchStudentCount = async (classCode) => {

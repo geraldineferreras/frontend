@@ -367,7 +367,7 @@ let chartExample1 = {
   },
 };
 
-// Example 2 of Chart inside src/views/Index.js (Total orders - Card)
+// Example 2 of Chart inside src/views/Index.js (Section Count - Card)
 let chartExample2 = {
   options: {
     scales: {
@@ -375,8 +375,7 @@ let chartExample2 = {
         {
           ticks: {
             callback: function (value) {
-              if (!(value % 10)) {
-                //return '$' + value + 'k'
+              if (!(value % 2)) {
                 return value;
               }
             },
@@ -393,7 +392,7 @@ let chartExample2 = {
           if (data.datasets.length > 1) {
             content += label;
           }
-          content += yLabel;
+          content += yLabel + " sections";
           return content;
         },
       },
@@ -403,8 +402,8 @@ let chartExample2 = {
     labels: ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     datasets: [
       {
-        label: "Sales",
-        data: [25, 20, 30, 22, 17, 29],
+        label: "Sections",
+        data: [8, 10, 12, 15, 18, 20],
         maxBarThickness: 10,
       },
     ],

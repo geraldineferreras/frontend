@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Card, CardBody, CardHeader, Button, Input, Row, Col, Dropdown, DropdownToggle, DropdownMenu, DropdownItem, Badge, ListGroup, ListGroupItem, Form, FormGroup, Label, Modal, ModalHeader, ModalBody, ModalFooter
 } from "reactstrap";
@@ -6,6 +6,7 @@ import { FaPaperclip, FaSmile, FaRegCommentDots, FaRegThumbsUp, FaPlus } from "r
 import TeacherNavbar from "components/Navbars/TeacherNavbar.js";
 import Header from "components/Headers/Header.js";
 import Select from "react-select";
+import { useLocation } from "react-router-dom";
 
 const mockClasses = [
   { id: 1, name: "Object Oriented Programming", section: "3A", code: "b7p3r9" },
@@ -55,6 +56,7 @@ const TeacherAnnouncement = () => {
   const [commentInputs, setCommentInputs] = useState({});
   const fileInputRef = useRef();
   const [selectedClass, setSelectedClass] = useState(null);
+  const location = useLocation();
 
   // For react-select
   const classOptions = mockClasses.map(cls => ({ value: cls.id, label: `${cls.name} (${cls.section})` }));
@@ -82,6 +84,14 @@ const TeacherAnnouncement = () => {
     setTargetType("Class");
     setSelectedClass(null);
   };
+
+  // Auto-open modal when redirected with ?new=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') === '1') {
+      setShowModal(true);
+    }
+  }, [location.search]);
 
   const handleAddComment = (announcementId) => {
     const comment = commentInputs[announcementId];

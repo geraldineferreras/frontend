@@ -6,6 +6,7 @@ import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip,
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/api';
 import axios from "axios";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
 
 // Mock data removed - now using real API data
 
@@ -188,7 +189,8 @@ const ClassroomDetailStudent = () => {
   const [formExpanded, setFormExpanded] = useState(false);
   const [allowComments, setAllowComments] = useState(true);
   const [announcementTitle, setAnnouncementTitle] = useState("");
-  const [likedAnnouncements, setLikedAnnouncements] = useState({}); // { [id]: true/false }
+  // Likes disabled on student stream
+  // const [likedAnnouncements, setLikedAnnouncements] = useState({});
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuRef = useRef();
   const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
@@ -378,18 +380,7 @@ const ClassroomDetailStudent = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [openCommentMenu]);
 
-  function handleLike(announcement) {
-    setLikedAnnouncements(prev => {
-      const liked = !!prev[announcement.id];
-      // Update the like count in the announcement (mockAnnouncements is static, so for demo, update local state)
-      if (!liked) {
-        announcement.reactions.like = (announcement.reactions.like || 0) + 1;
-      } else {
-        announcement.reactions.like = Math.max(0, (announcement.reactions.like || 0) - 1);
-      }
-      return { ...prev, [announcement.id]: !liked };
-    });
-  }
+  // function handleLike(announcement) {}
 
   function handleEditClick(announcement) {
     setEditingAnnouncementId(announcement.id);
@@ -474,28 +465,75 @@ const ClassroomDetailStudent = () => {
     const ann = [...studentAnnouncements, ...apiAnnouncements].find(a => a.id === announcementId);
     setEditCommentValue(ann.comments[idx].text);
   }
-  function handleCommentEditSave(announcementId, idx) {
-    // Update in studentAnnouncements if it's a student post, else in mockAnnouncements
-    if (studentAnnouncements.some(a => a.id === announcementId)) {
-      setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.map((c, i) => i === idx ? { ...c, text: editCommentValue } : c) } : a));
-    } else {
-      const ann = apiAnnouncements.find(a => a.id === announcementId);
-      if (ann) ann.comments[idx].text = editCommentValue;
+  async function handleCommentEditSave(announcementId, idx) {
+    const ann = [...studentAnnouncements, ...apiAnnouncements].find(a => a.id === announcementId);
+    if (!ann) return;
+    const existing = ann.comments[idx];
+    const commentId = existing?.id;
+    const newText = editCommentValue.trim();
+    if (!newText) return;
+
+    try {
+      const res = await apiService.editStudentStreamComment(code, announcementId, commentId, newText);
+      const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+      const comments = raw.map(c => ({
+        id: c.id || c.comment_id || c.id_comment,
+        author: c.user_name || c.author || c.name || 'Unknown',
+        text: c.comment || c.text || '',
+        date: c.created_at || c.date || null,
+        profile_pic: c.user_avatar || c.profile_pic || c.user_profile_pic || null,
+      }));
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      } else {
+        setApiAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      }
+    } catch (err) {
+      console.warn('Failed to edit comment:', err?.message || err);
+      // optimistic local update
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.map((c, i) => i === idx ? { ...c, text: newText } : c) } : a));
+      } else {
+        setApiAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.map((c, i) => i === idx ? { ...c, text: newText } : c) } : a));
+      }
+    } finally {
+      setEditingComment({});
+      setEditCommentValue("");
     }
-    setEditingComment({});
-    setEditCommentValue("");
   }
   function handleCommentEditCancel() {
     setEditingComment({});
     setEditCommentValue("");
   }
-  function handleCommentDelete(announcementId, idx) {
+  async function handleCommentDelete(announcementId, idx) {
     setOpenCommentMenu({});
-    if (studentAnnouncements.some(a => a.id === announcementId)) {
-      setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.filter((_, i) => i !== idx) } : a));
-    } else {
-      const ann = apiAnnouncements.find(a => a.id === announcementId);
-      if (ann) ann.comments.splice(idx, 1);
+    const ann = [...studentAnnouncements, ...apiAnnouncements].find(a => a.id === announcementId);
+    const commentId = ann?.comments?.[idx]?.id;
+    try {
+      await apiService.deleteStudentStreamComment(code, announcementId, commentId);
+      // After deletion, re-fetch comments for accurate list or remove locally
+      const res = await apiService.getStudentStreamComments(code, announcementId);
+      const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+      const comments = raw.map(c => ({
+        id: c.id || c.comment_id || c.id_comment,
+        author: c.user_name || c.author || c.name || 'Unknown',
+        text: c.comment || c.text || '',
+        date: c.created_at || c.date || null,
+        profile_pic: c.user_avatar || c.profile_pic || c.user_profile_pic || null,
+      }));
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      } else {
+        setApiAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      }
+    } catch (err) {
+      console.warn('Failed to delete comment:', err?.message || err);
+      // fallback to local removal
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.filter((_, i) => i !== idx) } : a));
+      } else {
+        setApiAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: a.comments.filter((_, i) => i !== idx) } : a));
+      }
     }
   }
 
@@ -592,16 +630,40 @@ const ClassroomDetailStudent = () => {
     setCommentInputs(inputs => ({ ...inputs, [announcementId]: (inputs[announcementId] || "") + emoji }));
     setShowCommentEmojiPicker(prev => ({ ...prev, [announcementId]: false }));
   }
-  function handlePostComment(announcementId) {
+  async function handlePostComment(announcementId) {
     const value = (commentInputs[announcementId] || "").trim();
     if (!value) return;
-    if (studentAnnouncements.some(a => a.id === announcementId)) {
-      setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: [...a.comments, { text: value, author: loggedInName, date: new Date().toISOString() }] } : a));
-    } else {
-      const ann = apiAnnouncements.find(a => a.id === announcementId);
-      if (ann) ann.comments.push({ text: value, author: loggedInName, date: new Date().toISOString() });
+
+    try {
+      const res = await apiService.addStudentStreamComment(code, announcementId, value);
+      // API returns full, normalized list of comments; rebuild into our UI shape
+      const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+      const comments = raw.map(c => ({
+        id: c.id || c.comment_id || c.id_comment,
+        author: c.user_name || c.author || c.name || 'Unknown',
+        text: c.comment || c.text || '',
+        date: c.created_at || c.date || null,
+        profile_pic: c.user_avatar || c.profile_pic || c.user_profile_pic || null,
+      }));
+
+      // Update the correct announcements array
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      } else {
+        setApiAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments } : a));
+      }
+    } catch (err) {
+      console.warn('Failed to add comment:', err?.message || err);
+      // Optimistic fallback if API fails
+      if (studentAnnouncements.some(a => a.id === announcementId)) {
+        setStudentAnnouncements(prev => prev.map(a => a.id === announcementId ? { ...a, comments: [...a.comments, { text: value, author: loggedInName, date: new Date().toISOString() }] } : a));
+      } else {
+        const ann = apiAnnouncements.find(a => a.id === announcementId);
+        if (ann) ann.comments.push({ text: value, author: loggedInName, date: new Date().toISOString() });
+      }
+    } finally {
+      setCommentInputs(inputs => ({ ...inputs, [announcementId]: "" }));
     }
-    setCommentInputs(inputs => ({ ...inputs, [announcementId]: "" }));
   }
 
   // Before rendering the announcements list:
@@ -711,6 +773,44 @@ const ClassroomDetailStudent = () => {
           });
           console.log("Mapped announcements:", mapped);
           setApiAnnouncements(mapped);
+          // Collapse comments by default for all loaded announcements
+          setCollapsedComments(prev => {
+            const next = { ...prev };
+            mapped.forEach(p => {
+              if (typeof next[p.id] === 'undefined') next[p.id] = true;
+            });
+            return next;
+          });
+
+          // Hydrate each announcement with real comment counts upfront
+          try {
+            const commentsArrays = await Promise.all(
+              mapped.map(async (p) => {
+                try {
+                  const res = await apiService.getStudentStreamComments(code, p.id);
+                  const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+                  const normalized = raw.map(c => ({
+                    id: c.id || c.comment_id || c.id_comment,
+                    author: c.author || c.user_name || c.full_name || c.name || c.user || 'Unknown',
+                    text: c.text || c.comment || c.content || '',
+                    date: c.date || c.created_at || c.createdAt || c.timestamp || null,
+                    profile_pic: c.user_avatar || c.user_profile_pic || c.profile_pic || c.avatar || c.profile_picture || null,
+                  }));
+                  return { id: p.id, comments: normalized };
+                } catch (_err) {
+                  return { id: p.id, comments: [] };
+                }
+              })
+            );
+            if (commentsArrays && commentsArrays.length > 0) {
+              setApiAnnouncements(prev => prev.map(a => {
+                const found = commentsArrays.find(x => x.id === a.id);
+                return found ? { ...a, comments: found.comments } : a;
+              }));
+            }
+          } catch (_e) {
+            // Ignore hydration errors; counts will still load on expand
+          }
         } else {
           console.log("No data or invalid response structure:", res.data);
           setApiAnnouncements([]);
@@ -752,6 +852,24 @@ const ClassroomDetailStudent = () => {
       return `http://localhost/scms_new_backup/${user.profile_pic.replace(/\\/g, "/")}`;
     }
     return "https://randomuser.me/api/portraits/men/75.jpg";
+  };
+
+  // Find a classroom member (teacher or student) by name for avatar resolution
+  const findMemberByName = (name) => {
+    if (!name) return null;
+    const normalized = String(name).toLowerCase();
+    // Search teacher
+    if (peopleData?.teacher) {
+      const t = peopleData.teacher;
+      const tName = (t.full_name || t.name || '').toLowerCase();
+      if (tName === normalized) return t;
+    }
+    // Search students
+    if (Array.isArray(peopleData?.students)) {
+      const found = peopleData.students.find(s => (s.full_name || s.name || '').toLowerCase() === normalized);
+      if (found) return found;
+    }
+    return null;
   };
 
   // Add state for 3-dots dropdown
@@ -1756,16 +1874,8 @@ const ClassroomDetailStudent = () => {
                   }}
                 >
                   <div style={{ padding: '0.75rem 1rem', position: 'relative' }}>
-                    {/* Like and menu group in upper right */}
+                    {/* Menu group in upper right (likes removed) */}
                     <div style={{ position: 'absolute', top: 16, right: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: likedAnnouncements[announcement.id] ? '#1976d2' : '#b0b0b0', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}
-                        onClick={() => handleLike(announcement)}
-                        title={likedAnnouncements[announcement.id] ? 'Unlike' : 'Like'}
-                      >
-                        <i className="fa fa-thumbs-up" style={{ color: likedAnnouncements[announcement.id] ? '#1976d2' : '#b0b0b0', fontSize: 18 }} />
-                        <span>{announcement.reactions?.like || 0}</span>
-                      </div>
                       <div style={{ color: '#5e6e8c', fontSize: 20, cursor: 'pointer', paddingLeft: 4, position: 'relative' }}>
                         <i className="fa fa-ellipsis-v" onClick={() => setOpenMenuId(openMenuId === announcement.id ? null : announcement.id)} />
                         {openMenuId === announcement.id && (
@@ -1781,15 +1891,38 @@ const ClassroomDetailStudent = () => {
                         )}
                       </div>
                     </div>
-                    {/* Inline edit form if editing */}
+                        {/* Inline edit form if editing */}
                     {editingAnnouncementId === announcement.id ? (
                       <>
                         {/* Author info, date, and pinned badge (always visible) */}
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4 }}>
-                              <img src={announcement.author === 'Prof. Smith' ? 'https://randomuser.me/api/portraits/men/32.jpg' : announcement.author === 'You' ? 'https://randomuser.me/api/portraits/women/44.jpg' : 'https://randomuser.me/api/portraits/men/75.jpg'} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-                            </div>
+                                {(() => {
+                                  const authorUser = {
+                                    profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
+                                    name: announcement.author,
+                                    full_name: announcement.author,
+                                  };
+                                  const avatarUrl = getProfilePictureUrl(authorUser);
+                                  const bgColor = getAvatarColor(authorUser);
+                                  const initials = getUserInitials(authorUser);
+                                  return (
+                                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatarUrl ? '#e9ecef' : bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4, color: '#fff', fontWeight: 600 }}>
+                                      {avatarUrl ? (
+                                        <img
+                                          src={avatarUrl}
+                                          alt="avatar"
+                                          style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                    </div>
+                                  );
+                                })()}
                             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <div style={{ fontWeight: 600, color: '#111' }}>{announcement.author}</div>
@@ -1864,9 +1997,32 @@ const ClassroomDetailStudent = () => {
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4 }}>
-                              <img src={announcement.author === 'Prof. Smith' ? 'https://randomuser.me/api/portraits/men/32.jpg' : announcement.author === 'You' ? 'https://randomuser.me/api/portraits/women/44.jpg' : 'https://randomuser.me/api/portraits/men/75.jpg'} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-                            </div>
+                            {(() => {
+                              const authorUser = {
+                                profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
+                                name: announcement.author,
+                                full_name: announcement.author,
+                              };
+                              const avatarUrl = getProfilePictureUrl(authorUser);
+                              const bgColor = getAvatarColor(authorUser);
+                              const initials = getUserInitials(authorUser);
+                              return (
+                                <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatarUrl ? '#e9ecef' : bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: -4, color: '#fff', fontWeight: 600 }}>
+                                  {avatarUrl ? (
+                                    <img
+                                      src={avatarUrl}
+                                      alt="avatar"
+                                      style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                </div>
+                              );
+                            })()}
                             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <div style={{ fontWeight: 600, color: '#111', fontSize: 14 }}>{announcement.author}</div>
@@ -1970,15 +2126,68 @@ const ClassroomDetailStudent = () => {
                           <div style={{ background: '#f7fafd', borderRadius: 10, padding: '12px 18px', marginTop: 10 }}>
                             <div
                               style={{ fontWeight: 600, fontSize: 15, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => setCollapsedComments(prev => ({ ...prev, [announcement.id]: !prev[announcement.id] }))}
+                              onClick={async () => {
+                                // Toggle collapse
+                                setCollapsedComments(prev => ({ ...prev, [announcement.id]: !prev[announcement.id] }));
+                                // Lazy-fetch comments from student endpoint if not loaded
+                                if (!announcement.__loadedComments) {
+                                  try {
+                                    announcement.__loadedComments = true;
+                                    const res = await apiService.getStudentStreamComments(code, announcement.id);
+                                    const raw = Array.isArray(res?.data) ? res.data : [];
+                                    const comments = raw.map(c => ({
+                                      id: c.id,
+                                      author: c.user_name,
+                                      text: c.comment,
+                                      date: c.created_at,
+                                      profile_pic: c.user_avatar || null,
+                                    }));
+                                    // Update the appropriate announcements array in state
+                                    if (studentAnnouncements.some(a => a.id === announcement.id)) {
+                                      setStudentAnnouncements(prev => prev.map(a => a.id === announcement.id ? { ...a, comments } : a));
+                                    } else {
+                                      setApiAnnouncements(prev => prev.map(a => a.id === announcement.id ? { ...a, comments } : a));
+                                    }
+                                  } catch (e) {
+                                    console.warn('Failed to load student comments:', e?.message || e);
+                                  }
+                                }
+                              }}
                             >
                               Comments ({announcement.comments.length})
+                              <i className={`fa fa-chevron-${collapsedComments[announcement.id] ? 'down' : 'up'}`} style={{ marginLeft: 8 }} />
                             </div>
                             {!collapsedComments[announcement.id] && announcement.comments.map((comment, idx) => (
                               <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 10, position: 'relative' }}>
-                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 10 }}>
-                                  <img src={comment.author === 'Prof. Smith' ? 'https://randomuser.me/api/portraits/men/32.jpg' : 'https://randomuser.me/api/portraits/men/75.jpg'} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-                                </div>
+                                {(() => {
+                                  // Prefer the logged-in user's data for their own comments
+                                  let authorUser = (comment.author === loggedInName && user) ? { ...user, name: loggedInName, full_name: loggedInName } : null;
+                                  if (!authorUser) {
+                                    const found = findMemberByName(comment.author);
+                                    if (found) authorUser = { ...found, name: found.full_name || found.name };
+                                  }
+                                  if (!authorUser) authorUser = { name: comment.author, full_name: comment.author, profile_pic: comment.profile_pic || comment.user_avatar || null };
+
+                                  const avatarUrl = getProfilePictureUrl(authorUser);
+                                  const bgColor = getAvatarColor(authorUser);
+                                  const initials = getUserInitials(authorUser);
+                                  return (
+                                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatarUrl ? '#e9ecef' : bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 12, color: '#fff', fontWeight: 600 }}>
+                                      {avatarUrl ? (
+                                        <img
+                                          src={avatarUrl}
+                                          alt="avatar"
+                                          style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                    </div>
+                                  );
+                                })()}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontWeight: 600, fontSize: 12 }}>{comment.author} <span style={{ color: '#888', fontWeight: 400, fontSize: 10, marginLeft: 5 }}>{formatRelativeTime(comment.date)}</span></div>
                                   {editingComment.announcementId === announcement.id && editingComment.idx === idx ? (
@@ -2017,7 +2226,7 @@ const ClassroomDetailStudent = () => {
                                   placeholder="Add a comment..."
                                   value={commentInputs[announcement.id] || ""}
                                   onChange={e => handleCommentInputChange(announcement.id, e.target.value)}
-                                  style={{ flex: 1, borderRadius: 7, border: '2px solid #bfcfff', padding: '6px 10px', fontSize: 12, outline: 'none', background: '#fff', transition: 'border 0.2s', height: 22 }}
+                                  style={{ flex: 1, borderRadius: 8, border: '2px solid #bfcfff', padding: '10px 12px', fontSize: 13, outline: 'none', background: '#fff', transition: 'border 0.2s', height: 36 }}
                                   onKeyDown={e => { if (e.key === 'Enter') handlePostComment(announcement.id); }}
                                 />
                                 <div style={{ position: 'relative' }}>

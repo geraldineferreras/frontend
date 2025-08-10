@@ -423,6 +423,34 @@ const fileToBase64 = (file) => {
 const truncate = (str, n) => (str && str.length > n ? str.substr(0, n - 1) + '...' : str);
 
 const ClassroomDetail = () => {
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+
+  // Build absolute URL for profile_pic regardless of API base format
+  const buildImageUrlFromProfilePic = (profilePic) => {
+    if (!profilePic) return null;
+    const apiBase = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+    let siteBase = apiBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
+    const pic = String(profilePic).replace(/\\\\/g, '/').replace(/\\/g, '/');
+    if (pic.startsWith('http://') || pic.startsWith('https://')) return pic;
+    if (pic.startsWith('data:')) return pic;
+    if (pic.startsWith('/uploads/')) return `${siteBase}${pic}`;
+    if (pic.startsWith('uploads/')) return `${siteBase}/${pic}`;
+    return `${siteBase}/uploads/profile/${pic}`;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await apiService.getCurrentUser();
+        if (isMounted && res && (res.status === true || res.success === true) && (res.data || res.user)) {
+          const data = res.data || res.user;
+          setCurrentUserProfile(data);
+        }
+      } catch (_) {}
+    })();
+    return () => { isMounted = false; };
+  }, []);
   const [expandedAnnouncementComments, setExpandedAnnouncementComments] = useState({});
   const [openCommentMenu, setOpenCommentMenu] = useState({});
   const formExpandedRef = useRef(); // <-- This must be the first hook!
@@ -753,8 +781,15 @@ const ClassroomDetail = () => {
   // Add classrooms state to load actual classrooms
   const [classrooms, setClassrooms] = useState([]);
   
-  // Current user - in a real app, this would come from user context
-  const currentUser = "Prof. Smith";
+  // Current user - derive from stored auth user
+  let currentUser = 'You';
+  try {
+    const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+    if (stored) {
+      const u = JSON.parse(stored);
+      currentUser = u.full_name || u.name || u.user_name || 'You';
+    }
+  } catch (_) {}
 
   // Add state for student classes
   const [studentClasses, setStudentClasses] = useState([]);
@@ -1620,16 +1655,37 @@ useEffect(() => {
     }
   };
 
-  // 3. Add handler to post a comment
-  const handlePostComment = (announcementId) => {
+  // 3. Add handler to post a comment (teacher endpoint)
+  const handlePostComment = async (announcementId) => {
     const comment = commentInputs[announcementId]?.trim();
     if (!comment) return;
-    setAnnouncements(prev => prev.map(a =>
-      a.id === announcementId
-        ? { ...a, comments: (a.comments || []).concat({ text: comment, author: "Prof. Smith", date: new Date().toISOString() }) }
-        : a
-    ));
-    setCommentInputs(inputs => ({ ...inputs, [announcementId]: "" }));
+    try {
+      // Post to teacher stream comment endpoint
+      const apiResp = await apiService.addTeacherStreamComment(code, announcementId, comment);
+      // Resolve the created comment's id and fields from API response when available
+      const createdId = apiResp?.data?.id || apiResp?.data?.comment_id || apiResp?.comment_id || apiResp?.id || null;
+      const createdText = apiResp?.data?.comment || apiResp?.data?.text || apiResp?.comment || apiResp?.text || comment;
+      const createdDate = apiResp?.data?.created_at || apiResp?.created_at || new Date().toISOString();
+
+      // Current user info for author and avatar
+      const me = currentUserProfile || (() => {
+        try {
+          const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+          return stored ? JSON.parse(stored) : null;
+        } catch (_) { return null; }
+      })();
+      const meName = me?.full_name || me?.name || me?.user_name || currentUser || 'You';
+      const mePic = me?.profile_pic || me?.profile_picture || me?.avatar || null;
+      setAnnouncements(prev => prev.map(a =>
+        a.id === announcementId
+          ? { ...a, comments: (a.comments || []).concat({ id: createdId, text: createdText, author: meName, date: createdDate, profile_pic: mePic }) }
+          : a
+      ));
+      setCommentInputs(inputs => ({ ...inputs, [announcementId]: "" }));
+    } catch (error) {
+      console.error('Failed to post comment:', error);
+      alert(error.message || 'Failed to post comment');
+    }
   };
 
   // 2. Add a function to handle preview open
@@ -1769,7 +1825,38 @@ useEffect(() => {
           };
         });
 
+        // Set initial posts quickly
         setAnnouncements(transformedPosts);
+
+        // Fetch comments for each post to get accurate counts upfront
+        try {
+          const commentsArrays = await Promise.all(
+            transformedPosts.map(async (p) => {
+              try {
+                const res = await apiService.getTeacherStreamComments(code, p.id);
+                const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+                const normalized = raw.map(c => ({
+                  id: c.id || c.comment_id || c.id_comment,
+                  author: c.author || c.user_name || c.full_name || c.name || c.user || 'Unknown',
+                  text: c.text || c.comment || c.content || '',
+                  date: c.date || c.created_at || c.createdAt || c.timestamp || null,
+                  profile_pic: c.user_avatar || c.user_profile_pic || c.profile_pic || c.avatar || c.profile_picture || null,
+                }));
+                return { id: p.id, comments: normalized };
+              } catch (_err) {
+                return { id: p.id, comments: [] };
+              }
+            })
+          );
+          if (commentsArrays && commentsArrays.length > 0) {
+            setAnnouncements(prev => prev.map(a => {
+              const found = commentsArrays.find(x => x.id === a.id);
+              return found ? { ...a, comments: found.comments } : a;
+            }));
+          }
+        } catch (_e) {
+          // ignore count hydration failures
+        }
       } else {
         setStreamError('No data received from server');
       }
@@ -2590,12 +2677,36 @@ useEffect(() => {
     console.log('Edit state should be set for:', { itemId, idx });
   };
 
-  // Update handleSaveEditComment to work with both announcements and classwork
-  const handleSaveEditComment = (itemId, idx) => {
+  // Update handleSaveEditComment to work with both announcements and classwork and call API
+  const handleSaveEditComment = async (itemId, idx) => {
     const text = editingCommentText[`${itemId}-${idx}`] || "";
     
+    // Try to resolve commentId from current list if API needs it later
+    let commentId = null;
+    const ann = announcements.find(a => a.id === itemId);
+    if (ann && Array.isArray(ann.comments) && ann.comments[idx]) {
+      commentId = ann.comments[idx].id || ann.comments[idx].comment_id || ann.comments[idx].id_comment || null;
+    }
+
+    // Call backend edit endpoint (best-effort; keep UI responsive)
+    try {
+      if (commentId) {
+        const resp = await apiService.editTeacherStreamComment(code, itemId, commentId, text);
+        // If API returns updated comment, sync it to ensure UI matches backend
+        const updatedText = (resp && (resp.data?.comment || resp.data?.text || resp.comment || resp.text)) || text;
+        setAnnouncements(prevAnnouncements => prevAnnouncements.map(a => {
+          if (a.id !== itemId) return a;
+          const newComments = (a.comments || []).map((c, i) => i === idx ? { ...c, text: updatedText } : c);
+          return { ...a, comments: newComments };
+        }));
+      }
+    } catch (e) {
+      console.warn('Edit comment API failed; keeping optimistic UI:', e?.message || e);
+    }
+
     // Force a complete state update with a new array reference
-    if (itemId >= 1 && itemId <= 3) { // These are announcement IDs
+    const isAnnouncement = announcements.some(a => a.id === itemId);
+    if (isAnnouncement) {
       setAnnouncements(prevAnnouncements => {
         const newAnnouncements = prevAnnouncements.map(announcement => {
           if (announcement.id === itemId) {
@@ -2650,13 +2761,28 @@ useEffect(() => {
     });
   };
 
-  // 3. Delete comment handler
-  const handleDeleteComment = (announcementId, idx) => {
-      setAnnouncements(prev => prev.map(a =>
+  // 3. Delete comment handler with API call
+  const handleDeleteComment = async (announcementId, idx) => {
+    // Resolve commentId for API
+    const ann = announcements.find(a => a.id === announcementId);
+    const comment = ann && Array.isArray(ann.comments) ? ann.comments[idx] : null;
+    const commentId = comment?.id || comment?.comment_id || comment?.id_comment || null;
+
+    // Optimistic UI remove
+    setAnnouncements(prev => prev.map(a =>
       a.id === announcementId
-          ? { ...a, comments: (a.comments || []).filter((_, i) => i !== idx) }
-          : a
-      ));
+        ? { ...a, comments: (a.comments || []).filter((_, i) => i !== idx) }
+        : a
+    ));
+
+    // Fire and forget API
+    try {
+      if (commentId) {
+        await apiService.deleteTeacherStreamComment(code, announcementId, commentId);
+      }
+    } catch (e) {
+      console.warn('Delete comment API failed:', e?.message || e);
+    }
   };
 
   const handleLikeAnnouncement = (announcementId) => {
@@ -5788,31 +5914,69 @@ useEffect(() => {
                             </div>
                             {expandedAnnouncementComments[announcement.id] && (
                               <div>
+                                {/* Fetch comments when expanding */}
+                                {(() => {
+                                  if (!announcement.__loadedComments) {
+                                    // Mark as loading to avoid repeated fetches
+                                    announcement.__loadedComments = true;
+                                    apiService
+                                      .getTeacherStreamComments(code, announcement.id)
+                                      .then(res => {
+                                        // Normalize API response into UI-friendly shape
+                                        const raw = Array.isArray(res?.data) ? res.data : (res?.comments || []);
+                                        const comments = raw.map(c => ({
+                                          id: c.id || c.comment_id || c.id_comment,
+                                          author: c.author || c.user_name || c.full_name || c.name || c.user || 'Unknown',
+                                          text: c.text || c.comment || c.content || '',
+                                          date: c.date || c.created_at || c.createdAt || c.timestamp || null,
+                                          profile_pic: c.user_avatar || c.user_profile_pic || c.profile_pic || c.avatar || c.profile_picture || null,
+                                        }));
+                                        setAnnouncements(prev => prev.map(a => a.id === announcement.id ? { ...a, comments } : a));
+                                      })
+                                      .catch(err => {
+                                        console.warn('Failed to fetch comments:', err?.message || err);
+                                      });
+                                  }
+                                  return null;
+                                })()}
                                 {/* Render all comments here */}
                                 {announcement.comments && announcement.comments.length > 0 ? (
                                   announcement.comments.map((comment, idx) => {
                                     const isEditing = editingComment[announcement.id] === idx;
                                     return (
             <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 10, position: 'relative' }}>
-              <img
-                src={getAvatarForUser(findUserByName(comment.author))}
-                alt={comment.author}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  marginRight: 10,
-                  border: '1px solid #e9ecef'
-                }}
-              />
+              {(() => {
+                const authorUser = { profile_pic: comment.profile_pic, name: comment.author, full_name: comment.author };
+                const avatarUrl = getProfilePictureUrl(authorUser);
+                const bgColor = getAvatarColor(authorUser);
+                const initials = getUserInitials(authorUser);
+                return (
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700 }}>
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={comment.author}
+                        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                  </div>
+                );
+              })()}
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                                           <div style={{ fontWeight: 600, fontSize: 14, color: '#232b3b' }}>{comment.author}</div>
                     <div style={{ fontSize: 12, color: '#8898AA' }}>
-                      {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                                            </div>
+                      {(() => {
+                        const d = comment?.date ? new Date(comment.date) : null;
+                        return (d && !isNaN(d)) ? d.toLocaleString() : (comment?.created_at || comment?.date || '');
+                      })()}
+                    </div>
                   </div>
                   {/* 3-dots menu */}
                   <div style={{ position: 'relative', marginLeft: 8 }}>
@@ -5940,11 +6104,34 @@ useEffect(() => {
                                 )}
                                 {/* Comment input */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+          {/* Current user avatar next to input */}
+          {(() => {
+            const me = currentUserProfile || (() => {
+              try {
+                const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+                return stored ? JSON.parse(stored) : null;
+              } catch (_) { return null; }
+            })();
+            const pic = me?.profile_pic || me?.profile_picture || me?.avatar;
+            const avatarUrl = buildImageUrlFromProfilePic(pic);
+            const displayName = me?.full_name || me?.name || me?.user_name;
+            const bgColor = getAvatarColor({ name: displayName, full_name: displayName });
+            const initials = getUserInitials({ name: displayName, full_name: displayName });
+            return (
+              <div style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700 }}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="me" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }} onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }} />
+                ) : null}
+                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+              </div>
+            );
+          })()}
         <Input
                                     type="text"
           placeholder="Add a comment..."
           value={commentInputs[announcement.id] || ""}
           onChange={e => setCommentInputs(inputs => ({ ...inputs, [announcement.id]: e.target.value }))}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostComment(announcement.id); } }}
           style={{ flex: 1, borderRadius: 8, border: '1px solid #e9ecef' }}
         />
         <Button

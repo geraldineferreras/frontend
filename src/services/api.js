@@ -117,6 +117,14 @@ class ApiService {
     });
   }
 
+  // Current user profile
+  async getCurrentUser() {
+    return this.makeRequest('/user/me', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async register(userData) {
 
     
@@ -1116,6 +1124,40 @@ class ApiService {
     }
   }
 
+  // Teacher add comment to a stream post
+  async addTeacherStreamComment(classCode, postId, commentText) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment`, {
+      method: 'POST',
+      body: JSON.stringify({ comment: commentText }),
+      requireAuth: true,
+    });
+  }
+
+  // Teacher get all comments for a stream post
+  async getTeacherStreamComments(classCode, postId) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comments`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher edit a specific comment on a stream post
+  async editTeacherStreamComment(classCode, postId, commentId, newText) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ comment: newText }),
+      requireAuth: true,
+    });
+  }
+
+  // Teacher delete a specific comment on a stream post
+  async deleteTeacherStreamComment(classCode, postId, commentId) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  }
+
   // Student methods
   async getStudentClasses() {
     return this.makeRequest('/student/my-classes', {
@@ -2106,6 +2148,40 @@ class ApiService {
     });
   }
 
+  // Student: get comments for a specific stream post
+  async getStudentStreamComments(classCode, postId) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comments`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Student: add a comment to a specific stream post
+  async addStudentStreamComment(classCode, postId, commentText) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment`, {
+      method: 'POST',
+      body: JSON.stringify({ comment: commentText }),
+      requireAuth: true,
+    });
+  }
+
+  // Student: edit a comment on a specific stream post
+  async editStudentStreamComment(classCode, postId, commentId, commentText) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ comment: commentText }),
+      requireAuth: true,
+    });
+  }
+
+  // Student: delete a comment on a specific stream post
+  async deleteStudentStreamComment(classCode, postId, commentId) {
+    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+  }
+
   // Smart Notification Logic for Student Posts
   async createStudentPostWithSmartNotifications(classCode, postData) {
     try {
@@ -2262,6 +2338,14 @@ class ApiService {
       // Return empty array as fallback
       return { data: [] };
     }
+  }
+
+  // Get all sections
+  async getSections() {
+    return this.makeRequest('/admin/sections', {
+      method: 'GET',
+      requireAuth: true,
+    });
   }
 }
 

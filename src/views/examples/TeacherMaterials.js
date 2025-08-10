@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Card, CardBody, CardHeader, Button, Input, Row, Col, Badge, ListGroup, ListGroupItem, Form, FormGroup, Label, Modal, ModalHeader, ModalBody, ModalFooter, Nav, NavItem, NavLink, Container, Tooltip
 } from "reactstrap";
 import { FaPlus, FaPaperclip, FaRegCommentDots, FaRegThumbsUp, FaDownload, FaTrash, FaEye, FaTag, FaLink, FaCheck, FaTimes, FaCircle, FaBookOpen } from "react-icons/fa";
 import Select from "react-select";
 import Header from "../../components/Headers/Header";
+import { useLocation } from "react-router-dom";
 import classnames from "classnames";
 
 const mockClasses = [
@@ -71,6 +72,7 @@ const TeacherMaterials = () => {
   const fileInputRef = useRef();
   const [tooltipOpen, setTooltipOpen] = useState({});
   const [previewMaterial, setPreviewMaterial] = useState(null);
+  const location = useLocation();
 
   const handleAddMaterial = () => {
     if (!title.trim()) return;
@@ -97,6 +99,14 @@ const TeacherMaterials = () => {
     setLinks([{ url: "", label: "" }]);
     setStatus("active");
   };
+
+  // Auto-open Add Material when redirected with ?new=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') === '1') {
+      setShowModal(true);
+    }
+  }, [location.search]);
 
   const handleFileChange = (e) => {
     setFiles(Array.from(e.target.files));

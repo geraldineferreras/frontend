@@ -9,7 +9,7 @@ export const getProfilePictureUrl = (user) => {
   }
 
   // Check for profile picture in various possible fields
-  const profilePic = user.profile_pic || user.profile_picture || user.avatar || user.profileImageUrl;
+  const profilePic = user.profile_pic || user.profile_picture || user.avatar || user.user_avatar || user.profileImageUrl;
   
   console.log('Profile picture field found:', profilePic);
   console.log('Profile pic type:', typeof profilePic);
@@ -24,7 +24,10 @@ export const getProfilePictureUrl = (user) => {
   // Handle different URL formats
   if (profilePic.startsWith('uploads/')) {
     // Relative path - construct full URL using the correct base URL
-    imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${profilePic}`;
+    // If API base is like http://host/.../index.php/api → strip to base site root
+    const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+    const base = rawBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
+    imageUrl = `${base}/${profilePic}`;
     console.log('📁 Relative path detected, constructed URL:', imageUrl);
   } else if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
     // Full URL
