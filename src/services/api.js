@@ -1064,11 +1064,56 @@ class ApiService {
 
   // Teacher Create Classroom Stream Post API
   async createClassroomStreamPost(classCode, postData) {
+    // Support both JSON and FormData payloads
+    const isForm = (typeof FormData !== 'undefined') && (postData instanceof FormData);
     return this.makeRequest(`/teacher/classroom/${classCode}/stream`, {
       method: 'POST',
-      body: JSON.stringify(postData),
+      body: isForm ? postData : JSON.stringify(postData),
       requireAuth: true,
     });
+  }
+
+  // Teacher Create Classroom Stream Post with multiple files using attachment_0, attachment_1, ...
+  async createTeacherStreamPostWithFiles(classCode, baseData = {}, files = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+
+    const formData = new FormData();
+
+    // Append text fields (convert booleans to 1/0 and arrays to JSON when needed)
+    Object.keys(baseData || {}).forEach((key) => {
+      const value = baseData[key];
+      if (value === undefined || value === null) {
+        formData.append(key, '');
+      } else if (typeof value === 'boolean') {
+        formData.append(key, value ? '1' : '0');
+      } else if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    // Files: backend expects attachment_0, attachment_1, ...
+    (files || []).forEach((file, index) => {
+      formData.append(`attachment_${index}`, file);
+    });
+
+    try {
+      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // No explicit Content-Type so browser sets multipart boundary
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to create stream post';
+      console.error('createTeacherStreamPostWithFiles error:', message);
+      throw new Error(message);
+    }
   }
 
   // Student methods

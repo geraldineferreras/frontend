@@ -635,50 +635,78 @@ const ClassroomDetailStudent = () => {
         );
         console.log("API response:", res.data);
         if (res.data.status && Array.isArray(res.data.data)) {
+          // Build a clean base URL for serving uploads (strip /index.php/api and /api)
+          const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+          const base = rawBase
+            .replace('/index.php/api', '')
+            .replace('/api', '')
+            .replace(/\/$/, '');
+
           // Map API data to UI structure
           const mapped = res.data.data.map((item) => {
             let attachments = [];
-            // Handle multiple attachments (JSON array string)
-            if (item.attachment_type === "multiple" && item.attachment_url) {
+
+            // 1) Prefer explicit attachments array from API
+            if (Array.isArray(item.attachments) && item.attachments.length > 0) {
+              attachments = item.attachments
+                .map((att) => ({
+                  type: att.attachment_type || att.file_type || 'file',
+                  name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+                  url: att.file_path ? `${base}/${att.file_path.replace(/\\/g, '/')}` : (att.serving_url || ''),
+                  fileType: att.file_type,
+                  size: att.file_size,
+                }))
+                .filter((a) => a.url);
+            } else if (
+              item.attachment_type === 'multiple' && typeof item.attachment_url === 'string'
+            ) {
+              // 2) Handle multiple attachments when backend returns JSON string in attachment_url
               try {
-                const arr = JSON.parse(item.attachment_url);
-                attachments = arr.map((f) => ({
-                  type: "file",
-                  name: f.file_name,
-                  url: f.file_path ? `http://localhost/scms_new_backup/${f.file_path.replace(/\\/g, "/")}` : undefined,
-                  fileType: f.file_type,
-                  size: f.file_size,
-                }));
-              } catch (e) {}
-            } else if (item.attachment_url) {
-              // Single attachment
-              attachments = [
-                {
-                  type: "file",
-                  name: item.attachment_url.split("/").pop(),
-                  url:
-                    item.attachment_serving_url ||
-                    (item.attachment_url.startsWith("http")
-                      ? item.attachment_url
-                      : `http://localhost/scms_new_backup/${item.attachment_url.replace(/\\/g, "/")}`),
-                  fileType: item.attachment_file_type,
-                },
-              ];
+                const parsed = JSON.parse(item.attachment_url);
+                const arr = Array.isArray(parsed) ? parsed : [parsed];
+                attachments = arr
+                  .map((f) => ({
+                    type: f.attachment_type || f.file_type || 'file',
+                    name: f.original_name || f.file_name || (f.file_path || '').split('/').pop(),
+                    url: f.file_path ? `${base}/${f.file_path.replace(/\\/g, '/')}` : (f.serving_url || ''),
+                    fileType: f.file_type,
+                    size: f.file_size,
+                  }))
+                  .filter((a) => a.url);
+              } catch (e) {
+                // Fall back to single attachment logic below
+              }
             }
+
+            // 3) Single attachment fields fallback
+            if (attachments.length === 0 && (item.attachment_url || item.attachment_serving_url)) {
+              const directUrl = (item.attachment_url && !String(item.attachment_url).startsWith('http'))
+                ? `${base}/${String(item.attachment_url).replace(/\\/g, '/')}`
+                : (item.attachment_url || item.attachment_serving_url);
+              if (directUrl) {
+                attachments = [
+                  {
+                    type: item.attachment_type || item.attachment_file_type || 'file',
+                    name: (item.original_name || String(item.attachment_url || item.attachment_serving_url).split('/').pop()),
+                    url: directUrl,
+                    fileType: item.attachment_file_type,
+                  },
+                ];
+              }
+            }
+
             return {
               id: item.id,
-              title: item.title || "",
-              content: item.content || "",
-              author: item.user_name || "Unknown",
-              avatar: item.user_avatar
-                ? `http://localhost/scms_new_backup/${item.user_avatar.replace(/\\/g, "/")}`
-                : undefined,
+              title: item.title || '',
+              content: item.content || '',
+              author: item.user_name || 'Unknown',
+              avatar: item.user_avatar ? `${base}/${String(item.user_avatar).replace(/\\/g, '/')}` : undefined,
               date: item.created_at,
-              isPinned: item.is_pinned === "1" || item.is_pinned === 1,
+              isPinned: item.is_pinned === '1' || item.is_pinned === 1,
               reactions: { like: item.like_count || 0, likedBy: [] },
-              comments: [], // API does not provide comments in this response
+              comments: [],
               attachments,
-              allowComments: true, // Assume true unless API says otherwise
+              allowComments: true,
             };
           });
           console.log("Mapped announcements:", mapped);
@@ -780,13 +808,39 @@ const ClassroomDetailStudent = () => {
   };
 
   const handlePreviewAttachment = async (att) => {
-    setPreviewAttachment(att);
-    setPreviewText("");
-    setPreviewModalOpen(true);
-    const ext = att.name ? att.name.split('.').pop().toLowerCase() : '';
-    if ((ext === 'txt' || ext === 'csv') && att.file) {
-      const text = await att.file.text();
-      setPreviewText(text);
+    try {
+      setPreviewText("");
+      // If we only have a URL from the API, fetch it and create a Blob for preview
+      if (!att.file && att.url) {
+        const res = await fetch(att.url);
+        if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
+        const contentType = res.headers.get('Content-Type') || '';
+        const blob = await res.blob();
+        // Infer name/type from extension if needed
+        const name = att.name || (att.url.split('/').pop());
+        const ext = name?.split('.').pop()?.toLowerCase() || '';
+        let mime = contentType;
+        if (!mime) {
+          if (ext === 'pdf') mime = 'application/pdf';
+          else if (['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext)) mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          else if (['mp3','mpeg'].includes(ext)) mime = 'audio/mpeg';
+          else if (ext === 'mp4') mime = 'video/mp4';
+        }
+        const fileLike = new File([blob], name || 'file', { type: mime || blob.type || 'application/octet-stream' });
+        setPreviewAttachment({ ...att, file: fileLike, name: name });
+      } else {
+        setPreviewAttachment(att);
+        // Load text preview if applicable
+        const ext = att.name ? att.name.split('.').pop().toLowerCase() : '';
+        if ((ext === 'txt' || ext === 'csv') && att.file) {
+          const text = await att.file.text();
+          setPreviewText(text);
+        }
+      }
+      setPreviewModalOpen(true);
+    } catch (e) {
+      setPreviewAttachment(att);
+      setPreviewModalOpen(true);
     }
   };
 
@@ -1309,7 +1363,9 @@ const ClassroomDetailStudent = () => {
                             const fileType = isMp3 ? 'MP3' : isPdf ? 'PDF' : isMp4 ? 'MP4' : isWord ? 'WORD' : (att.file && att.file.type ? att.file.type.split('/')[1]?.toUpperCase() : att.type.charAt(0).toUpperCase() + att.type.slice(1));
                             const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
                             const linkColor = typeColor;
+                            // Compute preview availability per attachment scope
                             const isFile = att.type === 'file' && att.file;
+                            const canPreview = isFile || !!att.url;
                             // Truncate file name and type string
                             const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
                             let typeString = '';
@@ -1322,8 +1378,8 @@ const ClassroomDetailStudent = () => {
                             return (
                               <div
                                 key={idx}
-                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isFile ? 'pointer' : 'default' }}
-                                onClick={isFile ? () => handlePreviewAttachment(att) : undefined}
+                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: canPreview ? 'pointer' : 'default' }}
+                                onClick={canPreview ? () => handlePreviewAttachment(att) : undefined}
                               >
                                 {/* File icon */}
                                 {isMp3 ? (
@@ -1357,7 +1413,7 @@ const ClassroomDetailStudent = () => {
                                   <div style={{ fontWeight: 600, fontSize: 15, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName}</div>
                                   <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
                                     <span style={{ color: typeColor }}>{typeString}</span>
-                                    {isFile && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
+                                    {canPreview && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
                                     {isFile ? (
                                       <a
                                         href={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)}
@@ -1367,46 +1423,18 @@ const ClassroomDetailStudent = () => {
                                       >
                                         Download
                                       </a>
-                                    ) : att.url ? (
+                                    ) : null}
+                                    {canPreview ? (
                                       <a
-                                        href={att.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        href="#"
                                         style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => e.stopPropagation()}
+                                        onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
                                       >
                                         Open
                                       </a>
                                     ) : null}
                                   </div>
                                 </div>
-                                {/* Remove button */}
-                                <button
-                                  onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
-                                  style={{
-                                    marginLeft: 10,
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#888',
-                                    fontWeight: 700,
-                                    fontSize: 22,
-                                    cursor: 'pointer',
-                                    borderRadius: '50%',
-                                    width: 32,
-                                    height: 32,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'background 0.2s',
-                                  }}
-                                  title="Remove attachment"
-                                  aria-label="Remove attachment"
-                                  type="button"
-                                  tabIndex={0}
-                                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
-                                >
-                                  &times;
-                                </button>
                               </div>
                             );
                           })}
@@ -1449,6 +1477,7 @@ const ClassroomDetailStudent = () => {
                             const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
                             const linkColor = typeColor;
                             const isFile = att.type === 'file' && att.file;
+                            const canPreview = isFile || !!att.url;
                             // Truncate file name and type string
                             const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
                             let typeString = '';
@@ -1461,8 +1490,8 @@ const ClassroomDetailStudent = () => {
                             return (
                               <div
                                 key={idx}
-                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isFile ? 'pointer' : 'default' }}
-                                onClick={isFile ? () => handlePreviewAttachment(att) : undefined}
+                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: canPreview ? 'pointer' : 'default' }}
+                                onClick={canPreview ? () => handlePreviewAttachment(att) : undefined}
                               >
                                 {/* File icon */}
                                 {isMp3 ? (
@@ -1496,7 +1525,7 @@ const ClassroomDetailStudent = () => {
                                   <div style={{ fontWeight: 600, fontSize: 15, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName}</div>
                                   <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
                                     <span style={{ color: typeColor }}>{typeString}</span>
-                                    {isFile && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
+                                    {canPreview && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
                                     {isFile ? (
                                       <a
                                         href={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)}
@@ -1506,46 +1535,18 @@ const ClassroomDetailStudent = () => {
                                       >
                                         Download
                                       </a>
-                                    ) : att.url ? (
+                                    ) : null}
+                                    {canPreview ? (
                                       <a
-                                        href={att.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        href="#"
                                         style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => e.stopPropagation()}
+                                        onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
                                       >
                                         Open
                                       </a>
                                     ) : null}
                                   </div>
                                 </div>
-                                {/* Remove button */}
-                                <button
-                                  onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
-                                  style={{
-                                    marginLeft: 10,
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#888',
-                                    fontWeight: 700,
-                                    fontSize: 22,
-                                    cursor: 'pointer',
-                                    borderRadius: '50%',
-                                    width: 32,
-                                    height: 32,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'background 0.2s',
-                                  }}
-                                  title="Remove attachment"
-                                  aria-label="Remove attachment"
-                                  type="button"
-                                  tabIndex={0}
-                                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
-                                >
-                                  &times;
-                                </button>
                               </div>
                             );
                           })}
@@ -1712,46 +1713,17 @@ const ClassroomDetailStudent = () => {
                                 >
                                   Download
                                 </a>
-                              ) : att.url ? (
-                                <a
-                                  href={att.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                  onClick={e => e.stopPropagation()}
-                                >
-                                  Open
-                                </a>
                               ) : null}
-                            </div>
-                          </div>
-                          {/* Remove button */}
-                          <button
-                            onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
-                            style={{
-                              marginLeft: 10,
-                              background: 'none',
-                              border: 'none',
-                              color: '#888',
-                              fontWeight: 700,
-                              fontSize: 22,
-                              cursor: 'pointer',
-                              borderRadius: '50%',
-                              width: 32,
-                              height: 32,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'background 0.2s',
-                            }}
-                            title="Remove attachment"
-                            aria-label="Remove attachment"
-                            type="button"
-                            tabIndex={0}
-                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
-                          >
-                            &times;
-                          </button>
+                              {/* Always open modal instead of new tab */}
+                              <a
+                                href="#"
+                                style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
+                              >
+                                Open
+                              </a>
+                                  </div>
+                                </div>
                         </div>
                       );
                     })}
@@ -1976,46 +1948,18 @@ const ClassroomDetailStudent = () => {
                                         >
                                           Download
                                         </a>
-                                      ) : att.url ? (
+                                      ) : (
                                         <a
-                                          href={att.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
+                                          href="#"
                                           style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                          onClick={e => e.stopPropagation()}
+                                          onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
                                         >
                                           Open
                                         </a>
-                                      ) : null}
+                                      )}
                                     </div>
                                   </div>
-                                  {/* Remove button */}
-                                  <button
-                                    onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
-                                    style={{
-                                      marginLeft: 10,
-                                      background: 'none',
-                                      border: 'none',
-                                      color: '#888',
-                                      fontWeight: 700,
-                                      fontSize: 22,
-                                      cursor: 'pointer',
-                                      borderRadius: '50%',
-                                      width: 32,
-                                      height: 32,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'background 0.2s',
-                                    }}
-                                    title="Remove attachment"
-                                    aria-label="Remove attachment"
-                                    type="button"
-                                    tabIndex={0}
-                                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
-                                  >
-                                    &times;
-                                  </button>
+                                  {/* Remove control hidden for student API attachments */}
                                 </div>
                               );
                             })}
@@ -3375,116 +3319,72 @@ const ClassroomDetailStudent = () => {
         </div>
       )}
       {/* Attachment Preview Modal */}
-      <Modal isOpen={previewModalOpen} toggle={() => setPreviewModalOpen(false)} centered size="lg">
+      <style>{`
+        /* Widen preview modal */
+        .modal-dialog.preview-modal-xl { max-width: 95vw; }
+        @media (min-width: 576px) { .modal-dialog.preview-modal-xl { max-width: 90vw; } }
+      `}</style>
+      <Modal isOpen={previewModalOpen} toggle={() => setPreviewModalOpen(false)} centered size="xl" modalClassName="preview-modal-xl">
         <ModalHeader toggle={() => setPreviewModalOpen(false)}>
           {previewAttachment ? (previewAttachment.name || 'File Preview') : 'Preview'}
         </ModalHeader>
-        <ModalBody>
-          {previewAttachment && (
-            <div>
-              {previewAttachment.file && previewAttachment.file.type && previewAttachment.file.type.startsWith('image/') ? (
-                <img src={typeof previewAttachment.file === 'string' ? previewAttachment.file : URL.createObjectURL(previewAttachment.file)} alt={previewAttachment.name} style={{ maxWidth: '100%', maxHeight: '500px', objectFit: 'contain' }} />
-              ) : previewAttachment.file && previewAttachment.file.type && previewAttachment.file.type.startsWith('video/') ? (
-                <video controls style={{ width: '100%', maxHeight: '600px', borderRadius: '8px' }}>
-                  <source src={typeof previewAttachment.file === 'string' ? previewAttachment.file : URL.createObjectURL(previewAttachment.file)} type={previewAttachment.file.type} />
-                  Your browser does not support the video tag.
-                </video>
-              ) : previewAttachment.file && previewAttachment.file.type && previewAttachment.file.type.startsWith('audio/') ? (
-                <div id="mp3-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '30px 15px', background: mp3Backgrounds[mp3BgIndex], borderRadius: '16px', color: 'white', position: 'relative', overflow: 'hidden', transition: 'all 2s cubic-bezier(0.4,0,0.2,1)', boxShadow: isPlaying ? '0 20px 60px rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.1)' : '0 8px 32px rgba(0,0,0,0.2)', maxHeight: '600px' }}>
-            <div id="mp3-disk" style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'conic-gradient(from 0deg, #333 0deg, #666 90deg, #333 180deg, #666 270deg, #333 360deg)', border: '6px solid #fff', boxShadow: isPlaying ? '0 8px 32px rgba(0,0,0,0.5), 0 0 15px rgba(255,255,255,0.2)' : '0 6px 24px rgba(0,0,0,0.3)', marginBottom: '20px', position: 'relative', transition: 'all 0.3s ease', zIndex: 2, transform: isPlaying ? 'scale(1.1)' : 'scale(1)', animation: isPlaying ? 'rotate 2s linear infinite' : 'none' }}>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', border: '2px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#333' }} />
-              </div>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '96px', height: '96px', borderRadius: '50%', background: 'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 2deg, rgba(255,255,255,0.1) 2deg, rgba(255,255,255,0.1) 4deg)' }} />
-            </div>
-            {/* Audio Visualizer Bars */}
-            <div id="audio-visualizer" style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginBottom: '15px', opacity: isPlaying ? 1 : 0, transition: 'opacity 0.3s ease', zIndex: 2 }}>
-              {[...Array(20)].map((_, i) => (
-                <div key={i} className="visualizer-bar" style={{ width: '3px', background: 'rgba(255, 255, 255, 0.8)', borderRadius: '1.5px', height: '8px', transition: 'height 0.1s ease', boxShadow: '0 0 6px 1px rgba(255,255,255,0.3)' }} />
-              ))}
-            </div>
-            {/* Floating Particles */}
-            <div id="particles-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1, opacity: isPlaying ? 1 : 0, transition: 'opacity 0.5s ease' }}>
-              {[...Array(20)].map((_, i) => (
-                <div key={i} className="particle" style={{ position: 'absolute', width: `${Math.random() * 8 + 4}px`, height: `${Math.random() * 8 + 4}px`, background: 'rgba(255, 255, 255, 0.7)', borderRadius: '50%', left: `${Math.random() * 90 + 5}%`, top: `${Math.random() * 80 + 10}%`, boxShadow: '0 0 12px 2px rgba(255,255,255,0.3)', animation: isPlaying ? `float ${3 + Math.random() * 4}s ease-in-out infinite` : 'none', animationDelay: `${Math.random() * 2}s`, transform: `rotate(${Math.random() * 360}deg)` }} />
-              ))}
-            </div>
-            {/* Audio Player */}
-            <div style={{ width: '100%', maxWidth: '500px', zIndex: 2, position: 'relative' }}>
-              <audio ref={audioRef} id="mp3-player" controls src={audioUrl || ''} style={{ width: '100%', borderRadius: '20px' }}>
-                <source src={audioUrl || ''} type={previewAttachment?.file?.type || 'audio/mp3'} />
-                Your browser does not support the audio tag.
-              </audio>
-            </div>
-            <div style={{ marginTop: '6px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(10px)', padding: '8px 12px', borderRadius: '12px', boxShadow: '0 6px 24px rgba(0,0,0,0.1)', width: '100%', maxWidth: '500px', fontWeight: 500, position: 'relative', zIndex: 2, transition: 'all 0.3s ease' }}>
-              <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transition: 'all 2s cubic-bezier(0.4,0,0.2,1)' }}>
-                <circle cx="24" cy="24" r="24" fill="#43a047" />
-                <path d="M32 12V30.5C32 33.5376 29.5376 36 26.5 36C23.4624 36 21 33.5376 21 30.5C21 27.4624 23.4624 25 26.5 25C27.8807 25 29.0784 25.3358 29.5858 25.8787C29.8358 26.1287 30 26.4886 30 26.8787V16H18V30.5C18 33.5376 15.5376 36 12.5 36C9.46243 36 7 33.5376 7 30.5C7 27.4624 9.46243 25 12.5 25C13.8807 25 15.0784 25.3358 15.5858 25.8787C15.8358 26.1287 16 26.4886 16 26.8787V12C16 11.4477 16.4477 11 17 11H31C31.5523 11 32 11.4477 32 12Z" fill="white"/>
-              </svg>
-              <div>{previewAttachment.name}</div>
-              <div style={{ fontSize: '13px', opacity: '0.8', color: '#7f8c8d' }}>MP3 Audio File</div>
-            </div>
-            <style>{`
-              @keyframes rotate {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
+      <ModalBody>
+        {previewAttachment ? (
+          <div>
+            {(() => {
+              const file = previewAttachment.file;
+              const hasFile = !!file;
+              const fileType = (file && file.type) || '';
+              const name = previewAttachment.name || previewAttachment.url || '';
+              const lower = name.toLowerCase();
+              const urlFromFile = hasFile ? (typeof file === 'string' ? file : URL.createObjectURL(file)) : '';
+              const url = hasFile ? urlFromFile : (previewAttachment.url || '');
+
+              if (fileType.startsWith('image/') || /(\.png|\.jpe?g|\.gif|\.webp|\.bmp|\.svg)(\?.*)?$/.test(lower)) {
+                return <img src={url} alt={name} style={{ maxWidth: '100%', maxHeight: '500px', objectFit: 'contain' }} />;
               }
-              @keyframes float {
-                0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
-                50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
+              if (fileType.startsWith('video/') || /(\.mp4)(\?.*)?$/.test(lower)) {
+                return (
+                  <video controls style={{ width: '100%', maxHeight: '600px', borderRadius: '8px' }}>
+                    <source src={url} type={fileType || 'video/mp4'} />
+                    Your browser does not support the video tag.
+                  </video>
+                );
               }
-              @keyframes pulse {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.05); }
+              if (fileType.startsWith('audio/') || /(\.mp3|\.mpeg)(\?.*)?$/.test(lower)) {
+                return (
+                  <audio controls style={{ width: '100%' }} src={url}>
+                    <source src={url} type={fileType || 'audio/mpeg'} />
+                    Your browser does not support the audio element.
+                  </audio>
+                );
               }
-              #mp3-disk:hover {
-                transform: scale(1.1);
-                box-shadow: 0 12px 48px rgba(0,0,0,0.4);
+              if (fileType === 'application/pdf' || /(\.pdf)(\?.*)?$/.test(lower)) {
+                return <iframe src={url} style={{ width: '100%', height: '600px', border: 'none', borderRadius: '8px' }} title={name || 'PDF'} />;
               }
-              .particle {
-                animation-delay: calc(var(--i) * -0.5s);
+              if (previewText) {
+                return <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '14px', whiteSpace: 'pre-wrap', maxHeight: '500px', overflowY: 'auto' }}>{previewText}</div>;
               }
-              .visualizer-bar {
-                animation: visualizerPulse 0.5s ease-in-out infinite alternate;
-              }
-              @keyframes visualizerPulse {
-                from { height: 10px; }
-                to { height: 40px; }
-              }
-              * { transition: all 0.3s ease; }
-            `}</style>
-            {/* Subtle Animated Wave at Bottom */}
-            <div style={{ position: 'absolute', left: 0, bottom: 0, width: '100%', height: '80px', zIndex: 1, pointerEvents: 'none', overflow: 'hidden' }}>
-              <svg width="100%" height="100%" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
-                <path ref={wavePathRef} d="M0,40 Q360,80 720,40 T1440,40 V80 H0 Z" fill="rgba(255,255,255,0.10)" />
-              </svg>
-            </div>
+              return (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <i className="ni ni-single-copy-04" style={{ fontSize: '48px', color: '#ccc', marginBottom: '16px' }} />
+                  <p style={{ color: '#666' }}>Preview not available for this file type.</p>
+                  {hasFile && (
+                    <Button color="primary" onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = name;
+                      a.click();
+                    }}>
+                      Download File
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
-        ) : previewAttachment.file && previewAttachment.file.type === 'application/pdf' ? (
-          <iframe src={typeof previewAttachment.file === 'string' ? previewAttachment.file : URL.createObjectURL(previewAttachment.file)} style={{ width: '100%', height: '600px', border: 'none', borderRadius: '8px' }} title={previewAttachment.name} />
-        ) : previewText ? (
-          <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '14px', whiteSpace: 'pre-wrap', maxHeight: '500px', overflowY: 'auto' }}>{previewText}</div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <i className="ni ni-single-copy-04" style={{ fontSize: '48px', color: '#ccc', marginBottom: '16px' }} />
-            <p style={{ color: '#666' }}>Preview not available for this file type.</p>
-            {previewAttachment.file && (
-              <Button color="primary" onClick={() => {
-                const url = typeof previewAttachment.file === 'string' ? previewAttachment.file : URL.createObjectURL(previewAttachment.file);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = previewAttachment.name;
-                a.click();
-                if (typeof previewAttachment.file !== 'string') URL.revokeObjectURL(url);
-              }}>
-                Download File
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-    )}
-  </ModalBody>
+        ) : null}
+      </ModalBody>
 </Modal>
     </div>
   );

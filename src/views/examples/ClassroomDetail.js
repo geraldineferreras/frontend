@@ -1550,6 +1550,7 @@ useEffect(() => {
   const [editSelectedStudents, setEditSelectedStudents] = useState([]);
 
   // 3. In handlePostAnnouncement, save both title and content
+  const [postLoading, setPostLoading] = useState(false);
   const handlePostAnnouncement = async (e) => {
     e.preventDefault();
 
@@ -1561,7 +1562,14 @@ useEffect(() => {
       is_scheduled: 0,
       scheduled_at: '',
       allow_comments: allowComments ? 1 : 0,
-      student_ids: selectedAnnouncementStudents,
+      // When teacher selects specific students, treat as individual assignment
+      assignment_type: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
+        ? 'individual'
+        : 'classroom',
+      // Only include specific students when any are selected; otherwise let backend post to whole class
+      student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
+        ? selectedAnnouncementStudents
+        : null,
     };
 
     console.log("Posting announcement with data:", postData);
@@ -1574,6 +1582,7 @@ useEffect(() => {
     }
 
     try {
+      setPostLoading(true);
       let response;
 
       // Collect any file attachments and link attachments
@@ -1581,33 +1590,9 @@ useEffect(() => {
       const firstLinkAttachment = (attachments || []).find(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
 
       if (fileAttachments.length > 0) {
-        // Use multipart/form-data for file uploads (supports multiple files with distinct keys)
-        const formData = new FormData();
-        formData.append('title', postData.title || '');
-        formData.append('content', postData.content || '');
-        formData.append('allow_comments', postData.allow_comments ? '1' : '0');
-        formData.append('is_draft', postData.is_draft ? '1' : '0');
-        formData.append('is_scheduled', postData.is_scheduled ? '1' : '0');
-        formData.append('scheduled_at', postData.scheduled_at || '');
-        if (Array.isArray(postData.student_ids)) {
-          formData.append('student_ids', JSON.stringify(postData.student_ids));
-        }
-        // Append files: first key must be 'attachment', subsequent as 'file2', 'file3', ...
-        fileAttachments.forEach((att, idx) => {
-          const key = idx === 0 ? 'attachment' : `file${idx + 1}`;
-          formData.append(key, att.file);
-        });
-
-        response = await axios.post(
-          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              // Content-Type automatically set for FormData
-            },
-          }
-        );
+        // Backend expects keys: attachment_0, attachment_1, ...
+        const files = fileAttachments.map(att => att.file);
+        response = await apiService.createTeacherStreamPostWithFiles(code, postData, files);
       } else if (firstLinkAttachment) {
         // Send JSON payload including link details
         const payload = {
@@ -1615,30 +1600,12 @@ useEffect(() => {
           attachment_type: 'link',
           attachment_url: firstLinkAttachment.url,
         };
-        response = await axios.post(
-          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
-          payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        response = await apiService.createClassroomStreamPost(code, payload);
       } else {
         // No attachments
-        response = await axios.post(
-          `http://localhost/scms_new_backup/index.php/api/teacher/classroom/${code}/stream`,
-          postData,
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        response = await apiService.createClassroomStreamPost(code, postData);
       }
-      console.log("Success response:", response.data);
+      console.log("Success response:", response?.data || response);
       setNewAnnouncement("");
       setNewAnnouncementTitle("");
       setAttachments([]);
@@ -1648,6 +1615,8 @@ useEffect(() => {
       console.error("Error posting announcement:", err);
       console.error("Error response:", err.response?.data);
       alert('Failed to post announcement: ' + (err.response?.data?.message || err.message || err));
+    } finally {
+      setPostLoading(false);
     }
   };
 
@@ -1720,33 +1689,86 @@ useEffect(() => {
     setStreamLoading(true);
     setStreamError(null);
     try {
-      const response = await apiService.getClassroomStream(code);
-      if (response.status && response.data) {
-        // Transform API data to match the expected format
-        const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup').replace(/\/$/, '');
-        const transformedPosts = response.data.map(post => ({
-          id: post.id,
-          title: post.title,
-          content: post.content,
-          author: post.user_name,
-          date: post.created_at,
-          isPinned: post.is_pinned === "1",
-          reactions: { 
-            like: post.like_count || 0, 
-            likedBy: [] 
-          },
-          comments: [],
-          user_avatar: post.user_avatar,
-          attachments: post.attachment_url || post.attachment_serving_url
-            ? [{
-                name: (post.original_name || (post.attachment_url || post.attachment_serving_url || '').split('/').pop()),
-                url: post.attachment_serving_url
-                  ? post.attachment_serving_url
-                  : (post.attachment_url && (post.attachment_url.startsWith('http') ? post.attachment_url : `${base}/${post.attachment_url}`)),
-                type: post.attachment_type || post.attachment_file_type || 'file'
-              }]
-            : []
-        }));
+      // Choose endpoint based on role; student should use the student stream API
+      let isStudent = false;
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          isStudent = (parsed.role || '').toLowerCase() === 'student';
+        }
+      } catch (_) {}
+
+      const response = isStudent
+        ? await apiService.getStudentStreamPosts(code)
+        : await apiService.getClassroomStream(code);
+      if (response?.status && response?.data) {
+        // Derive a clean site base for serving uploaded files
+        // Strip both "/index.php/api" and "/api" if present, and any trailing slash
+        const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+        const base = rawBase
+          .replace('/index.php/api', '')
+          .replace('/api', '')
+          .replace(/\/$/, '');
+
+        const transformedPosts = response.data.map(post => {
+          // Normalize multiple attachments from either `attachments` array or JSON string in `attachment_url`
+          let normalizedAttachments = [];
+
+          if (Array.isArray(post.attachments) && post.attachments.length > 0) {
+            normalizedAttachments = post.attachments.map(att => ({
+              name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+              // Prefer direct uploaded path to avoid redirect links
+              url: att.file_path
+                ? `${base}/${att.file_path}`
+                : (att.serving_url || ''),
+              type: att.attachment_type || att.file_type || 'file',
+            })).filter(a => a.url);
+          } else if (
+            (post.attachment_type === 'multiple' || (typeof post.attachment_url === 'string' && post.attachment_url.trim().startsWith('['))) &&
+            typeof post.attachment_url === 'string'
+          ) {
+            try {
+              const parsed = JSON.parse(post.attachment_url);
+              const arr = Array.isArray(parsed) ? parsed : [parsed];
+              normalizedAttachments = arr.map(att => ({
+                name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+                url: att.file_path
+                  ? `${base}/${att.file_path}`
+                  : (att.serving_url || ''),
+                type: att.attachment_type || att.file_type || 'file',
+              })).filter(a => a.url);
+            } catch (e) {
+              // Fall back to single attachment logic below
+            }
+          }
+
+          // If still empty, check single file fields
+          if (normalizedAttachments.length === 0 && (post.attachment_url || post.attachment_serving_url)) {
+            normalizedAttachments = [{
+              name: (post.original_name || (post.attachment_url || post.attachment_serving_url || '').split('/').pop()),
+              // Prefer direct uploads path if provided
+              url: (post.attachment_url && !post.attachment_url.startsWith('http'))
+                ? `${base}/${post.attachment_url}`
+                : (post.attachment_url || post.attachment_serving_url || ''),
+              type: post.attachment_type || post.attachment_file_type || 'file',
+            }].filter(a => a.url);
+          }
+
+          return {
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            author: post.user_name,
+            date: post.created_at,
+            isPinned: post.is_pinned === '1',
+            reactions: { like: post.like_count || 0, likedBy: [] },
+            comments: [],
+            user_avatar: post.user_avatar,
+            attachments: normalizedAttachments,
+          };
+        });
+
         setAnnouncements(transformedPosts);
       } else {
         setStreamError('No data received from server');
@@ -5367,11 +5389,22 @@ useEffect(() => {
                               opacity: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 1 : 0.6,
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 4
+                              gap: 6,
+                              minWidth: 88
                             }}
-                            disabled={!(newAnnouncement.trim().length > 0 || attachments.length > 0)}
+                            disabled={!(newAnnouncement.trim().length > 0 || attachments.length > 0) || postLoading}
                           >
-                            <i className="fa fa-paper-plane" style={{ marginRight: 4, color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888' }}></i> Post
+                            {postLoading ? (
+                              <>
+                                <i className="fa fa-spinner fa-spin" style={{ marginRight: 6 }}></i>
+                                Posting...
+                              </>
+                            ) : (
+                              <>
+                                <i className="fa fa-paper-plane" style={{ marginRight: 4, color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888' }}></i>
+                                Post
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -6610,9 +6643,24 @@ useEffect(() => {
           </div>
         );
       },
-      MultiValueRemove: props => {
+      MultiValueRemove: (props) => {
         if (props.data.value === 'current') return null;
-        return <components.MultiValueRemove {...props} />;
+        // Avoid relying on imported components; render a simple remove control
+        return (
+          <div
+            {...props.innerProps}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              paddingLeft: 6,
+              paddingRight: 6,
+              cursor: 'pointer'
+            }}
+            aria-hidden
+          >
+            ×
+          </div>
+        );
       }
     }}
     menuPlacement="auto"
@@ -7677,25 +7725,29 @@ useEffect(() => {
         </TabContent>
       </div>
       {/* Attachment Preview Modal */}
-      <Modal isOpen={previewModalOpen} toggle={() => setPreviewModalOpen(false)} centered size="lg">
+      <Modal
+        isOpen={previewModalOpen}
+        toggle={() => setPreviewModalOpen(false)}
+        centered
+        size="xl"
+        style={{ maxWidth: '98vw', width: '98vw' }}
+        contentClassName="p-0"
+      >
         <ModalHeader toggle={() => setPreviewModalOpen(false)}>
           {previewAttachment ? (previewAttachment.name || 'File Preview') : 'Preview'}
         </ModalHeader>
         <ModalBody>
           {previewAttachment && (
             <div>
-              {/* Handle images - both from file objects and URLs */}
-              {(previewAttachment.file && previewAttachment.file.type.startsWith('image/')) || 
-               (previewAttachment.url && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())) ? (
-                <img 
-                  src={previewAttachment.file ? URL.createObjectURL(previewAttachment.file) : previewAttachment.url} 
+              {(((previewAttachment.file && previewAttachment.file.type.startsWith('image/')) ||
+                 (previewAttachment.url && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())))) ? (
+                <img
+                  src={previewAttachment.file ? URL.createObjectURL(previewAttachment.file) : previewAttachment.url}
                   alt={previewAttachment.name}
                   style={{ maxWidth: '100%', maxHeight: '500px', objectFit: 'contain' }}
                 />
-              ) : 
-              {/* Handle PDFs - both from file objects and URLs */}
-              (previewAttachment.file && previewAttachment.file.type === 'application/pdf') || 
-              (previewAttachment.url && previewAttachment.name?.toLowerCase().endsWith('.pdf')) ? (
+              ) : (((previewAttachment.file && previewAttachment.file.type === 'application/pdf') ||
+                 (previewAttachment.url && previewAttachment.name?.toLowerCase().endsWith('.pdf')))) ? (
                 <div style={{ width: '100%', height: '600px', border: '1px solid #e9ecef', borderRadius: '8px' }}>
                   <iframe
                     src={previewAttachment.file ? `${URL.createObjectURL(previewAttachment.file)}#toolbar=1&navpanes=1&scrollbar=1` : `${previewAttachment.url}#toolbar=1&navpanes=1&scrollbar=1`}
@@ -7703,30 +7755,29 @@ useEffect(() => {
                     title={previewAttachment.name}
                   />
                 </div>
-              ) : 
-              {/* Handle videos - both from file objects and URLs */}
-              (previewAttachment.file && previewAttachment.file.type.startsWith('video/')) || 
-              (previewAttachment.url && ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())) ? (
-                <video 
-                  controls 
+              ) : (((previewAttachment.file && previewAttachment.file.type.startsWith('video/')) ||
+                 (previewAttachment.url && ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())))) ? (
+                <video
+                  controls
                   style={{ width: '100%', maxHeight: '600px', borderRadius: '8px' }}
                 >
-                  <source src={previewAttachment.file ? URL.createObjectURL(previewAttachment.file) : previewAttachment.url} type={
-                    previewAttachment.file?.type || 
-                    (previewAttachment.name?.toLowerCase().endsWith('.mp4') ? 'video/mp4' :
-                     previewAttachment.name?.toLowerCase().endsWith('.avi') ? 'video/x-msvideo' :
-                     previewAttachment.name?.toLowerCase().endsWith('.mov') ? 'video/quicktime' :
-                     previewAttachment.name?.toLowerCase().endsWith('.wmv') ? 'video/x-ms-wmv' :
-                     previewAttachment.name?.toLowerCase().endsWith('.flv') ? 'video/x-flv' :
-                     previewAttachment.name?.toLowerCase().endsWith('.webm') ? 'video/webm' :
-                     'video/mp4')
-                  } />
+                  <source
+                    src={previewAttachment.file ? URL.createObjectURL(previewAttachment.file) : previewAttachment.url}
+                    type={
+                      previewAttachment.file?.type ||
+                      (previewAttachment.name?.toLowerCase().endsWith('.mp4') ? 'video/mp4' :
+                       previewAttachment.name?.toLowerCase().endsWith('.avi') ? 'video/x-msvideo' :
+                       previewAttachment.name?.toLowerCase().endsWith('.mov') ? 'video/quicktime' :
+                       previewAttachment.name?.toLowerCase().endsWith('.wmv') ? 'video/x-ms-wmv' :
+                       previewAttachment.name?.toLowerCase().endsWith('.flv') ? 'video/x-flv' :
+                       previewAttachment.name?.toLowerCase().endsWith('.webm') ? 'video/webm' :
+                       'video/mp4')
+                    }
+                  />
                   Your browser does not support the video tag.
                 </video>
-              ) : 
-              {/* Handle audio - both from file objects and URLs */}
-              (previewAttachment.file && previewAttachment.file.type.startsWith('audio/')) || 
-              (previewAttachment.url && ['mp3', 'wav', 'ogg', 'aac', 'flac'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())) ? (
+              ) : (((previewAttachment.file && previewAttachment.file.type.startsWith('audio/')) ||
+                 (previewAttachment.url && ['mp3', 'wav', 'ogg', 'aac', 'flac'].includes(previewAttachment.name?.split('.').pop()?.toLowerCase())))) ? (
                 <div 
                   id="mp3-container"
                   style={{ 
