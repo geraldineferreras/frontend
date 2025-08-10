@@ -30,6 +30,37 @@ const AssignmentDetailStudent = () => {
   const [numPages, setNumPages] = useState(null);
   const [resolvedAssignmentFileName, setResolvedAssignmentFileName] = useState(null);
 
+  // Helpers to handle due date logic
+  const parseDueDate = () => {
+    try {
+      const raw = assignment?.due_date;
+      if (!raw) return null;
+      if (raw instanceof Date) return raw;
+      if (typeof raw === 'string') {
+        // Normalize common formats: 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS', ISO
+        let normalized = raw.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+          // Date only: treat as end of day local time
+          normalized = `${normalized}T23:59:59`;
+        } else if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+          // Space-separated date-time: convert space to 'T'
+          normalized = normalized.replace(' ', 'T');
+        }
+        const dt = new Date(normalized);
+        if (!isNaN(dt.getTime())) return dt;
+      }
+    } catch (_) {
+      // ignore
+    }
+    return null;
+  };
+
+  const isPastDue = () => {
+    const due = parseDueDate();
+    if (!due) return false;
+    return Date.now() > due.getTime();
+  };
+
   // Fetch assignment details and submission data
   useEffect(() => {
     const fetchData = async () => {
@@ -37,7 +68,16 @@ const AssignmentDetailStudent = () => {
       setError(null);
       try {
         console.log('Fetching assignment details for ID:', assignmentId);
-        const response = await apiService.getStudentTaskDetails(assignmentId);
+        // Prefer full task details (includes attachments), fallback to student endpoint if needed
+        let response = null;
+        try {
+          response = await apiService.getTaskDetails(assignmentId);
+        } catch (e) {
+          console.warn('getTaskDetails failed, falling back to student task details:', e?.message || e);
+        }
+        if (!response || !response.status) {
+          response = await apiService.getStudentTaskDetails(assignmentId);
+        }
         console.log('Raw API response:', response);
         
         if (response.status && response.data) {
@@ -87,6 +127,26 @@ const AssignmentDetailStudent = () => {
               });
             }
 
+            // If no attachments present, try to fetch full details again (teacher endpoint)
+            if ((!cloned.attachments || cloned.attachments.length === 0)) {
+              try {
+                const alt = await apiService.getTaskDetails(assignmentId);
+                if (alt && alt.status && alt.data && Array.isArray(alt.data.attachments) && alt.data.attachments.length > 0) {
+                  cloned.attachments = alt.data.attachments;
+                } else if (alt && alt.status && alt.data && alt.data.attachment_url) {
+                  cloned.attachments = [
+                    {
+                      attachment_url: alt.data.attachment_url,
+                      attachment_type: alt.data.attachment_type || 'file',
+                      original_name: alt.data.original_name || (typeof alt.data.attachment_url === 'string' ? alt.data.attachment_url.split('/').pop() : 'Attachment'),
+                    }
+                  ];
+                }
+              } catch (_) {
+                // ignore if not allowed
+              }
+            }
+
             if (tasksToRun.length > 0) {
               await Promise.all(tasksToRun);
             }
@@ -95,10 +155,39 @@ const AssignmentDetailStudent = () => {
 
           const enriched = await enrichWithOriginalNames(response.data);
           setAssignment(enriched);
+
+          // Fallback: if attachments are still missing, try fetching student tasks list and merge
+          if (!enriched.attachments || enriched.attachments.length === 0) {
+            try {
+              const cc = classCode || enriched.class_code || (Array.isArray(enriched.class_codes) ? enriched.class_codes[0] : undefined);
+              if (cc) {
+                const listResp = await apiService.getStudentTasks({ classCode: cc, type: 'assignment' });
+                const list = (listResp && listResp.data) ? listResp.data : [];
+                if (Array.isArray(list) && list.length > 0) {
+                  const found = list.find(t => String(t.task_id || t.id) === String(assignmentId));
+                  if (found) {
+                    const merged = { ...enriched };
+                    if (Array.isArray(found.attachments) && found.attachments.length > 0) {
+                      merged.attachments = found.attachments;
+                    } else if (found.attachment_url) {
+                      merged.attachments = [{
+                        attachment_url: found.attachment_url,
+                        attachment_type: found.attachment_type || 'file',
+                        original_name: found.original_name || (typeof found.attachment_url === 'string' ? found.attachment_url.split('/').pop() : 'Attachment')
+                      }];
+                    }
+                    setAssignment(merged);
+                  }
+                }
+              }
+            } catch (_) {
+              // ignore if not available for student
+            }
+          }
           console.log('Assignment details loaded:', response.data);
           
           // Fetch submission data using the correct endpoint
-          const finalClassCode = classCode || response.data.class_code;
+          const finalClassCode = classCode || response.data.class_code || (Array.isArray(response.data.class_codes) ? response.data.class_codes[0] : undefined);
           if (finalClassCode) {
             try {
               const submissionResponse = await apiService.getTaskSubmission(assignmentId, finalClassCode);
@@ -273,7 +362,50 @@ const AssignmentDetailStudent = () => {
     setViewerOpen(true);
   };
 
+  // Icon-only back button with hover effects
+  const BackArrowButton = ({ onClick }) => {
+    const [hovered, setHovered] = useState(false);
+    return (
+      <button
+        aria-label="Back to Classwork"
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          width: 46,
+          height: 38,
+          borderRadius: 12,
+          border: '1px solid #d7dbff',
+          background: hovered ? '#324cdd' : '#e6e8ff',
+          color: hovered ? '#ffffff' : '#324cdd',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: hovered ? '0 10px 20px rgba(50, 76, 221, 0.25)' : '0 2px 8px rgba(0,0,0,0.08)',
+          cursor: 'pointer',
+          transition: 'all 180ms ease',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            transform: hovered ? 'translateX(-2px)' : 'translateX(0)',
+            transition: 'transform 180ms ease',
+          }}
+        >
+          ←
+        </span>
+      </button>
+    );
+  };
+
   const handleSubmitFiles = async () => {
+    // Block submission after due date
+    if (isPastDue()) {
+      setUploadError('Work cannot be turned in after the due date.');
+      return;
+    }
     if (selectedFiles.length === 0 && externalLinks.length === 0) {
       setUploadError('Please select at least one file or add an external link to submit');
       return;
@@ -511,8 +643,19 @@ const AssignmentDetailStudent = () => {
       padding: "20px 0"
     }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 20px' }}>
-        
-                {/* Top Score Banner - Always show */}
+        {/* Back button (icon only) */}
+        <div style={{ marginBottom: 12 }}>
+          <BackArrowButton onClick={() => {
+            const cc = (assignment && (assignment.class_code || (Array.isArray(assignment.class_codes) ? assignment.class_codes[0] : null))) || classCode;
+            if (cc) {
+              navigate(`/student/classroom/${cc}?tab=classwork`);
+            } else {
+              navigate(-1);
+            }
+          }} />
+        </div>
+
+        {/* Top Score Banner - Always show */}
         <div style={{
           background: '#ffffff',
           borderRadius: '16px',
@@ -522,7 +665,8 @@ const AssignmentDetailStudent = () => {
           textAlign: 'center',
           border: '1px solid #e9ecef'
         }}>
-          <div style={{ fontSize: '14px', marginBottom: '6px', color: '#6c757d' }}>Your Score</div>
+          <div style={{ fontSize: 14, color: '#6c757d', marginBottom: 8 }}>Your Score</div>
+          
                      <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '12px', color: '#212529' }}>
             {(() => {
               // Check for grade in submission first
@@ -637,19 +781,21 @@ const AssignmentDetailStudent = () => {
                <i className="ni ni-time-alarm" style={{ fontSize: '32px', marginBottom: '12px', color: '#6c757d' }} />
                <h4 style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#212529' }}>Due Date</h4>
                <div style={{ fontSize: '18px', marginBottom: '12px', color: '#495057' }}>
-                 {assignment.due_date ? new Date(assignment.due_date).toLocaleString() : 'No due date set'}
+                  {assignment.due_date ? (parseDueDate()?.toLocaleString?.() || String(assignment.due_date)) : 'No due date set'}
                </div>
-               <Badge style={{
-                 background: '#fff3cd',
-                 color: '#856404',
-                 borderRadius: '20px',
-                 padding: '8px 16px',
-                 fontSize: '14px',
-                 fontWeight: 600,
-                 border: '1px solid #ffeaa7'
-               }}>
-                 ⚡ Due Soon
-               </Badge>
+                {assignment.due_date && (
+                  <Badge style={{
+                    background: isPastDue() ? '#fdecea' : '#fff3cd',
+                    color: isPastDue() ? '#b71c1c' : '#856404',
+                    borderRadius: '20px',
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    border: `1px solid ${isPastDue() ? '#f5c6cb' : '#ffeaa7'}`
+                  }}>
+                    {isPastDue() ? '⛔ Past Due' : '⚡ Due Soon'}
+                  </Badge>
+                )}
              </CardBody>
            </Card>
          </Col>
@@ -715,7 +861,7 @@ const AssignmentDetailStudent = () => {
                      Assignment Files
                    </h4>
                    
-                    {assignment.attachments && assignment.attachments.length > 0 ? (
+                     {assignment.attachments && assignment.attachments.length > 0 ? (
                      // Multiple attachments
                      assignment.attachments.map((attachment, index) => (
                        <div key={index} style={{
@@ -729,7 +875,7 @@ const AssignmentDetailStudent = () => {
                           cursor: 'pointer',
                          transition: 'all 0.3s ease',
                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                        }} onClick={() => openPreview(attachment)}>
+                          }} onClick={() => openPreview(attachment)}>
                          <div style={{
                            width: '50px',
                            height: '60px',
@@ -744,7 +890,7 @@ const AssignmentDetailStudent = () => {
                            marginRight: '16px',
                            boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
                          }}>
-                            PDF
+                            {(attachment.attachment_url || '').toLowerCase().endsWith('.pdf') ? 'PDF' : 'FILE'}
                          </div>
                          <div style={{ flex: 1 }}>
                            <div style={{
@@ -753,13 +899,13 @@ const AssignmentDetailStudent = () => {
                              color: '#2d3748',
                              marginBottom: '4px'
                            }}>
-                             {attachment.original_name || attachment.file_name || 'Assignment File'}
+                              {attachment.original_name || attachment.file_name || (attachment.attachment_url ? attachment.attachment_url.split('/').pop() : 'Assignment File')}
                            </div>
                            <div style={{
                              color: '#718096',
                              fontSize: '14px'
                            }}>
-                              PDF Document • Click to preview
+                               {(attachment.attachment_url || '').toLowerCase().endsWith('.pdf') ? 'PDF Document' : (attachment.mime_type || 'File')} • Click to preview
                            </div>
                          </div>
                          <div style={{
@@ -1004,7 +1150,7 @@ const AssignmentDetailStudent = () => {
                      padding: '12px',
                      cursor: 'pointer'
                    }}
-                   disabled={uploading}
+                    disabled={uploading || isPastDue()}
                  >
                    <i className="ni ni-world" style={{ marginRight: '8px' }} />
                    🔗 Add External Links
@@ -1060,7 +1206,7 @@ const AssignmentDetailStudent = () => {
                        color="success"
                        size="sm"
                        onClick={handleAddExternalLink}
-                       disabled={!newLink.name.trim() || !newLink.url.trim()}
+                    disabled={!newLink.name.trim() || !newLink.url.trim() || isPastDue()}
                        style={{ marginRight: '8px' }}
                      >
                        Add Link
@@ -1234,7 +1380,7 @@ const AssignmentDetailStudent = () => {
                  />
                  <Button
                    color="primary"
-                   onClick={() => document.getElementById('file-upload').click()}
+                    onClick={() => { if (!isPastDue()) document.getElementById('file-upload').click(); }}
                    style={{
                      borderRadius: '12px',
                      fontWeight: 600,
@@ -1243,7 +1389,7 @@ const AssignmentDetailStudent = () => {
                      padding: '12px',
                      cursor: 'pointer'
                    }}
-                   disabled={uploading}
+                    disabled={uploading || isPastDue()}
                  >
                    <i className="ni ni-fat-add" style={{ marginRight: '8px' }} />
                    📎 Add Files
@@ -1254,7 +1400,7 @@ const AssignmentDetailStudent = () => {
                  <Button
                    color="success"
                    onClick={handleSubmitFiles}
-                   disabled={uploading}
+                    disabled={uploading || isPastDue()}
                    style={{
                      borderRadius: '12px',
                      fontWeight: 600,
@@ -1264,7 +1410,12 @@ const AssignmentDetailStudent = () => {
                      padding: '12px'
                    }}
                  >
-                   {uploading ? (
+                    {isPastDue() ? (
+                      <>
+                        <i className="ni ni-fat-remove" style={{ marginRight: '8px' }} />
+                        ⛔ Past Due
+                      </>
+                    ) : uploading ? (
                      <>
                        <Spinner size="sm" style={{ marginRight: '8px' }} />
                        {uploading ? 'Submitting...' : 'Refreshing...'}
@@ -1309,17 +1460,19 @@ const AssignmentDetailStudent = () => {
                  🔄 Resubmit
                </Button>
 
-                                <div style={{
-                 color: '#6c757d',
-                 fontSize: '12px',
-                 textAlign: 'center',
-                 padding: '8px',
-                 background: '#fff3cd',
-                 borderRadius: '8px',
-                 border: '1px solid #ffeaa7'
-               }}>
-                 ⏰ Work cannot be turned in after the due date
-               </div>
+                {isPastDue() && (
+                  <div style={{
+                    color: '#721c24',
+                    fontSize: '12px',
+                    textAlign: 'center',
+                    padding: '8px',
+                    background: '#f8d7da',
+                    borderRadius: '8px',
+                    border: '1px solid #f5c6cb'
+                  }}>
+                    ⏰ Work cannot be turned in after the due date
+                  </div>
+                )}
 
                 {/* Private Message Section - Inside Your Work Card */}
                 <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>

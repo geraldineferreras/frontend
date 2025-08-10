@@ -1615,9 +1615,10 @@ class ApiService {
         }
       });
       
-      // Add multiple files with same field name (attachment[])
+      // Add multiple files using backend-compatible keys: attachment, attachment2, attachment3, ...
       files.forEach((file, index) => {
-        formData.append('attachment', file);
+        const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
+        formData.append(key, file);
       });
       
       const response = await axios.post(`${API_BASE}/tasks/create`, formData, {

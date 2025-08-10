@@ -3549,6 +3549,8 @@ useEffect(() => {
 
 
   // Class Tasks handlers
+  // Loading state for posting/creating a task
+  const [taskPostLoading, setTaskPostLoading] = useState(false);
   const handleTaskFormChange = (e) => {
     const { name, value } = e.target;
     setTaskForm(prev => ({ ...prev, [name]: value }));
@@ -3571,6 +3573,7 @@ useEffect(() => {
     }
     
     try {
+      setTaskPostLoading(true);
       // Convert postToClassrooms to actual class codes
       // 'current' should be replaced with the current classroom code
       const classCodes = (taskForm.postToClassrooms || []).map(classroom => {
@@ -3630,10 +3633,11 @@ useEffect(() => {
           // Add external links as JSON string
           formData.append('external_links', JSON.stringify(taskExternalLinks));
           
-          // Add all file attachments
+          // Add all file attachments using backend-compatible keys
           taskAttachments.forEach((attachment, index) => {
             if (attachment.file) {
-              formData.append('attachment', attachment.file);
+              const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
+              formData.append(key, attachment.file);
             }
           });
           
@@ -3702,6 +3706,8 @@ useEffect(() => {
     } catch (error) {
       console.error('Error creating task:', error);
       alert(error.message || 'Failed to create task');
+    } finally {
+      setTaskPostLoading(false);
     }
   };
 
@@ -6794,7 +6800,7 @@ useEffect(() => {
                       )}
                       <div className="d-flex flex-row flex-wrap" style={{ gap: 24, marginBottom: 0, width: '100%' }}>
                         <div style={{ display: 'flex', gap: 8, marginTop: 2, justifyContent: 'flex-start' }}>
-                          <input type="file" style={{ display: 'none' }} ref={taskFileInputRef} onChange={handleTaskFileChange} />
+                          <input type="file" style={{ display: 'none' }} ref={taskFileInputRef} onChange={handleTaskFileChange} multiple />
                           <Dropdown isOpen={taskAttachmentDropdownOpen} toggle={() => setTaskAttachmentDropdownOpen(!taskAttachmentDropdownOpen)}>
                             <DropdownToggle color="secondary" style={{ fontSize: 18, padding: '4px 14px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <FaPaperclip />
@@ -6922,9 +6928,13 @@ useEffect(() => {
                               width: 40,
                               height: 40
                             }}
-                            disabled={!(taskForm.title.trim() && taskForm.points)}
+                            disabled={!(taskForm.title.trim() && taskForm.points) || taskPostLoading}
                           >
-                            <i className="ni ni-send" />
+                            {taskPostLoading ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            ) : (
+                              <i className="ni ni-send" />
+                            )}
                           </button>
                           <UncontrolledDropdown>
                             <DropdownToggle
@@ -6946,7 +6956,7 @@ useEffect(() => {
                                 background: '#fff',
                                 opacity: (taskForm.title.trim() && taskForm.points) ? 1 : 0.5
                               }}
-                              disabled={!(taskForm.title.trim() && taskForm.points)}
+                              disabled={!(taskForm.title.trim() && taskForm.points) || taskPostLoading}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
                                 <div style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: 'currentColor' }}></div>
@@ -6963,7 +6973,7 @@ useEffect(() => {
                                   color: (taskForm.title.trim() && taskForm.points) ? '#333' : '#ccc',
                                   cursor: (taskForm.title.trim() && taskForm.points) ? 'pointer' : 'not-allowed'
                                 }}
-                                disabled={!(taskForm.title.trim() && taskForm.points)}
+                                disabled={!(taskForm.title.trim() && taskForm.points) || taskPostLoading}
                               >
                                 Save as Draft
                               </DropdownItem>
@@ -6977,7 +6987,7 @@ useEffect(() => {
                                   color: (taskForm.title.trim() && taskForm.points && taskForm.text.trim()) ? '#333' : '#ccc',
                                   cursor: (taskForm.title.trim() && taskForm.points && taskForm.text.trim()) ? 'pointer' : 'not-allowed'
                                 }}
-                                disabled={!(taskForm.title.trim() && taskForm.points && taskForm.text.trim())}
+                                disabled={!(taskForm.title.trim() && taskForm.points && taskForm.text.trim()) || taskPostLoading}
                               >
                                 Schedule
                               </DropdownItem>

@@ -165,6 +165,16 @@ const ClassroomDetailStudent = () => {
   const { code } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("stream");
+  // Initialize active tab from URL query (?tab=class)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && ['stream','classwork','people','grades'].includes(tab)) {
+        setActiveTab(tab);
+      }
+    } catch (_) {}
+  }, []);
   const [activeStreamTab, setActiveStreamTab] = useState(null); // 'scheduled' | 'drafts' | null
   const [announcement, setAnnouncement] = useState("");
   const [expandedId, setExpandedId] = useState(7);
