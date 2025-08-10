@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip, Spinner, Alert } from "reactstrap";
+import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip, Alert } from "reactstrap";
+import LottieLoader from "components/LottieLoader";
 
 
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/api';
 import axios from "axios";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
+import useMinDelay from "utils/useMinDelay";
 
 // Mock data removed - now using real API data
 
@@ -184,6 +186,7 @@ const ClassroomDetailStudent = () => {
   const [expandedGradeId, setExpandedGradeId] = useState(7);
   const [currentClass, setCurrentClass] = useState(null);
   const [loadingClass, setLoadingClass] = useState(true);
+  const showClassLoader = useMinDelay(loadingClass, 1600);
   const [studentAnnouncement, setStudentAnnouncement] = useState("");
   const [studentAnnouncements, setStudentAnnouncements] = useState([]);
   const [formExpanded, setFormExpanded] = useState(false);
@@ -1265,13 +1268,12 @@ const ClassroomDetailStudent = () => {
   }, [activeTab, currentClass]);
 
   // Show loading state while fetching class data
-  if (loadingClass) {
+  if (showClassLoader) {
     return (
       <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
         <div className="container py-4">
-          <div className="text-center py-5">
-            <Spinner color="primary" size="lg" />
-            <h4 className="mt-3 text-muted">Loading class details...</h4>
+          <div className="py-5" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading class details..." width={160} height={160} centered minHeight={'70vh'} desiredDurationSec={1.4} />
           </div>
         </div>
       </div>
@@ -2345,8 +2347,7 @@ const ClassroomDetailStudent = () => {
           {/* Assignments List */}
           {loadingAssignments ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
-              <Spinner color="primary" size="lg" />
-              <h4 className="mt-3 text-muted">Loading assignments...</h4>
+              <LottieLoader message="Loading assignments..." width={140} height={140} centered desiredDurationSec={1.4} />
             </div>
           ) : realAssignments.length > 0 ? (
             <div>
@@ -2539,8 +2540,7 @@ const ClassroomDetailStudent = () => {
         <div style={{ maxWidth: 1100, margin: '32px auto 0' }}>
           {loadingPeople ? (
             <div style={{ textAlign: 'center', padding: '60px' }}>
-              <Spinner color="primary" size="lg" />
-              <div style={{ marginTop: '16px', color: '#6c757d', fontSize: '18px' }}>Loading people...</div>
+              <LottieLoader message="Loading people..." width={140} height={140} centered desiredDurationSec={1.4} />
             </div>
           ) : peopleError ? (
             <Alert color="danger" style={{ margin: '32px auto', maxWidth: 1100 }}>
@@ -2917,8 +2917,7 @@ const ClassroomDetailStudent = () => {
         <div style={{ maxWidth: 1100, margin: '32px auto 0' }}>
           {loadingGrades ? (
             <div style={{ textAlign: 'center', padding: '60px' }}>
-              <Spinner color="primary" size="lg" />
-              <div style={{ marginTop: '16px', color: '#6c757d', fontSize: '18px' }}>Loading grades...</div>
+              <LottieLoader message="Loading grades..." width={140} height={140} centered desiredDurationSec={1.4} />
             </div>
           ) : gradesError ? (
             <Alert color="danger" style={{ margin: '32px auto', maxWidth: 1100 }}>

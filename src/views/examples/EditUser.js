@@ -19,6 +19,8 @@ import {
   Alert,
   Spinner
 } from "reactstrap";
+import LottieLoader from "components/LottieLoader";
+import useMinDelay from "utils/useMinDelay";
 import Header from "components/Headers/Header.js";
 import { FaCamera, FaTrash } from "react-icons/fa";
 import userDefault from "../../assets/img/theme/user-default.svg";
@@ -75,6 +77,7 @@ const EditUser = () => {
 
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
+  const showPageLoader = useMinDelay(isLoading, 1600);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState("");
@@ -487,7 +490,7 @@ const EditUser = () => {
   };
 
   // Loading state
-  if (isLoading) {
+  if (showPageLoader) {
     return (
       <>
         <Header compact />
@@ -496,8 +499,7 @@ const EditUser = () => {
             <Col xl="8" lg="8" md="10">
               <Card className="bg-secondary shadow border-0 mt-5">
                 <CardBody className="text-center py-5">
-                  <Spinner color="primary" size="lg" />
-                  <h5 className="mt-3">Loading user data...</h5>
+                  <LottieLoader message="Loading user data..." desiredDurationSec={1.4} />
                 </CardBody>
               </Card>
             </Col>
@@ -1013,12 +1015,7 @@ const EditUser = () => {
             {/* Loading Modal */}
             <Modal isOpen={showLoadingModal} centered backdrop="static" keyboard={false}>
               <ModalBody className="text-center py-4">
-                <div className="mb-3">
-                  <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
-                    <span className="sr-only">Loading...</span>
-                  </div>
-                </div>
-                <h5 className="text-primary mb-2">Updating User...</h5>
+                <LottieLoader message="Updating User..." width={140} height={140} centered minHeight={'40vh'} desiredDurationSec={1.4} />
                 <p className="text-muted mb-0">Please wait while we process your request.</p>
               </ModalBody>
             </Modal>

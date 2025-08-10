@@ -52,9 +52,11 @@ import {
   DropdownItem,
   UncontrolledTooltip,
 } from "reactstrap";
+import LottieLoader from "components/LottieLoader";
 import classnames from "classnames";
 import userDefault from "../../assets/img/theme/user-default.svg";
 import scmsLogo from "../../assets/img/brand/logo-scms.png";
+import useMinDelay from "utils/useMinDelay";
 
 // Import jsPDF for PDF export
 import jsPDF from 'jspdf';
@@ -144,6 +146,7 @@ const UserManagement = () => {
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const showLoader = useMinDelay(loading, 1600);
   const [error, setError] = useState(null);
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [deleteUserName, setDeleteUserName] = useState("");
@@ -1453,12 +1456,9 @@ const UserManagement = () => {
               {/* Content */}
               <TabContent activeTab={activeTab} className="mt-4">
                 <TabPane tabId={activeTab}>
-                  {loading ? (
-                    <div className="text-center py-5">
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="sr-only">Loading...</span>
-                      </div>
-                      <p className="mt-2 text-muted">Loading users...</p>
+                  {showLoader ? (
+                    <div className="py-5" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <LottieLoader message="Loading users..." width={150} height={150} centered minHeight={'60vh'} desiredDurationSec={1.4} />
                     </div>
                   ) : error ? (
                     <Alert color="danger">

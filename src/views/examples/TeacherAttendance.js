@@ -26,14 +26,17 @@ import {
   Spinner,
 } from "reactstrap";
 import { FaQrcode, FaTable, FaCheckCircle, FaTimesCircle, FaUndo, FaUser, FaDownload, FaCalendarAlt } from "react-icons/fa";
+import LottieLoader from "components/LottieLoader";
 import { QrReader } from "react-qr-reader";
 import apiService from "../../services/api";
+import useMinDelay from "utils/useMinDelay";
 
 const TeacherAttendance = () => {
   // State for API data
   const [classes, setClasses] = useState([]);
   const [attendanceData, setAttendanceData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const showLoader = useMinDelay(loading, 1600);
   const [error, setError] = useState(null);
 
   // State for form controls
@@ -391,10 +394,9 @@ const TeacherAttendance = () => {
         )}
 
         {/* Loading Spinner */}
-        {loading && (
-          <div className="text-center mb-4">
-            <Spinner color="primary" />
-            <span className="ml-2">Loading...</span>
+        {showLoader && (
+          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading..." width={150} height={150} centered minHeight={'60vh'} desiredDurationSec={1.4} />
           </div>
         )}
 

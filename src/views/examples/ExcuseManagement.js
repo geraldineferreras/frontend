@@ -3,7 +3,9 @@ import {
   Card, CardHeader, CardBody, Row, Col, Button, FormGroup, Input, Table, Badge, Modal, ModalHeader, ModalBody, ModalFooter, Alert, Spinner
 } from "reactstrap";
 import { FaCheck, FaTimes, FaEye, FaSearch, FaFileImage, FaUser, FaCheckCircle } from "react-icons/fa";
+import LottieLoader from "components/LottieLoader";
 import apiService from "../../services/api";
+import useMinDelay from "utils/useMinDelay";
 
 const ExcuseManagement = () => {
   const [selectedClass, setSelectedClass] = useState("");
@@ -16,6 +18,7 @@ const ExcuseManagement = () => {
   const [excuses, setExcuses] = useState([]);
   const [availableClasses, setAvailableClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useMinDelay(loading, 1600);
   const [error, setError] = useState("");
   const [teacherNotes, setTeacherNotes] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -366,10 +369,9 @@ const ExcuseManagement = () => {
         )}
 
         {/* Loading Spinner */}
-        {loading && (
-          <div className="text-center mb-4">
-            <Spinner color="primary" />
-            <span className="ml-2">Loading excuse letters...</span>
+        {showLoader && (
+          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading excuse letters..." width={150} height={150} centered minHeight={'60vh'} desiredDurationSec={1.4} />
           </div>
         )}
 

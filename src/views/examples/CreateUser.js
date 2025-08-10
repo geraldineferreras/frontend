@@ -18,6 +18,7 @@ import {
   Container,
   Alert
 } from "reactstrap";
+import LottieLoader from "components/LottieLoader";
 import { QrReader } from "react-qr-reader";
 import Header from "components/Headers/Header.js";
 import { FaCamera, FaTrash } from "react-icons/fa";
@@ -26,6 +27,7 @@ import Cropper from 'react-easy-crop';
 import "./CreateUser.css";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import apiService from "../../services/api";
+import useMinDelay from "utils/useMinDelay";
 
 const defaultCoverPhotoSvg =
   "data:image/svg+xml;utf8,<svg width='600' height='240' viewBox='0 0 600 240' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='600' height='240' fill='%23f7f7f7'/><path d='M0 180 Q150 120 300 180 T600 180 V240 H0 Z' fill='%23e3eafc'/><path d='M0 200 Q200 140 400 200 T600 200 V240 H0 Z' fill='%23cfd8dc' opacity='0.7'/></svg>";
@@ -55,6 +57,7 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
   const [emailValid, setEmailValid] = useState(true);
   const [status, setStatus] = useState("active");
   const [isLoading, setIsLoading] = useState(false);
+  const showBtnLoader = useMinDelay(isLoading, 1600);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [showLoadingModal, setShowLoadingModal] = useState(false);
@@ -945,7 +948,7 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
                   )}
                   <div className="text-center">
                     <Button color="primary" type="submit" disabled={isLoading}>
-                      {isLoading ? (
+                      {showBtnLoader ? (
                         <>
                           <span className="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
                           {editMode ? 'Updating...' : 'Creating...'}
@@ -962,14 +965,7 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
             {/* Loading Modal */}
             <Modal isOpen={showLoadingModal} centered backdrop="static" keyboard={false}>
               <ModalBody className="text-center py-4">
-                <div className="mb-3">
-                  <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
-                    <span className="sr-only">Loading...</span>
-                  </div>
-                </div>
-                <h5 className="text-primary mb-2">
-                  {editMode ? 'Updating User...' : 'Creating User...'}
-                </h5>
+                <LottieLoader message={editMode ? 'Updating User...' : 'Creating User...'} width={140} height={140} centered minHeight={'40vh'} desiredDurationSec={1.4} />
                 <p className="text-muted mb-0">Please wait while we process your request.</p>
               </ModalBody>
             </Modal>

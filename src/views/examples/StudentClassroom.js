@@ -1,9 +1,11 @@
 
 
 import React, { useState, useEffect } from "react";
-import { Card, CardBody, Button, Row, Col, Badge, Input, Spinner, Alert } from "reactstrap";
+import { Card, CardBody, Button, Row, Col, Badge, Input, Alert } from "reactstrap";
+import LottieLoader from "components/LottieLoader";
 import { useNavigate } from "react-router-dom";
 import apiService from "../../services/api";
+import useMinDelay from "utils/useMinDelay";
 
 // Color themes for classroom cards
 const colorThemes = [
@@ -30,6 +32,7 @@ const StudentClassroom = () => {
   const navigate = useNavigate();
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useMinDelay(loading, 1600);
   const [error, setError] = useState(null);
 
   // Function to fetch student classes
@@ -78,13 +81,12 @@ const StudentClassroom = () => {
     fetchStudentClasses();
   }, []);
 
-  if (loading) {
+  if (showLoader) {
     return (
       <div style={{ background: "#f7fafd", minHeight: "100vh" }}>
         <div className="container py-4">
-          <div className="text-center py-5">
-            <Spinner color="primary" size="lg" />
-            <h4 className="mt-3 text-muted">Loading your classes...</h4>
+          <div className="py-5" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading your classes..." width={160} height={160} centered minHeight={'70vh'} desiredDurationSec={1.4} />
           </div>
         </div>
       </div>

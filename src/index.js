@@ -29,6 +29,7 @@ import TeacherLayout from "layouts/Teacher.js";
 import VideoConferenceLayout from "layouts/VideoConference.js";
 import RemoteCameraMobile from './components/RemoteCameraMobile';
 import { AuthProvider } from "contexts/AuthContext.js";
+import GlobalRouteLoader from "components/GlobalRouteLoader";
 
 function SessionTimeoutModal() {
   const [open, setOpen] = useState(false);
@@ -63,6 +64,7 @@ root.render(
   <AuthProvider>
     <BrowserRouter>
       <SessionTimeoutModal />
+      <GlobalRouteLoader minVisibleMs={1600} />
       <Routes>
         <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/student/*" element={<StudentLayout />} />

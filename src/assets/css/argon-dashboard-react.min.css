@@ -1,3 +1,11 @@
+/* Smooth page fade-in after loader */
+body[data-route-loading="true"] #root > *:not(.global-loader-overlay){
+  opacity: 0.001;
+}
+body[data-route-loading="false"] #root > *:not(.global-loader-overlay){
+  transition: opacity 220ms ease-out;
+  opacity: 1;
+}
 /*!
 
 =========================================================
