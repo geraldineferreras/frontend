@@ -24,6 +24,7 @@ import "./Classroom.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import apiService from "../../services/api";
 import { QRCodeSVG } from "qrcode.react";
+import * as XLSX from 'xlsx';
 
 function generateCode() {
   // Generate a more readable 6-character code
@@ -88,6 +89,7 @@ const Classroom = () => {
   const [newlyCreatedClass, setNewlyCreatedClass] = useState(null);
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [exportingGrades, setExportingGrades] = useState(false);
 
   // New state for assigned subjects and available sections
   const [assignedSubjects, setAssignedSubjects] = useState([]);
@@ -99,6 +101,12 @@ const Classroom = () => {
   const [createdClassData, setCreatedClassData] = useState(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
   const location = useLocation();
+  // Export customization modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [weights, setWeights] = useState(() => {
+    const saved = localStorage.getItem('scms_export_weights');
+    return saved ? JSON.parse(saved) : { attendance: 10, activities: 50, major: 40 };
+  });
 
   // Fetch classrooms from API
   useEffect(() => {
@@ -439,6 +447,282 @@ const Classroom = () => {
     return themes[Math.floor(Math.random() * themes.length)];
   };
 
+  // Export all classrooms' grades into a single workbook (one sheet per class)
+  const handleExportAllGrades = async (customWeights) => {
+    try {
+      if (!classes || classes.length === 0) {
+        alert('No classrooms to export.');
+        return;
+      }
+
+      setExportingGrades(true);
+
+      // Use customized grading settings provided by modal
+      const attendanceW = Number(customWeights?.attendance ?? 10);
+      const activitiesW = Number(customWeights?.activities ?? 50);
+      const majorW = Number(customWeights?.major ?? 40);
+      const gradingSettings = {
+        attendance: attendanceW,
+        activity: activitiesW,
+        assignment: 0,
+        // We'll map the entire Major weight to either Midterm or Final (not both)
+        midtermExam: majorW,
+        finalExam: 0,
+      };
+      const DEFAULT_MAX_ATTENDANCE = 6;
+      const DEFAULT_MAX_MIDTERM = 68;
+      const DEFAULT_MAX_FINAL = 100;
+
+      const workbook = XLSX.utils.book_new();
+
+      for (const cls of classes) {
+        try {
+          const response = await apiService.get(`/teacher/classroom/${cls.code}/grades`);
+          if (!response || !response.status || !response.data) continue;
+
+          const gradesData = response.data;
+          const students = gradesData.students || [];
+          const allTasks = Array.isArray(gradesData.tasks) ? gradesData.tasks : [];
+
+          // Separate assignment tasks (exclude midterm and final exam)
+          const assignmentTasks = allTasks.filter(task =>
+            task &&
+            task.type !== 'midterm_exam' &&
+            task.type !== 'final_exam' &&
+            !(task.title || '').toLowerCase().includes('midterm') &&
+            !(task.title || '').toLowerCase().includes('final')
+          );
+
+          // Identify midterm/final tasks and max scores
+          const getPoints = (t) => parseFloat(t?.points || t?.max_points || t?.total_points || t?.max_score || 0) || 0;
+          const midtermTask = allTasks.find(t => t?.type === 'midterm_exam' || (t?.title || '').toLowerCase().includes('midterm'));
+          const finalTask = allTasks.find(t => t?.type === 'final_exam' || (t?.title || '').toLowerCase().includes('final'));
+          const maxMidtermScore = (() => { const p = getPoints(midtermTask); return p > 0 ? p : DEFAULT_MAX_MIDTERM; })();
+          const maxFinalExamScore = (() => { const p = getPoints(finalTask); return p > 0 ? p : DEFAULT_MAX_FINAL; })();
+          const maxAttendanceScore = DEFAULT_MAX_ATTENDANCE;
+
+          // Header information (top meta section)
+          const exportData = [];
+          exportData.push(['SCMS - Student Course Management System']);
+          exportData.push(['Class Record']);
+          exportData.push(['']);
+          exportData.push(['Class Information:']);
+          exportData.push(['Class Code:', gradesData.classroom?.class_code || cls.code || 'N/A']);
+          exportData.push(['Title:', gradesData.classroom?.title || cls.name || 'N/A']);
+          exportData.push(['Semester:', gradesData.classroom?.semester || cls.semester || 'N/A']);
+          exportData.push(['School Year:', gradesData.classroom?.school_year || cls.schoolYear || 'N/A']);
+          exportData.push(['']);
+          exportData.push(['Grading Breakdown:']);
+          exportData.push(['Attendance:', `${gradingSettings.attendance}%`]);
+          exportData.push(['Activity:', `${gradingSettings.activity}%`]);
+          exportData.push(['Assignment/Quiz:', `${gradingSettings.assignment}%`]);
+          // Display the combined Major weight (not split)
+          exportData.push(['Major Exam (Midterm/Final):', `${majorW}%`]);
+          exportData.push(['Total:', '100%']);
+          exportData.push(['']);
+
+          // Table headers
+          const headers = ['Student Name', 'Student ID', 'Attendance', 'RS', 'PS', 'WS'];
+          assignmentTasks.forEach(task => headers.push(task.title || task.name || `Task ${task.task_id || ''}`));
+          headers.push('Total Score', 'RS', 'PS', 'WS', 'Midterm', 'PS', 'WS', 'Final Exam', 'PS', 'WS', 'Quarterly Grade', 'Rounded Grade');
+          exportData.push(headers);
+          const headerRowNumber = exportData.length; // 1-based index for Excel
+
+          // Highest Possible Score row
+          const assignmentMaxPoints = assignmentTasks.map(getPoints);
+          const totalAssignmentMax = assignmentMaxPoints.reduce((acc, v) => acc + v, 0);
+          const majorWeight = Number(majorW) || 0;
+
+          const highestRow = [];
+          highestRow.push('Highest Possible Score');
+          highestRow.push('');
+          highestRow.push(`${maxAttendanceScore}/${maxAttendanceScore}`);
+          highestRow.push(maxAttendanceScore);
+          highestRow.push('');
+          highestRow.push('');
+          assignmentTasks.forEach(task => { highestRow.push(getPoints(task)); });
+          highestRow.push(totalAssignmentMax);
+          highestRow.push(totalAssignmentMax);
+          highestRow.push('');
+          highestRow.push('');
+          highestRow.push(maxMidtermScore);
+          highestRow.push('');
+          highestRow.push('');
+          highestRow.push(maxFinalExamScore);
+          highestRow.push('');
+          highestRow.push('');
+          highestRow.push('');
+          highestRow.push('');
+          exportData.push(highestRow);
+
+          // Student rows
+          students.forEach(student => {
+            const attendance = student.attendance || {};
+            const present = Number(attendance.present_sessions || 0);
+            const excused = Number(attendance.excused_sessions || 0);
+            const late = Number(attendance.late_sessions || 0);
+            const rawAttendance = present + excused + (late * 0.7);
+            const attendancePct = maxAttendanceScore > 0 ? (rawAttendance / maxAttendanceScore) * 100 : 0;
+
+            const row = [
+              student.student_name || student.name || 'Unknown',
+              student.student_num || student.student_id || '',
+              `${rawAttendance.toFixed(1)}/${maxAttendanceScore} (${attendancePct.toFixed(1)}%)`,
+              rawAttendance.toFixed(2),
+              `${attendancePct.toFixed(2)}%`,
+              ((attendancePct * gradingSettings.attendance) / 100).toFixed(2)
+            ];
+
+            assignmentTasks.forEach(task => {
+              const assign = (student.assignments || []).find(a => a.task_id === task.task_id);
+              if (assign) {
+                row.push(`${assign.grade ?? ''}/${assign.points ?? ''} (${(Number(assign.grade_percentage || 0)).toFixed(1)}%)`);
+              } else {
+                row.push('N/A');
+              }
+            });
+
+            // Aggregate assignment metrics
+            const assignmentsForStudent = assignmentTasks.map(t => (student.assignments || []).find(a => a.task_id === t.task_id)).filter(Boolean);
+            const rawAssign = assignmentsForStudent.reduce((sum, a) => sum + (Number(a.grade || 0)), 0);
+            const maxAssign = assignmentMaxPoints.reduce((a, b) => a + b, 0);
+            const assignPct = maxAssign > 0 ? (rawAssign / maxAssign) * 100 : 0;
+            const assignWS = (assignPct * gradingSettings.activity) / 100;
+            row.push(maxAssign);
+            row.push(rawAssign.toFixed(2));
+            row.push(`${assignPct.toFixed(2)}%`);
+            row.push(assignWS.toFixed(2));
+
+          // Decide where to apply the Major weight: to Midterm if present, otherwise to Final
+          const applyMajorToMidterm = !!midtermTask;
+          const midWeight = applyMajorToMidterm ? majorWeight : 0;
+          const finalWeight = applyMajorToMidterm ? 0 : (finalTask ? majorWeight : 0);
+
+          // Midterm
+            const midAssign = (student.assignments || []).find(a => midtermTask && a.task_id === midtermTask.task_id);
+            if (midAssign) {
+              const midPct = maxMidtermScore > 0 ? (Number(midAssign.grade || 0) / maxMidtermScore) * 100 : 0;
+            const midWS = (midPct * midWeight) / 100;
+              row.push(`${Number(midAssign.grade || 0).toFixed(1)} (${midPct.toFixed(1)}%)`);
+              row.push(`${midPct.toFixed(2)}%`);
+              row.push(midWS.toFixed(2));
+            } else {
+              row.push('No Midterm Task');
+              row.push('-');
+              row.push('-');
+            }
+
+            // Final exam
+            const finAssign = (student.assignments || []).find(a => finalTask && a.task_id === finalTask.task_id);
+            if (finAssign) {
+              const finPct = maxFinalExamScore > 0 ? (Number(finAssign.grade || 0) / maxFinalExamScore) * 100 : 0;
+            const finWS = (finPct * finalWeight) / 100;
+              row.push(`${Number(finAssign.grade || 0).toFixed(1)}/${maxFinalExamScore} (${finPct.toFixed(1)}%)`);
+              row.push(`${finPct.toFixed(2)}%`);
+              row.push(finWS.toFixed(2));
+            } else {
+              row.push('No Final Exam Task');
+              row.push('-');
+              row.push('-');
+            }
+
+            const quarterly = ((attendancePct * gradingSettings.attendance) / 100) + assignWS + (midtermTask ? ((Number(midAssign?.grade || 0) / maxMidtermScore) * 100 * midWeight) / 100 : (!midtermTask && finalTask ? ((Number(finAssign?.grade || 0) / maxFinalExamScore) * 100 * finalWeight) / 100 : 0));
+            row.push(quarterly.toFixed(2));
+            row.push(Math.round(quarterly));
+
+            exportData.push(row);
+          });
+
+          // Create worksheet
+          const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+          // Column widths (Student + ID + Attendance + RS/PS/WS, then tasks..., then totals)
+          const colWidths = [
+            { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+            ...assignmentTasks.map(() => ({ wch: 18 })),
+            { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, // total score/RS/PS/WS
+            { wch: 20 }, { wch: 10 }, { wch: 10 }, // midterm
+            { wch: 20 }, { wch: 10 }, { wch: 10 }, // final
+            { wch: 18 }, { wch: 12 } // quarterly/rounded
+          ];
+          ws['!cols'] = colWidths;
+
+          // Inject formulas for PS/WS and derived fields
+          const toCell = (r1, c0) => XLSX.utils.encode_cell({ r: r1 - 1, c: c0 });
+          const highestRowNumber = headerRowNumber + 1; // row with Highest Possible Score
+          const firstDataRow = headerRowNumber + 2; // first student row
+          const assignCount = assignmentTasks.length;
+          const COL_ATT_RS = 3;
+          const COL_ATT_PS = 4;
+          const COL_ATT_WS = 5;
+          const COL_AFTER_ASSIGN = 6 + assignCount;
+          const COL_AS_TOTAL = COL_AFTER_ASSIGN + 0;
+          const COL_AS_RS = COL_AFTER_ASSIGN + 1;
+          const COL_AS_PS = COL_AFTER_ASSIGN + 2;
+          const COL_AS_WS = COL_AFTER_ASSIGN + 3;
+          const COL_MID_DISPLAY = COL_AFTER_ASSIGN + 4;
+          const COL_MID_PS = COL_AFTER_ASSIGN + 5;
+          const COL_MID_WS = COL_AFTER_ASSIGN + 6;
+          const COL_FINAL_DISPLAY = COL_AFTER_ASSIGN + 7;
+          const COL_FINAL_PS = COL_AFTER_ASSIGN + 8;
+          const COL_FINAL_WS = COL_AFTER_ASSIGN + 9;
+          const COL_QUARTERLY = COL_AFTER_ASSIGN + 10;
+          const COL_ROUNDED = COL_AFTER_ASSIGN + 11;
+
+          // Highest row formulas
+          ws[toCell(highestRowNumber, COL_ATT_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_ATT_RS)}/${maxAttendanceScore})*100,2)` };
+          ws[toCell(highestRowNumber, COL_ATT_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_ATT_PS)}*${gradingSettings.attendance}/100,2)` };
+          ws[toCell(highestRowNumber, COL_AS_PS)] = { f: `IFERROR(ROUND((${toCell(highestRowNumber, COL_AS_RS)}/${toCell(highestRowNumber, COL_AS_TOTAL)})*100,2),0)` };
+          ws[toCell(highestRowNumber, COL_AS_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_AS_PS)}*${gradingSettings.activity}/100,2)` };
+          ws[toCell(highestRowNumber, COL_MID_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_MID_DISPLAY)}/${maxMidtermScore})*100,2)` };
+          ws[toCell(highestRowNumber, COL_MID_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_MID_PS)}*${'${'}midWeight{'}'}/100,2)` };
+          ws[toCell(highestRowNumber, COL_FINAL_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_FINAL_DISPLAY)}/${maxFinalExamScore})*100,2)` };
+          ws[toCell(highestRowNumber, COL_FINAL_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_FINAL_PS)}*${'${'}finalWeight{'}'}/100,2)` };
+          ws[toCell(highestRowNumber, COL_QUARTERLY)] = { f: `ROUND(${toCell(highestRowNumber, COL_ATT_WS)}+${toCell(highestRowNumber, COL_AS_WS)}+${toCell(highestRowNumber, COL_MID_WS)},2)` };
+          ws[toCell(highestRowNumber, COL_ROUNDED)] = { f: `ROUND(${toCell(highestRowNumber, COL_QUARTERLY)},0)` };
+
+          // Student rows formulas
+          const numStudents = students.length;
+          for (let i = 0; i < numStudents; i++) {
+            const r = firstDataRow + i;
+            ws[toCell(r, COL_ATT_PS)] = { f: `ROUND((${toCell(r, COL_ATT_RS)}/${maxAttendanceScore})*100,2)` };
+            ws[toCell(r, COL_ATT_WS)] = { f: `ROUND(${toCell(r, COL_ATT_PS)}*${gradingSettings.attendance}/100,2)` };
+            ws[toCell(r, COL_AS_PS)] = { f: `IFERROR(ROUND((${toCell(r, COL_AS_RS)}/${toCell(r, COL_AS_TOTAL)})*100,2),0)` };
+            ws[toCell(r, COL_AS_WS)] = { f: `ROUND(${toCell(r, COL_AS_PS)}*${gradingSettings.activity}/100,2)` };
+            ws[toCell(r, COL_MID_PS)] = { f: `IFERROR(ROUND(VALUE(LEFT(${toCell(r, COL_MID_DISPLAY)},FIND(" ",${toCell(r, COL_MID_DISPLAY)})-1))/${maxMidtermScore}*100,2),0)` };
+            ws[toCell(r, COL_MID_WS)] = { f: `ROUND(${toCell(r, COL_MID_PS)}*${'${'}midWeight{'}'}/100,2)` };
+            ws[toCell(r, COL_FINAL_PS)] = { f: `IFERROR(ROUND(VALUE(LEFT(${toCell(r, COL_FINAL_DISPLAY)},FIND("/",${toCell(r, COL_FINAL_DISPLAY)})-1))/${maxFinalExamScore}*100,2),0)` };
+            ws[toCell(r, COL_FINAL_WS)] = { f: `ROUND(${toCell(r, COL_FINAL_PS)}*${'${'}finalWeight{'}'}/100,2)` };
+            ws[toCell(r, COL_QUARTERLY)] = { f: `ROUND(${toCell(r, COL_ATT_WS)}+${toCell(r, COL_AS_WS)}+${toCell(r, COL_MID_WS)},2)` };
+            ws[toCell(r, COL_ROUNDED)] = { f: `ROUND(${toCell(r, COL_QUARTERLY)},0)` };
+          }
+
+          const sheetName = (gradesData.classroom?.title || cls.name || cls.code || 'Class').toString().slice(0, 31);
+          XLSX.utils.book_append_sheet(workbook, ws, sheetName || 'Class');
+        } catch (innerErr) {
+          console.error('Failed exporting class grades for', cls.code, innerErr);
+        }
+      }
+
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        alert('No grade data available to export.');
+        return;
+      }
+
+      const fileName = `SCMS_All_Class_Grades_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      alert('Grades exported successfully!');
+    } catch (err) {
+      console.error('Error exporting grades:', err);
+      alert('Error exporting grades. Please try again.');
+    } finally {
+      setExportingGrades(false);
+    }
+  };
+
+  const totalWeights = Number(weights.attendance||0) + Number(weights.activities||0) + Number(weights.major||0);
+  const canExport = totalWeights === 100 && !exportingGrades;
+
   return (
     <div>
       {/* <Header compact /> */}
@@ -490,6 +774,23 @@ const Classroom = () => {
                 >
                   <i className="ni ni-refresh mr-2"></i>
                   Refresh
+                </Button>
+                <Button
+                  color="success"
+                  size="lg"
+                  onClick={() => setShowExportModal(true)}
+                  disabled={loading || exportingGrades}
+                  style={{
+                    borderRadius: "12px",
+                    fontWeight: 600,
+                    fontSize: "1rem",
+                    padding: "12px 16px",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.1)"
+                  }}
+                  title="Export grades for all your classrooms"
+                >
+                  <i className="ni ni-chart-bar-32 mr-2"></i>
+                  {exportingGrades ? 'Exporting…' : 'Export Grades'}
                 </Button>
                 <Button 
                   color="primary" 
@@ -774,6 +1075,44 @@ const Classroom = () => {
               disabled={!form.subject || !form.section || !form.semester || !form.schoolYear || submittingForm}
             >
               {submittingForm ? <Spinner size="sm" /> : "Create Class"}
+            </Button>
+          </ModalFooter>
+        </Form>
+      </Modal>
+
+      {/* Export Settings Modal */}
+      <Modal isOpen={showExportModal} toggle={() => setShowExportModal(false)} size="md" centered>
+        <ModalHeader toggle={() => setShowExportModal(false)} style={{ border: 'none', paddingBottom: 0 }}>
+          <h4 className="mb-0">Export Grades</h4>
+        </ModalHeader>
+        <Form onSubmit={(e)=>{e.preventDefault(); localStorage.setItem('scms_export_weights', JSON.stringify(weights)); setShowExportModal(false); handleExportAllGrades(weights); }}>
+          <ModalBody>
+            <p className="text-muted">Customize the grading percentages used in the export. Total must be 100%.</p>
+            <FormGroup>
+              <Label for="exp_att">Attendance (%)</Label>
+              <Input id="exp_att" type="number" min="0" max="100" value={weights.attendance}
+                     onChange={(e)=>setWeights({...weights, attendance: parseInt(e.target.value)||0})} />
+            </FormGroup>
+            <FormGroup>
+              <Label for="exp_act">Assignments/Activities/Quiz/Exam (%)</Label>
+              <Input id="exp_act" type="number" min="0" max="100" value={weights.activities}
+                     onChange={(e)=>setWeights({...weights, activities: parseInt(e.target.value)||0})} />
+            </FormGroup>
+            <FormGroup>
+              <Label for="exp_major">Major Exam (combined Midterm + Final) (%)</Label>
+              <Input id="exp_major" type="number" min="0" max="100" value={weights.major}
+                     onChange={(e)=>setWeights({...weights, major: parseInt(e.target.value)||0})} />
+            </FormGroup>
+            <div className={`mt-2 ${totalWeights!==100?'text-danger':'text-success'}`}>
+              Total: <strong>{totalWeights}%</strong>
+            </div>
+          </ModalBody>
+          <ModalFooter style={{ border: 'none', paddingTop: 0 }}>
+            <Button color="secondary" onClick={()=>setShowExportModal(false)} style={{ borderRadius: 8 }}>
+              Cancel
+            </Button>
+            <Button color="success" type="submit" disabled={!canExport} style={{ borderRadius: 8 }}>
+              {exportingGrades ? <Spinner size="sm" /> : 'Export Now'}
             </Button>
           </ModalFooter>
         </Form>

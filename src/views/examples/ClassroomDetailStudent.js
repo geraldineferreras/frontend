@@ -1178,6 +1178,7 @@ const ClassroomDetailStudent = () => {
       setAssignmentsError(null);
       
       // First, fetch the student's enrolled classes to get the correct class codes
+      let selectedClassCode = null;
       apiService.getStudentClasses()
         .then(response => {
           console.log('Enrolled Classes Response:', response);
@@ -1188,23 +1189,43 @@ const ClassroomDetailStudent = () => {
             
             // Use the current class code from the URL parameter
             const classCode = currentClass ? currentClass.code : code;
+            selectedClassCode = classCode;
             console.log('Using class code:', classCode, 'from current class:', currentClass);
             
-            // Now fetch assignments for this class using API service
-            return apiService.get(`/tasks/student/assigned?class_code=${classCode}`);
+            // Now fetch assignments for this class using dedicated API service that includes grades
+            return apiService.getStudentAssignedTasks(classCode);
           } else {
             throw new Error('Invalid response format for enrolled classes');
           }
         })
-        .then(response => {
+        .then(async (response) => {
           console.log('Assignments API Response:', response);
           // Handle the nested data structure from your API
           if (response.status && response.data && Array.isArray(response.data)) {
             console.log('Setting assignments from response.data:', response.data);
-            setRealAssignments(response.data);
+            let base = response.data;
+            // Response already contains grade, submission_status, submission_id per task
+            // Normalize to include a submission-like object for uniform rendering
+            const normalized = (base || []).map((a) => {
+              if (a.grade !== undefined || a.submission_status) {
+                return {
+                  ...a,
+                  submission: {
+                    submission_id: a.submission_id,
+                    grade: a.grade !== undefined && a.grade !== null ? Number(a.grade) : null,
+                    status: a.submission_status,
+                    submitted_at: a.submitted_at,
+                    feedback: a.feedback,
+                  },
+                };
+              }
+              return a;
+            });
+            setRealAssignments(normalized);
           } else if (Array.isArray(response)) {
             console.log('Setting assignments from response array:', response);
-            setRealAssignments(response);
+            const base = response;
+            setRealAssignments(base);
           } else {
             console.log('No valid assignments data found, setting empty array');
             setRealAssignments([]);
@@ -2437,29 +2458,32 @@ const ClassroomDetailStudent = () => {
                           
                           <Badge style={{
                             background: (() => {
-                              // Check for submission status first
+                              // Determine status with QR-graded awareness
                               let status = 'pending';
+                              let grade = null;
                               if (assignment.submission) {
                                 status = assignment.submission.status || 'submitted';
+                                grade = assignment.submission.grade;
                               } else if (assignment.submission_status) {
                                 status = assignment.submission_status;
                               }
-                              
-                              const normalizedStatus = status.toLowerCase().trim();
+                              const normalizedStatus = (status || '').toLowerCase().trim();
+                              if (grade !== null && grade !== undefined) return '#d4edda';
                               if (normalizedStatus === 'graded') return '#d4edda'; // Green for graded
                               if (normalizedStatus === 'submitted') return '#d4edda'; // Green for submitted
                               return '#fff3cd'; // Yellow for pending
                             })(),
                             color: (() => {
-                              // Check for submission status first
                               let status = 'pending';
+                              let grade = null;
                               if (assignment.submission) {
                                 status = assignment.submission.status || 'submitted';
+                                grade = assignment.submission.grade;
                               } else if (assignment.submission_status) {
                                 status = assignment.submission_status;
                               }
-                              
-                              const normalizedStatus = status.toLowerCase().trim();
+                              const normalizedStatus = (status || '').toLowerCase().trim();
+                              if (grade !== null && grade !== undefined) return '#155724';
                               if (normalizedStatus === 'graded') return '#155724'; // Dark green for graded
                               if (normalizedStatus === 'submitted') return '#155724'; // Dark green for submitted
                               return '#856404'; // Dark yellow for pending
@@ -2470,15 +2494,16 @@ const ClassroomDetailStudent = () => {
                             fontWeight: 600
                           }}>
                             {(() => {
-                              // Check for submission status first
                               let status = 'pending';
+                              let grade = null;
                               if (assignment.submission) {
                                 status = assignment.submission.status || 'submitted';
+                                grade = assignment.submission.grade;
                               } else if (assignment.submission_status) {
                                 status = assignment.submission_status;
                               }
-                              
-                              const normalizedStatus = status.toLowerCase().trim();
+                              const normalizedStatus = (status || '').toLowerCase().trim();
+                              if (grade !== null && grade !== undefined) return `🏆 Graded • ${grade}/${assignment.points || assignment.max_points || assignment.total_points || 100}`;
                               if (normalizedStatus === 'graded') return '🏆 Graded';
                               if (normalizedStatus === 'submitted') return '✅ Submitted';
                               return '⏳ Pending';

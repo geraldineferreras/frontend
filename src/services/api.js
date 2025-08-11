@@ -2023,6 +2023,80 @@ class ApiService {
     });
   }
 
+  // QR Grading API
+  async qrQuickGrade({ taskId, studentId, score, feedback, classCode, attachments = [], qrData }) {
+    // If there are file attachments, send multipart/form-data
+    const hasFiles = Array.isArray(attachments) && attachments.some((a) => a && (a.file instanceof File));
+    if (hasFiles) {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+      const formData = new FormData();
+      if (taskId !== undefined && taskId !== null) formData.append('task_id', String(taskId));
+      // For QR grading, backend derives student/class from qr_data; send only grade and qr_data
+      if (score !== undefined) {
+        formData.append('grade', String(score));
+      }
+      if (feedback !== undefined && feedback !== null) formData.append('feedback', String(feedback));
+      attachments.forEach((att, idx) => {
+        if (att && att.file instanceof File) {
+          const key = idx === 0 ? 'attachment' : `attachment_${idx}`;
+          formData.append(key, att.file, att.name || att.file.name);
+        }
+      });
+      if (qrData !== undefined) formData.append('qr_data', String(qrData));
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+      try {
+        const response = await axios.post(`${API_BASE}/qr-grading/quick-grade`, formData, config);
+        return response.data;
+      } catch (error) {
+        const message = error.response?.data?.message || error.message || 'QR quick grade failed';
+        throw new Error(message);
+      }
+    }
+
+    // Otherwise, send JSON
+    const payload = {
+      task_id: taskId,
+      grade: Number(score),
+      feedback,
+      qr_data: qrData,
+    };
+    return this.makeRequest(`/qr-grading/quick-grade`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      requireAuth: true,
+    });
+  }
+
+  async qrBulkQuickGrade({ taskId, grades = [], classCode }) {
+    const payload = { task_id: taskId, class_code: classCode, grades };
+    return this.makeRequest(`/qr-grading/bulk-quick-grade`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      requireAuth: true,
+    });
+  }
+
+  async getClassQRCodes(classCode) {
+    return this.makeRequest(`/qr-grading/class-qr/${encodeURIComponent(classCode)}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  async getStudentQRCode(studentId) {
+    return this.makeRequest(`/qr-grading/student-qr/${encodeURIComponent(studentId)}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async getTaskComments(taskId) {
     return this.makeRequest(`/tasks/${taskId}/comments`, {
       method: 'GET',
@@ -2040,6 +2114,14 @@ class ApiService {
     const endpoint = `/tasks/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Fetch individually assigned tasks for a student including grade/status for a class
+  async getStudentAssignedTasks(classCode) {
+    return this.makeRequest(`/tasks/student/assigned?class_code=${encodeURIComponent(classCode)}`, {
       method: 'GET',
       requireAuth: true,
     });

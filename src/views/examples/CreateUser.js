@@ -341,6 +341,68 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
     setIsLoading(true);
     
     try {
+      // Resolve section_id if role is student and section is provided
+      let resolvedSectionId = '';
+      if (role === 'student' && section && section.trim()) {
+        const trimmed = section.trim();
+        const isNumeric = /^[0-9]+$/.test(trimmed);
+        if (isNumeric) {
+          resolvedSectionId = String(parseInt(trimmed, 10));
+        } else {
+          try {
+            // Build intended section_name like "BSIT 1Z"
+            const programToAbbr = {
+              'Associate in Computer Technology': 'ACT',
+              'Bachelor of Science in Information Technology': 'BSIT',
+              'Bachelor of Science in Information Systems': 'BSIS',
+              'Bachelor of Science in Computer Science': 'BSCS',
+            };
+            const abbr = programToAbbr[department] || (department ? department.substring(0, 4).toUpperCase() : '');
+            const yearNum = (year || '').toString().replace(/[^0-9]/g, '') || '';
+            const letter = trimmed.toUpperCase().slice(0, 1);
+            const desiredSectionName = yearNum ? `${abbr} ${yearNum}${letter}` : `${abbr} ${letter}`;
+
+            // Look up existing sections
+            const sectionsResp = await apiService.getSections();
+            const sectionsArr = sectionsResp?.data || sectionsResp || [];
+            const found = (sectionsArr || []).find((s) => {
+              const name = s.name || s.section_name || '';
+              return name.toLowerCase() === desiredSectionName.toLowerCase();
+            });
+
+            if (found) {
+              resolvedSectionId = String(found.id || found.section_id || '');
+            } else {
+              // Create the section automatically with sensible defaults
+              const payload = {
+                section_name: desiredSectionName,
+                program: department,
+                year_level: yearNum || (year || ''),
+                adviser_id: '',
+                semester: '1st',
+                academic_year: (() => {
+                  const now = new Date();
+                  const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1; // AY starts around June
+                  return `${startYear}-${startYear + 1}`;
+                })(),
+                student_ids: [],
+              };
+              try {
+                const createRes = await apiService.createSection(payload);
+                const createdId = createRes?.data?.id || createRes?.id || createRes?.section_id;
+                if (createdId) {
+                  resolvedSectionId = String(createdId);
+                }
+              } catch (createErr) {
+                console.warn('Auto-create section failed; proceeding without section assignment:', createErr);
+              }
+            }
+          } catch (secErr) {
+            console.warn('Section resolution failed; proceeding without section assignment:', secErr);
+          }
+        }
+      }
+
       // Create FormData to send images with user data
       const formData = new FormData();
       
@@ -360,9 +422,8 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
       } else if (role === 'student') {
         formData.append('program', department);
         formData.append('student_num', studentNumber);
-        if (section && section.trim()) {
-          formData.append('section_id', parseInt(section) || 1);
-        }
+        // Use the resolvedSectionId if available (existing or newly created)
+        formData.append('section_id', resolvedSectionId || '');
         formData.append('qr_code', qrData || `IDNo: ${studentNumber}\nFull Name: ${fullName}\nProgram: ${department}`);
       }
       

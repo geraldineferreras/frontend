@@ -438,6 +438,34 @@ const ClassroomDetail = () => {
     return `${siteBase}/uploads/profile/${pic}`;
   };
 
+  // Map frontend task type display values to backend API values
+  const mapTaskTypeToBackend = (frontendType) => {
+    const typeMapping = {
+      'Assignment': 'assignment',
+      'Quiz': 'quiz',
+      'Activity': 'activity',
+      'Project': 'project',
+      'Exam': 'exam',
+      'Midterm Exam': 'midterm_exam',
+      'Final Exam': 'final_exam'
+    };
+    return typeMapping[frontendType] || frontendType.toLowerCase();
+  };
+
+  // Map backend task type values to frontend display values
+  const mapTaskTypeToFrontend = (backendType) => {
+    const typeMapping = {
+      'assignment': 'Assignment',
+      'quiz': 'Quiz',
+      'activity': 'Activity',
+      'project': 'Project',
+      'exam': 'Exam',
+      'midterm_exam': 'Midterm Exam',
+      'final_exam': 'Final Exam'
+    };
+    return typeMapping[backendType] || backendType.charAt(0).toUpperCase() + backendType.slice(1);
+  };
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -523,14 +551,293 @@ const ClassroomDetail = () => {
   const [loadingScheduled, setLoadingScheduled] = useState(false);
   
   // Export functionality state
-  const [showExportModal, setShowExportModal] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [showWeightsModal, setShowWeightsModal] = useState(false);
   const [gradingBreakdown, setGradingBreakdown] = useState({
     attendance: 10,
     activity: 30,
-    assignment: 30,
-    majorExam: 30
+    assignment: 0,
+    midtermExam: 40,
+    finalExam: 20
   });
+  const [maxAttendanceScore, setMaxAttendanceScore] = useState(6);
+  const [maxMidtermScore, setMaxMidtermScore] = useState(68);
+  const [maxFinalExamScore, setMaxFinalExamScore] = useState(100);
+
+  // Compute attendance metrics based on weights:
+  // Present = 1, Excused = 1, Late = 0.7, Absent = 0
+  // Maximum possible score is customizable by teacher
+  const computeAttendanceMetrics = (attendance) => {
+    if (!attendance) {
+      return { rawScore: 0, maxPossibleScore: maxAttendanceScore, percentage: 0, weighted: 0 };
+    }
+    const presentSessions = Number(attendance.present_sessions || 0);
+    const excusedSessions = Number(attendance.excused_sessions || 0);
+    const lateSessions = Number(attendance.late_sessions || 0);
+    const absentSessions = Number(attendance.absent_sessions || 0);
+
+    const rawScore = presentSessions + excusedSessions + (lateSessions * 0.7);
+    const percentage = maxAttendanceScore > 0 ? (rawScore / maxAttendanceScore) * 100 : 0;
+    const weighted = (percentage * (gradingBreakdown.attendance || 0)) / 100;
+
+    return { rawScore, maxPossibleScore: maxAttendanceScore, percentage, weighted };
+  };
+
+  // Compute assignment metrics (RS, PS, WS) for all assignments combined
+  // Excludes midterm and final exams which are calculated separately
+  const computeAssignmentMetrics = (student) => {
+    if (!student.assignments || !gradesData.tasks) {
+      return { rawScore: 0, maxPossibleScore: 0, percentage: 0, weighted: 0 };
+    }
+
+    let totalRawScore = 0;
+    let totalMaxScore = 0;
+
+    // Sum up all assignment scores and max scores, excluding midterm and final exams
+    gradesData.tasks.forEach(task => {
+      // Skip midterm and final exams - they have their own separate calculations
+      if (task.type === 'midterm_exam' || 
+          task.type === 'final_exam' || 
+          task.title.toLowerCase().includes('midterm') ||
+          task.title.toLowerCase().includes('final')) {
+        return; // Skip this task
+      }
+
+      const assignment = student.assignments.find(a => a.task_id === task.task_id);
+      if (assignment) {
+        totalRawScore += parseFloat(assignment.grade || 0);
+        totalMaxScore += parseFloat(assignment.points || 0);
+      } else {
+        // If no assignment found, assume 0 score but still count the max points
+        totalMaxScore += parseFloat(task.points || 0);
+      }
+    });
+
+    const percentage = totalMaxScore > 0 ? (totalRawScore / totalMaxScore) * 100 : 0;
+    const weighted = (percentage * (gradingBreakdown.activity || 0)) / 100;
+
+    return { rawScore: totalRawScore, maxPossibleScore: totalMaxScore, percentage, weighted };
+  };
+
+  // Compute midterm exam metrics (RS, PS, WS) based on customizable highest possible score
+  const computeMidtermMetrics = (student) => {
+    if (!student.assignments || !gradesData.tasks) {
+      console.log('No assignments or tasks data available');
+      return { rawScore: 0, maxPossibleScore: 0, percentage: 0, weighted: 0 };
+    }
+    
+    console.log('Grades Data Tasks:', gradesData.tasks);
+    console.log('Student Assignments:', student.assignments);
+    console.log('Current maxMidtermScore state:', maxMidtermScore);
+    console.log('Current maxFinalExamScore state:', maxFinalExamScore);
+
+    // Find midterm exam task - check multiple criteria
+    const midtermTask = gradesData.tasks.find(task => 
+      task.type === 'midterm_exam' || 
+      task.type === 'midterm' ||
+      task.title.toLowerCase().includes('midterm') ||
+      task.title.toLowerCase().includes('mid term') ||
+      task.title.toLowerCase().includes('mid-term')
+    );
+
+    console.log('Found Midterm Task:', midtermTask);
+    console.log('All tasks:', gradesData.tasks.map(t => ({ 
+      id: t.task_id, 
+      type: t.type, 
+      title: t.title, 
+      points: t.points,
+      max_points: t.max_points,
+      total_points: t.total_points,
+      max_score: t.max_score
+    })));
+
+    if (!midtermTask) {
+      console.log('No midterm task found, using state variable as fallback');
+      // If no midterm task found, use the state variable as fallback
+      return { 
+        rawScore: 0, 
+        maxPossibleScore: maxMidtermScore, 
+        percentage: 0, 
+        weighted: 0,
+        hasTask: false,
+        hasSubmission: false
+      };
+    }
+
+    // Find student's midterm assignment
+    const midtermAssignment = student.assignments.find(a => a.task_id === midtermTask.task_id);
+    
+    // Try different possible field names for the grade
+    const rawScore = midtermAssignment ? parseFloat(
+      midtermAssignment.grade || 
+      midtermAssignment.score || 
+      midtermAssignment.raw_score || 
+      0
+    ) : 0;
+    
+    console.log('Midterm Assignment:', midtermAssignment);
+    console.log('Raw Score from assignment:', rawScore);
+    
+    // Use the state variable as primary source, then check task points as fallback
+    // This ensures the modal input values are always used first
+    let maxPossibleScore = maxMidtermScore;
+    
+    // Only use task points if they are explicitly set and different from defaults
+    const taskPoints = parseFloat(
+      midtermTask.points || 
+      midtermTask.max_points || 
+      midtermTask.total_points || 
+      midtermTask.max_score || 
+      0
+    );
+    
+    // If task has specific points set (and it's not a default value), use those instead
+    if (taskPoints > 0 && taskPoints !== 100 && taskPoints !== maxMidtermScore) {
+      console.log('Using task-specific points:', taskPoints);
+      maxPossibleScore = taskPoints;
+    } else {
+      console.log('Using state variable from modal:', maxMidtermScore);
+    }
+    
+    // Debug logging to verify the values
+    console.log('Midterm Task:', midtermTask);
+    console.log('Raw Score:', rawScore);
+    console.log('Max Possible Score:', maxPossibleScore);
+    console.log('Grading Breakdown Midterm:', gradingBreakdown.midtermExam);
+    console.log('Task points field:', midtermTask.points);
+    console.log('Task max_points field:', midtermTask.max_points);
+    console.log('Task total_points field:', midtermTask.total_points);
+    
+    // PS = (Midterm_RS / Highest_Possible_Score) * 100
+    // Example: (51 / 68) * 100 = 75.00
+    const percentage = maxPossibleScore > 0 ? (rawScore / maxPossibleScore) * 100 : 0;
+    
+    // WS = PS * Weight (in decimal form)
+    // Example: 75.00 * 0.40 = 30.00
+    const weighted = (percentage * (gradingBreakdown.midtermExam || 0)) / 100;
+    
+    console.log('Calculated Percentage:', percentage);
+    console.log('Calculated Weighted Score:', weighted);
+    
+        // If maxPossibleScore is 0, fall back to a default or show error
+    if (maxPossibleScore === 0) {
+      console.warn('Warning: Max possible score is 0 for midterm task. Using fallback value.');
+      // You can set a default value here if needed
+      // const fallbackMaxScore = 100; // or any other default
+    }
+    
+    // Final verification of the calculation
+    console.log('Final Calculation Summary:');
+    console.log(`Raw Score: ${rawScore}`);
+    console.log(`Max Possible Score: ${maxPossibleScore}`);
+    console.log(`Percentage: (${rawScore} / ${maxPossibleScore}) * 100 = ${percentage}%`);
+    console.log(`Weight: ${gradingBreakdown.midtermExam}%`);
+    console.log(`Weighted Score: ${percentage}% * ${gradingBreakdown.midtermExam}% = ${weighted}`);
+    
+    return { 
+      rawScore, 
+      maxPossibleScore, 
+      percentage, 
+      weighted,
+      hasTask: !!midtermTask,
+      hasSubmission: !!midtermAssignment
+    };
+  };
+
+  // Compute quarterly grade by summing weighted scores (Attendance + Activity + Midterm only)
+  const computeQuarterlyGrade = (student) => {
+    const attendanceMetrics = computeAttendanceMetrics(student.attendance);
+    const assignmentMetrics = computeAssignmentMetrics(student);
+    const midtermMetrics = computeMidtermMetrics(student);
+
+    // Debug logging
+    console.log(`Student: ${student.full_name}`);
+    console.log(`Attendance WS: ${attendanceMetrics.weighted}`);
+    console.log(`Assignment/Activity WS: ${assignmentMetrics.weighted}`);
+    console.log(`Midterm WS: ${midtermMetrics.weighted}`);
+
+    // Sum weighted scores (exclude Final Exam for quarterly grade)
+    // Ensure we're working with numbers and handle any potential null/undefined values
+    const attendanceWS = Number(attendanceMetrics.weighted) || 0;
+    const activityWS = Number(assignmentMetrics.weighted) || 0;
+    const midtermWS = Number(midtermMetrics.weighted) || 0;
+    
+    const totalWeightedScore = attendanceWS + activityWS + midtermWS;
+
+    console.log(`Total: ${attendanceWS} + ${activityWS} + ${midtermWS} = ${totalWeightedScore}`);
+
+    const roundedGrade = Math.round(totalWeightedScore);
+
+    return {
+      exact: totalWeightedScore,
+      rounded: roundedGrade
+    };
+  };
+
+  // Compute final exam metrics (RS, PS, WS) based on customizable highest possible score
+  const computeFinalExamMetrics = (student) => {
+    if (!student.assignments || !gradesData.tasks) {
+      return { rawScore: 0, maxPossibleScore: 0, percentage: 0, weighted: 0 };
+    }
+
+    // Find final exam task - check multiple criteria
+    const finalExamTask = gradesData.tasks.find(task => 
+      task.type === 'final_exam' || 
+      task.type === 'final' ||
+      task.title.toLowerCase().includes('final') ||
+      task.title.toLowerCase().includes('final exam') ||
+      task.title.toLowerCase().includes('final-exam')
+    );
+
+    if (!finalExamTask) {
+      // If no final exam task found, use the state variable as fallback
+      return { 
+        rawScore: 0, 
+        maxPossibleScore: maxFinalExamScore, 
+        percentage: 0, 
+        weighted: 0,
+        hasTask: false,
+        hasSubmission: false
+      };
+    }
+
+    // Find student's final exam assignment
+    const finalExamAssignment = student.assignments.find(a => a.task_id === finalExamTask.task_id);
+    
+    const rawScore = finalExamAssignment ? parseFloat(finalExamAssignment.grade || 0) : 0;
+    
+    // Use the state variable as primary source, then check task points as fallback
+    // This ensures the modal input values are always used first
+    let maxPossibleScore = maxFinalExamScore;
+    
+    // Only use task points if they are explicitly set and different from defaults
+    const taskPoints = parseFloat(finalExamTask.points || 0);
+    
+    // If task has specific points set (and it's not a default value), use those instead
+    if (taskPoints > 0 && taskPoints !== 100 && taskPoints !== maxFinalExamScore) {
+      console.log('Using final exam task-specific points:', taskPoints);
+      maxPossibleScore = taskPoints;
+    } else {
+      console.log('Using final exam state variable from modal:', maxFinalExamScore);
+    }
+    
+    // PS = (FinalExam_RS / Highest_Possible_Score) * 100
+    // Example: (51 / 68) * 100 = 75.00
+    const percentage = maxPossibleScore > 0 ? (rawScore / maxPossibleScore) * 100 : 0;
+    
+    // WS = PS * Weight (in decimal form)
+    // Example: 75.00 * 0.40 = 30.00
+    const weighted = (percentage * (gradingBreakdown.finalExam || 0)) / 100;
+
+    return { 
+      rawScore, 
+      maxPossibleScore, 
+      percentage, 
+      weighted,
+      hasTask: !!finalExamTask,
+      hasSubmission: !!finalExamAssignment
+    };
+  };
 
   // Save students to localStorage whenever they change
   useEffect(() => {
@@ -846,7 +1153,6 @@ const ClassroomDetail = () => {
       setClassrooms([]);
     }
   }, []);
-
   // Load tasks from API for current classroom
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [taskError, setTaskError] = useState(null);
@@ -3141,7 +3447,6 @@ useEffect(() => {
       })));
     }
   };
-
   // Add state for cropping modal
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropImage, setCropImage] = useState(null);
@@ -3571,32 +3876,88 @@ useEffect(() => {
       exportData.push(['Attendance:', `${gradingBreakdown.attendance}%`]);
       exportData.push(['Activity:', `${gradingBreakdown.activity}%`]);
       exportData.push(['Assignment/Quiz:', `${gradingBreakdown.assignment}%`]);
-      exportData.push(['Major Exam:', `${gradingBreakdown.majorExam}%`]);
+      exportData.push(['Midterm Exam:', `${gradingBreakdown.midtermExam}%`]);
+      exportData.push(['Final Exam:', `${gradingBreakdown.finalExam}%`]);
       exportData.push(['Total:', '100%']);
       exportData.push(['']);
       
       // Create headers for the table
-      const headers = ['Student Name', 'Student ID', 'Attendance'];
+      const headers = ['Student Name', 'Student ID', 'Attendance', 'RS', 'PS', 'WS'];
       
-      // Add assignment headers
-      gradesData.tasks?.forEach(task => {
+      // Collect assignment tasks once to know column counts
+      const assignmentTasks = gradesData.tasks?.filter(task => 
+        task.type !== 'midterm_exam' && 
+        task.type !== 'final_exam' && 
+        !task.title.toLowerCase().includes('midterm') &&
+        !task.title.toLowerCase().includes('final')
+      ) || [];
+      
+      // Add assignment headers (exclude midterm and final exams)
+      assignmentTasks.forEach(task => {
         headers.push(task.title);
       });
       
-      headers.push('Total Points', 'Average Grade', 'Final Grade');
+      headers.push('Total Score', 'RS', 'PS', 'WS', 'Midterm', 'PS', 'WS', 'Final Exam', 'PS', 'WS', 'Quarterly Grade', 'Rounded Grade');
       
       exportData.push(headers);
+      // Keep track of the header row index (1-based in Excel)
+      const headerRowNumber = exportData.length; 
+      
+      // Highest Possible Score row (inserted after headers)
+      const getPoints = (t) => parseFloat(t?.points || t?.max_points || t?.total_points || t?.max_score || 0) || 0;
+      const assignmentMaxPoints = assignmentTasks.map(getPoints);
+      const totalAssignmentMax = assignmentMaxPoints.reduce((acc, v) => acc + v, 0);
+
+      const allTasks = gradesData.tasks || [];
+      const midtermTask = allTasks.find(t => t.type === 'midterm_exam' || t.type === 'midterm' || (t.title||'').toLowerCase().includes('midterm') || (t.title||'').toLowerCase().includes('mid term') || (t.title||'').toLowerCase().includes('mid-term'));
+      const finalTask = allTasks.find(t => t.type === 'final_exam' || t.type === 'final' || (t.title||'').toLowerCase().includes('final exam') || (t.title||'').toLowerCase().includes('final-exam') || (t.title||'').toLowerCase().includes('final'));
+      const midtermMax = (() => { const p = getPoints(midtermTask); return p > 0 ? p : maxMidtermScore; })();
+      const finalMax = (() => { const p = getPoints(finalTask); return p > 0 ? p : maxFinalExamScore; })();
+      const majorWeight = (Number(gradingBreakdown.midtermExam)||0) + (Number(gradingBreakdown.finalExam)||0);
+
+      const highestRow = [];
+      highestRow.push('Highest Possible Score'); // Student Name
+      highestRow.push(''); // Student ID
+      highestRow.push(`${maxAttendanceScore}/${maxAttendanceScore}`); // Attendance display
+      highestRow.push(maxAttendanceScore); // RS (attendance)
+      highestRow.push(''); // PS (formula later)
+      highestRow.push(''); // WS (formula later)
+      // Per-assignment columns: show each max
+      assignmentTasks.forEach(task => { highestRow.push(getPoints(task)); });
+      // Totals & activity columns
+      highestRow.push(totalAssignmentMax); // Total Score
+      highestRow.push(totalAssignmentMax); // RS equals total
+      highestRow.push(''); // PS formula
+      highestRow.push(''); // WS formula
+      // Midterm
+      highestRow.push(midtermMax); // display
+      highestRow.push(''); // PS
+      highestRow.push(''); // WS
+      // Final
+      highestRow.push(finalMax); // display
+      highestRow.push(''); // PS
+      highestRow.push(''); // WS
+      // Quarterly + Rounded
+      highestRow.push('');
+      highestRow.push('');
+
+      exportData.push(highestRow);
       
       // Add student data
       gradesData.students?.forEach(student => {
         const row = [
           student.student_name,
           student.student_num,
-          student.attendance ? `${student.attendance.total_earned_score}/${student.attendance.max_possible_total} (${student.attendance.attendance_percentage}%)` : 'N/A'
+          student.attendance ? `${computeAttendanceMetrics(student.attendance).rawScore.toFixed(1)}/${maxAttendanceScore} (${computeAttendanceMetrics(student.attendance).percentage.toFixed(1)}%)` : 'N/A'
         ];
+        // Compute RS/PS/WS for export
+        const m = computeAttendanceMetrics(student.attendance);
+        row.push(m.rawScore.toFixed(2));
+        row.push(`${m.percentage.toFixed(2)}%`);
+        row.push(m.weighted.toFixed(2));
         
-        // Add assignment scores
-        gradesData.tasks?.forEach(task => {
+        // Add assignment scores (exclude midterm and final exams)
+        assignmentTasks.forEach(task => {
           const assignment = student.assignments?.find(a => a.task_id === task.task_id);
           if (assignment) {
             row.push(`${assignment.grade}/${assignment.points} (${assignment.grade_percentage}%)`);
@@ -3605,18 +3966,41 @@ useEffect(() => {
           }
         });
         
-        // Add totals and calculated grades
-        row.push(`${student.total_earned}/${student.total_points}`);
-        row.push(`${student.average_grade}%`);
+        // Add Total Score/RS/PS/WS for export
+        const assignmentMetrics = computeAssignmentMetrics(student);
+        row.push(assignmentMetrics.maxPossibleScore);
+        row.push(assignmentMetrics.rawScore.toFixed(2));
+        row.push(`${assignmentMetrics.percentage.toFixed(2)}%`);
+        row.push(assignmentMetrics.weighted.toFixed(2));
         
-        // Calculate final grade based on custom breakdown
-        const attendanceScore = student.attendance ? (student.attendance.attendance_percentage / 100) * gradingBreakdown.attendance : 0;
-        const activityScore = (student.average_grade / 100) * gradingBreakdown.activity;
-        const assignmentScore = (student.average_grade / 100) * gradingBreakdown.assignment;
-        const examScore = (student.average_grade / 100) * gradingBreakdown.majorExam;
+        // Add Midterm RS/PS/WS for export
+        const midtermMetrics = computeMidtermMetrics(student);
+        if (midtermMetrics.hasTask) {
+          row.push(`${midtermMetrics.rawScore.toFixed(1)} (${midtermMetrics.percentage.toFixed(1)}%)`);
+          row.push(`${midtermMetrics.percentage.toFixed(2)}%`);
+          row.push(midtermMetrics.weighted.toFixed(2));
+        } else {
+          row.push('No Midterm Task');
+          row.push('-');
+          row.push('-');
+        }
         
-        const finalGrade = Math.round(attendanceScore + activityScore + assignmentScore + examScore);
-        row.push(`${finalGrade}%`);
+        // Add Final Exam RS/PS/WS for export
+        const finalExamMetrics = computeFinalExamMetrics(student);
+        if (finalExamMetrics.hasTask) {
+          row.push(`${finalExamMetrics.rawScore.toFixed(1)}/${finalExamMetrics.maxPossibleScore} (${finalExamMetrics.percentage.toFixed(1)}%)`);
+          row.push(`${finalExamMetrics.percentage.toFixed(2)}%`);
+          row.push(finalExamMetrics.weighted.toFixed(2));
+        } else {
+          row.push('No Final Exam Task');
+          row.push('-');
+          row.push('-');
+        }
+        
+        // Add Quarterly Grade (exact and rounded)
+        const quarterlyGrade = computeQuarterlyGrade(student);
+        row.push(quarterlyGrade.exact.toFixed(2));
+        row.push(quarterlyGrade.rounded);
         
         exportData.push(row);
       });
@@ -3629,16 +4013,94 @@ useEffect(() => {
         { wch: 25 }, // Student Name
         { wch: 15 }, // Student ID
         { wch: 20 }, // Attendance
+        { wch: 10 }, // RS
+        { wch: 10 }, // PS
+        { wch: 10 }, // WS
       ];
       
-      // Add widths for assignments
-      gradesData.tasks?.forEach(() => {
+      // Add widths for assignments (exclude midterm and final exams)
+      gradesData.tasks?.filter(task => 
+        task.type !== 'midterm_exam' && 
+        task.type !== 'final_exam' && 
+        !task.title.toLowerCase().includes('midterm') &&
+        !task.title.toLowerCase().includes('final')
+      ).forEach(() => {
         colWidths.push({ wch: 18 });
       });
       
-      colWidths.push({ wch: 15 }, { wch: 15 }, { wch: 15 }); // Total, Average, Final
+      colWidths.push({ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 12 }); // Total Score, RS, PS, WS, Midterm RS, PS, WS, Final Exam RS, PS, WS, Quarterly Grade, Rounded Grade
       
       ws['!cols'] = colWidths;
+
+      // Inject formulas into PS/WS and Quarterly Grade columns
+      const toCell = (r1, c0) => XLSX.utils.encode_cell({ r: r1 - 1, c: c0 });
+      const highestRowNumber = headerRowNumber + 1; // row with Highest Possible Score
+      const firstDataRow = headerRowNumber + 2; // first student row (1-based)
+      const numStudents = gradesData.students ? gradesData.students.length : 0;
+      const assignCount = assignmentTasks.length;
+      
+      // Column indices (0-based)
+      const COL_ATT_RS = 3;
+      const COL_ATT_PS = 4;
+      const COL_ATT_WS = 5;
+      const COL_AFTER_ASSIGN = 6 + assignCount;
+      const COL_AS_TOTAL = COL_AFTER_ASSIGN + 0;
+      const COL_AS_RS = COL_AFTER_ASSIGN + 1;
+      const COL_AS_PS = COL_AFTER_ASSIGN + 2;
+      const COL_AS_WS = COL_AFTER_ASSIGN + 3;
+      const COL_MID_DISPLAY = COL_AFTER_ASSIGN + 4;
+      const COL_MID_PS = COL_AFTER_ASSIGN + 5;
+      const COL_MID_WS = COL_AFTER_ASSIGN + 6;
+      const COL_FINAL_DISPLAY = COL_AFTER_ASSIGN + 7;
+      const COL_FINAL_PS = COL_AFTER_ASSIGN + 8;
+      const COL_FINAL_WS = COL_AFTER_ASSIGN + 9;
+      const COL_QUARTERLY = COL_AFTER_ASSIGN + 10;
+      const COL_ROUNDED = COL_AFTER_ASSIGN + 11;
+
+      // Inject formulas for Highest Possible Score row
+      // Attendance PS and WS
+      ws[toCell(highestRowNumber, COL_ATT_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_ATT_RS)}/${maxAttendanceScore})*100,2)` };
+      ws[toCell(highestRowNumber, COL_ATT_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_ATT_PS)}*${gradingBreakdown.attendance}/100,2)` };
+      // Assignments PS and WS
+      ws[toCell(highestRowNumber, COL_AS_PS)] = { f: `IFERROR(ROUND((${toCell(highestRowNumber, COL_AS_RS)}/${toCell(highestRowNumber, COL_AS_TOTAL)})*100,2),0)` };
+      ws[toCell(highestRowNumber, COL_AS_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_AS_PS)}*${gradingBreakdown.activity}/100,2)` };
+      // Midterm PS/WS
+      ws[toCell(highestRowNumber, COL_MID_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_MID_DISPLAY)}/${midtermMax})*100,2)` };
+      ws[toCell(highestRowNumber, COL_MID_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_MID_PS)}*${majorWeight}/100,2)` };
+      // Final PS/WS
+      ws[toCell(highestRowNumber, COL_FINAL_PS)] = { f: `ROUND((${toCell(highestRowNumber, COL_FINAL_DISPLAY)}/${finalMax})*100,2)` };
+      ws[toCell(highestRowNumber, COL_FINAL_WS)] = { f: `ROUND(${toCell(highestRowNumber, COL_FINAL_PS)}*${majorWeight}/100,2)` };
+      // Quarterly and Rounded
+      ws[toCell(highestRowNumber, COL_QUARTERLY)] = { f: `ROUND(${toCell(highestRowNumber, COL_ATT_WS)}+${toCell(highestRowNumber, COL_AS_WS)}+${toCell(highestRowNumber, COL_MID_WS)},2)` };
+      ws[toCell(highestRowNumber, COL_ROUNDED)] = { f: `ROUND(${toCell(highestRowNumber, COL_QUARTERLY)},0)` };
+
+      for (let i = 0; i < numStudents; i++) {
+        const r = firstDataRow + i;
+        // Attendance PS = (RS / maxAttendanceScore) * 100
+        ws[toCell(r, COL_ATT_PS)] = { f: `ROUND((${toCell(r, COL_ATT_RS)}/${maxAttendanceScore})*100,2)` };
+        // Attendance WS = PS * weight
+        ws[toCell(r, COL_ATT_WS)] = { f: `ROUND(${toCell(r, COL_ATT_PS)}*${gradingBreakdown.attendance}/100,2)` };
+
+        // Assignments PS = (RS / Total) * 100
+        ws[toCell(r, COL_AS_PS)] = { f: `IFERROR(ROUND((${toCell(r, COL_AS_RS)}/${toCell(r, COL_AS_TOTAL)})*100,2),0)` };
+        // Assignments WS = PS * weight
+        ws[toCell(r, COL_AS_WS)] = { f: `ROUND(${toCell(r, COL_AS_PS)}*${gradingBreakdown.activity}/100,2)` };
+
+        // Midterm PS from display cell text: "<RS> (<%>)"
+        ws[toCell(r, COL_MID_PS)] = { f: `IFERROR(ROUND(VALUE(LEFT(${toCell(r, COL_MID_DISPLAY)},FIND(" ",${toCell(r, COL_MID_DISPLAY)})-1))/${maxMidtermScore}*100,2),0)` };
+        // Midterm WS
+        ws[toCell(r, COL_MID_WS)] = { f: `ROUND(${toCell(r, COL_MID_PS)}*${gradingBreakdown.midtermExam}/100,2)` };
+
+        // Final Exam PS from display cell text
+        ws[toCell(r, COL_FINAL_PS)] = { f: `IFERROR(ROUND(VALUE(LEFT(${toCell(r, COL_FINAL_DISPLAY)},FIND("/",${toCell(r, COL_FINAL_DISPLAY)})-1))/${maxFinalExamScore}*100,2),0)` };
+        // Final Exam WS
+        ws[toCell(r, COL_FINAL_WS)] = { f: `ROUND(${toCell(r, COL_FINAL_PS)}*${gradingBreakdown.finalExam}/100,2)` };
+
+        // Quarterly Grade = Attendance WS + Assignments WS + Midterm WS
+        ws[toCell(r, COL_QUARTERLY)] = { f: `ROUND(${toCell(r, COL_ATT_WS)}+${toCell(r, COL_AS_WS)}+${toCell(r, COL_MID_WS)},2)` };
+        // Rounded Grade
+        ws[toCell(r, COL_ROUNDED)] = { f: `ROUND(${toCell(r, COL_QUARTERLY)},0)` };
+      }
       
       // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Grades');
@@ -3648,8 +4110,6 @@ useEffect(() => {
       
       // Save file
       XLSX.writeFile(wb, fileName);
-      
-      setShowExportModal(false);
       alert('Grades exported successfully!');
       
     } catch (error) {
@@ -3739,7 +4199,7 @@ useEffect(() => {
       // Prepare task data with student assignment fields
       const taskData = {
         title: taskForm.title.trim(),
-        type: taskForm.type.toLowerCase(),
+        type: mapTaskTypeToBackend(taskForm.type),
         points: parseInt(taskForm.points),
         instructions: taskForm.text.trim(),
         class_codes: classCodes, // Use all selected classroom codes
@@ -3759,6 +4219,10 @@ useEffect(() => {
           };
         }) : []
       };
+      
+      console.log('🐛 DEBUG - Creating task with data:', taskData);
+      console.log('🐛 DEBUG - Original taskForm.type:', taskForm.type);
+      console.log('🐛 DEBUG - Mapped type:', mapTaskTypeToBackend(taskForm.type));
       
       // Enhanced task creation with multiple files and external links
       let response;
@@ -3858,7 +4322,6 @@ useEffect(() => {
       setTaskPostLoading(false);
     }
   };
-
   const handleSaveTaskDraft = async () => {
     setTaskForm(prev => ({ ...prev, submitted: true }));
     if (!taskForm.title.trim() || !taskForm.points || !taskForm.text.trim()) {
@@ -3869,7 +4332,7 @@ useEffect(() => {
       // Prepare the API payload
       const taskData = {
         title: taskForm.title.trim(),
-        type: taskForm.type.toLowerCase(),
+        type: mapTaskTypeToBackend(taskForm.type),
         points: parseInt(taskForm.points),
         instructions: taskForm.text.trim(),
         class_codes: taskForm.postToClassrooms && taskForm.postToClassrooms.length > 0 
@@ -3892,7 +4355,9 @@ useEffect(() => {
         due_date: formatDueDate(taskForm.dueDate)
       };
 
-
+      console.log('🐛 DEBUG - Creating draft task with data:', taskData);
+      console.log('🐛 DEBUG - Original taskForm.type:', taskForm.type);
+      console.log('🐛 DEBUG - Mapped type:', mapTaskTypeToBackend(taskForm.type));
       
       // Validate required data
       if (!code) {
@@ -4019,7 +4484,7 @@ useEffect(() => {
       // Prepare the API payload
       const taskData = {
         title: taskForm.title.trim(),
-        type: taskForm.type.toLowerCase(),
+        type: mapTaskTypeToBackend(taskForm.type),
         points: parseInt(taskForm.points),
         instructions: taskForm.text.trim(),
         class_codes: taskForm.postToClassrooms && taskForm.postToClassrooms.length > 0 
@@ -4304,7 +4769,7 @@ useEffect(() => {
       
       // Populate the edit form with task data
       setEditTaskForm({
-        type: task.type || 'Assignment',
+        type: mapTaskTypeToFrontend(task.type) || 'Assignment',
         title: task.title || '',
         text: task.instructions || task.text || '',
         dueDate: formattedDueDate,
@@ -4372,7 +4837,7 @@ useEffect(() => {
 
       const taskData = {
         title: editTaskForm.title.trim(),
-        type: editTaskForm.type.toLowerCase(),
+        type: mapTaskTypeToBackend(editTaskForm.type),
         points: parseInt(editTaskForm.points),
         instructions: editTaskForm.text.trim(),
         class_codes: classCodes,
@@ -4648,7 +5113,6 @@ useEffect(() => {
 
   // Add this at the top of the ClassroomDetail component, before the return statement
   console.log('Top-level editingComment state:', editingComment);
-
   return (
     <div>
       <Header compact />
@@ -6899,6 +7363,8 @@ useEffect(() => {
                             <option value="Activity">Activity</option>
                             <option value="Project">Project</option>
                             <option value="Exam">Exam</option>
+                            <option value="Midterm Exam">Midterm Exam</option>
+                            <option value="Final Exam">Final Exam</option>
                           </select>
                         </div>
 
@@ -7464,7 +7930,7 @@ useEffect(() => {
                               )}
                             </div>
                             <div style={{ fontSize: 13, color: '#8898AA' }}>
-                              {task.type} • {task.points} pts • Due {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
+                              {mapTaskTypeToFrontend(task.type)} • {task.points} pts • Due {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
                             </div>
                           </div>
                           {task.allowComments && taskCommentsOpen[task.id] && (
@@ -7793,14 +8259,25 @@ useEffect(() => {
                     {/* Students Grades Table */}
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <h4 className="mb-0">Student Grades</h4>
-                      <Button 
-                        color="success" 
-                        size="sm" 
-                        style={{ borderRadius: "8px" }} 
-                        onClick={() => setShowExportModal(true)}
-                      >
-                        <i className="ni ni-chart-bar-32 mr-1"></i> Export Grades
-                      </Button>
+                      <div>
+                        <Button 
+                          color="secondary" 
+                          size="sm" 
+                          style={{ borderRadius: "8px", marginRight: 8 }} 
+                          onClick={() => setShowWeightsModal(true)}
+                        >
+                          <i className="ni ni-settings-gear-65 mr-1"></i> Edit Grading %
+                        </Button>
+                        <Button 
+                          color="success" 
+                          size="sm" 
+                          style={{ borderRadius: "8px" }} 
+                          onClick={handleExportGrades}
+                          disabled={exportLoading}
+                        >
+                          <i className="ni ni-chart-bar-32 mr-1"></i> Export Grades
+                        </Button>
+                      </div>
                     </div>
                     
                     <Table responsive>
@@ -7808,15 +8285,104 @@ useEffect(() => {
                         <tr>
                           <th>Student</th>
                           <th>Attendance</th>
-                          {gradesData.tasks?.map(task => (
+                          <th>RS</th>
+                          <th>PS</th>
+                          <th>WS</th>
+                          {gradesData.tasks?.filter(task => 
+                            task.type !== 'midterm_exam' && 
+                            task.type !== 'final_exam' && 
+                            !task.title.toLowerCase().includes('midterm') &&
+                            !task.title.toLowerCase().includes('final')
+                          ).map(task => (
                             <th key={task.task_id}>{task.title}</th>
                           ))}
-                          <th>Total Points</th>
-                          <th>Average</th>
+                          <th>Total Score</th>
+                          <th>RS</th>
+                          <th>PS</th>
+                          <th>WS</th>
+                          <th>Midterm</th>
+                          <th>PS</th>
+                          <th>WS</th>
+                          <th>Final Exam</th>
+                          <th>PS</th>
+                          <th>WS</th>
+                          <th>Quarterly Grade</th>
+                          <th>Rounded</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
+                        {(() => {
+                          const tasks = gradesData.tasks || [];
+                          const nonExamTasks = tasks.filter(task => 
+                            task.type !== 'midterm_exam' && 
+                            task.type !== 'final_exam' && 
+                            !(task.title || '').toLowerCase().includes('midterm') &&
+                            !(task.title || '').toLowerCase().includes('final')
+                          );
+
+                          const getPoints = (t) => parseFloat(t?.points || t?.max_points || t?.total_points || t?.max_score || 0) || 0;
+                          const assignmentMaxPoints = nonExamTasks.map(getPoints);
+                          const totalAssignmentMax = assignmentMaxPoints.reduce((acc, v) => acc + v, 0);
+
+                          const midtermTask = tasks.find(task => 
+                            task.type === 'midterm_exam' || 
+                            task.type === 'midterm' ||
+                            (task.title || '').toLowerCase().includes('midterm') ||
+                            (task.title || '').toLowerCase().includes('mid term') ||
+                            (task.title || '').toLowerCase().includes('mid-term')
+                          );
+                          const finalTask = tasks.find(task => 
+                            task.type === 'final_exam' || 
+                            task.type === 'final' ||
+                            (task.title || '').toLowerCase().includes('final exam') ||
+                            (task.title || '').toLowerCase().includes('final-exam') ||
+                            (task.title || '').toLowerCase().includes('final')
+                          );
+
+                          const midtermMax = (() => { const p = getPoints(midtermTask); return p > 0 ? p : maxMidtermScore; })();
+                          const finalMax = (() => { const p = getPoints(finalTask); return p > 0 ? p : maxFinalExamScore; })();
+
+                          const majorWeight = (Number(gradingBreakdown.midtermExam)||0) + (Number(gradingBreakdown.finalExam)||0);
+                          const quarterlyMaxExact = (Number(gradingBreakdown.attendance)||0) + (Number(gradingBreakdown.activity)||0) + majorWeight;
+                          const quarterlyMaxRounded = Math.round(quarterlyMaxExact);
+
+                          return (
+                            <tr key="highest-possible" style={{ background: '#fffbea' }}>
+                              <td className="font-weight-bold">Highest Possible Score</td>
+                              <td>
+                                <div>
+                                  <div className="font-weight-bold">{maxAttendanceScore}/{maxAttendanceScore}</div>
+                                  <small className="text-muted">100%</small>
+                                </div>
+                              </td>
+                              <td>{Number(maxAttendanceScore).toFixed(2)}</td>
+                              <td>100.00%</td>
+                              <td>{Number(gradingBreakdown.attendance || 0).toFixed(2)}</td>
+                              {nonExamTasks.map(task => {
+                                const pts = getPoints(task);
+                                return (
+                                  <td key={`max-${task.task_id}`}>
+                                    <div className="font-weight-bold">{pts}/{pts}</div>
+                                  </td>
+                                );
+                              })}
+                              <td className="font-weight-bold text-primary">{totalAssignmentMax}</td>
+                              <td className="font-weight-bold text-success">{totalAssignmentMax.toFixed(2)}</td>
+                              <td className="font-weight-bold text-info">100.00%</td>
+                              <td className="font-weight-bold text-warning">{Number(gradingBreakdown.activity || 0).toFixed(2)}</td>
+                              <td className="font-weight-bold">{midtermMax}</td>
+                              <td className="text-info">100.00%</td>
+                              <td className="text-warning">{majorWeight.toFixed(2)}</td>
+                              <td className="font-weight-bold">{finalMax}</td>
+                              <td className="text-info">100.00%</td>
+                              <td className="text-warning">{majorWeight.toFixed(2)}</td>
+                              <td className="font-weight-bold text-success">{quarterlyMaxExact.toFixed(2)}</td>
+                              <td className="font-weight-bold text-success">{quarterlyMaxRounded}</td>
+                              <td></td>
+                            </tr>
+                          );
+                        })()}
                         {gradesData.students?.map((student) => (
                           <tr key={student.student_id}>
                             <td>
@@ -7843,10 +8409,10 @@ useEffect(() => {
                               {student.attendance ? (
                                 <div>
                                   <div className="font-weight-bold">
-                                    {student.attendance.total_earned_score}/{student.attendance.max_possible_total}
+                                    {computeAttendanceMetrics(student.attendance).rawScore.toFixed(1)}/{maxAttendanceScore}
                                   </div>
                                   <small className="text-muted">
-                                    {student.attendance.attendance_percentage}%
+                                    {computeAttendanceMetrics(student.attendance).percentage.toFixed(1)}%
                                   </small>
                                   <div className="mt-1">
                                     <small className="text-muted">
@@ -7861,7 +8427,23 @@ useEffect(() => {
                                 <span className="text-muted">-</span>
                               )}
                             </td>
-                            {gradesData.tasks?.map(task => {
+                            {/* RS / PS / WS */}
+                            {(() => {
+                              const m = computeAttendanceMetrics(student.attendance);
+                              return (
+                                <>
+                                  <td>{m.rawScore.toFixed(2)}</td>
+                                  <td>{m.percentage.toFixed(2)}%</td>
+                                  <td>{m.weighted.toFixed(2)}</td>
+                                </>
+                              );
+                            })()}
+                            {gradesData.tasks?.filter(task => 
+                              task.type !== 'midterm_exam' && 
+                              task.type !== 'final_exam' && 
+                              !task.title.toLowerCase().includes('midterm') &&
+                              !task.title.toLowerCase().includes('final')
+                            ).map(task => {
                               const assignment = student.assignments?.find(a => a.task_id === task.task_id);
                               return (
                                 <td key={task.task_id}>
@@ -7880,16 +8462,98 @@ useEffect(() => {
                                 </td>
                               );
                             })}
-                            <td>
-                              <div className="font-weight-bold">
-                                {student.total_earned}/{student.total_points}
-                              </div>
-                            </td>
-                            <td>
-                              <Badge color={student.average_grade >= 90 ? "success" : student.average_grade >= 80 ? "primary" : "warning"}>
-                                {student.average_grade}%
-                              </Badge>
-                            </td>
+                            {/* Total Score / RS / PS / WS */}
+                            {(() => {
+                              const assignmentMetrics = computeAssignmentMetrics(student);
+                              return (
+                                <>
+                                  <td className="font-weight-bold text-primary">{assignmentMetrics.maxPossibleScore}</td>
+                                  <td className="font-weight-bold text-success">{assignmentMetrics.rawScore.toFixed(2)}</td>
+                                  <td className="font-weight-bold text-info">{assignmentMetrics.percentage.toFixed(2)}%</td>
+                                  <td className="font-weight-bold text-warning">{assignmentMetrics.weighted.toFixed(2)}</td>
+                                </>
+                              );
+                            })()}
+                            {/* Midterm / PS / WS */}
+                            {(() => {
+                              const midtermMetrics = computeMidtermMetrics(student);
+                              return (
+                                <>
+                                  <td className={`${midtermMetrics.hasTask ? 'font-weight-bold' : 'text-muted'}`}>
+                                    {midtermMetrics.hasTask ? (
+                                      midtermMetrics.hasSubmission ? (
+                                        <div>
+                                          <div>{midtermMetrics.rawScore.toFixed(1)}</div>
+                                          <small className="text-muted">
+                                            {midtermMetrics.percentage.toFixed(1)}%
+                                          </small>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <div>0</div>
+                                          <small className="text-warning">No submission</small>
+                                        </div>
+                                      )
+                                    ) : (
+                                      <small className="text-muted">No midterm</small>
+                                    )}
+                                  </td>
+                                  <td className={midtermMetrics.hasTask ? 'text-info' : 'text-muted'}>
+                                    {midtermMetrics.hasTask ? `${midtermMetrics.percentage.toFixed(2)}%` : '-'}
+                                  </td>
+                                  <td className={midtermMetrics.hasTask ? 'text-warning' : 'text-muted'}>
+                                    {midtermMetrics.hasTask ? midtermMetrics.weighted.toFixed(2) : '-'}
+                                  </td>
+                                </>
+                              );
+                            })()}
+                            {/* Final Exam / PS / WS */}
+                            {(() => {
+                              const finalExamMetrics = computeFinalExamMetrics(student);
+                              return (
+                                <>
+                                  <td className={`${finalExamMetrics.hasTask ? 'font-weight-bold' : 'text-muted'}`}>
+                                    {finalExamMetrics.hasTask ? (
+                                      finalExamMetrics.hasSubmission ? (
+                                        <div>
+                                          <div>{finalExamMetrics.rawScore.toFixed(1)}/{finalExamMetrics.maxPossibleScore}</div>
+                                          <small className="text-muted">
+                                            {finalExamMetrics.percentage.toFixed(1)}%
+                                          </small>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <div>0/{finalExamMetrics.maxPossibleScore}</div>
+                                          <small className="text-warning">No submission</small>
+                                        </div>
+                                      )
+                                    ) : (
+                                      <small className="text-muted">No final exam</small>
+                                    )}
+                                  </td>
+                                  <td className={finalExamMetrics.hasTask ? 'text-info' : 'text-muted'}>
+                                    {finalExamMetrics.hasTask ? `${finalExamMetrics.percentage.toFixed(2)}%` : '-'}
+                                  </td>
+                                  <td className={finalExamMetrics.hasTask ? 'text-warning' : 'text-muted'}>
+                                    {finalExamMetrics.hasTask ? finalExamMetrics.weighted.toFixed(2) : '-'}
+                                  </td>
+                                </>
+                              );
+                            })()}
+                            {/* Quarterly Grade */}
+                            {(() => {
+                              const quarterlyGrade = computeQuarterlyGrade(student);
+                              return (
+                                <>
+                                  <td className="font-weight-bold text-success">
+                                    {quarterlyGrade.exact.toFixed(2)}
+                                  </td>
+                                  <td className="font-weight-bold text-success">
+                                    {quarterlyGrade.rounded}
+                                  </td>
+                                </>
+                              );
+                            })()}
                             <td>
                               <Button color="link" size="sm" className="p-0 mr-2">
                                 <i className="ni ni-ruler-pencil"></i>
@@ -7911,6 +8575,134 @@ useEffect(() => {
           </TabPane>
         </TabContent>
       </div>
+
+      {/* Weights Modal for editing grading percentages */}
+      <Modal isOpen={showWeightsModal} toggle={() => setShowWeightsModal(false)} size="lg">
+        <ModalHeader toggle={() => setShowWeightsModal(false)}>
+          <i className="ni ni-settings-gear-65 mr-2"></i>
+          Edit Grading Percentages
+        </ModalHeader>
+        <ModalBody>
+          <p className="text-muted">Customize the percentage weights for each category and attendance settings.</p>
+          <Form>
+            <div className="row">
+              <div className="col-md-4">
+                <h6 className="mb-3">Exam Settings</h6>
+                <FormGroup>
+                  <Label for="max_attendance_score">Maximum Attendance Score</Label>
+                  <Input 
+                    id="max_attendance_score" 
+                    type="number" 
+                    min="1" 
+                    max="50"
+                    value={maxAttendanceScore}
+                    onChange={(e) => setMaxAttendanceScore(parseInt(e.target.value) || 1)} 
+                  />
+                  <small className="text-muted">Total number of classes/sessions</small>
+                </FormGroup>
+                <FormGroup>
+                  <Label for="max_midterm_score">Highest Possible Score Midterm</Label>
+                  <Input 
+                    id="max_midterm_score" 
+                    type="number" 
+                    min="1" 
+                    max="200"
+                    value={maxMidtermScore}
+                    onChange={(e) => setMaxMidtermScore(parseInt(e.target.value) || 100)} 
+                  />
+                  <small className="text-muted">Highest possible score for midterm exam (used in PS calculation)</small>
+                </FormGroup>
+                <FormGroup>
+                  <Label for="max_final_exam_score">Highest Possible Score Final</Label>
+                  <Input 
+                    id="max_final_exam_score" 
+                    type="number" 
+                    min="1" 
+                    max="200"
+                    value={maxFinalExamScore}
+                    onChange={(e) => setMaxFinalExamScore(parseInt(e.target.value) || 100)} 
+                  />
+                  <small className="text-muted">Highest possible score for final exam (used in PS calculation)</small>
+                </FormGroup>
+              </div>
+
+              <div className="col-md-8">
+                <h6 className="mb-3">Grading Weights (Total should be 100%)</h6>
+                <div className="row">
+                  <div className="col-md-6">
+                    <FormGroup>
+                      <Label for="weights_attendance">Attendance (%)</Label>
+                      <Input id="weights_attendance" type="number" min="0" max="100"
+                             value={gradingBreakdown.attendance}
+                             onChange={(e)=>setGradingBreakdown({...gradingBreakdown, attendance: parseInt(e.target.value)||0})} />
+                    </FormGroup>
+                  </div>
+                  <div className="col-md-6">
+                    <FormGroup>
+                      <Label for="weights_activity">Activities/Assignment/Quiz (%)</Label>
+                      <Input id="weights_activity" type="number" min="0" max="100"
+                             value={gradingBreakdown.activity}
+                             onChange={(e)=>setGradingBreakdown({...gradingBreakdown, activity: parseInt(e.target.value)||0})} />
+                    </FormGroup>
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-md-6">
+                    <FormGroup>
+                      <Label for="weights_major_exams">Major Exams (Midterm and Final) (%)</Label>
+                      <Input id="weights_major_exams" type="number" min="0" max="100"
+                             value={gradingBreakdown.midtermExam + gradingBreakdown.finalExam}
+                             onChange={(e)=>{
+                               const totalMajorExams = parseInt(e.target.value) || 0;
+                               const halfValue = Math.floor(totalMajorExams / 2);
+                               const remainder = totalMajorExams % 2;
+                               setGradingBreakdown({
+                                 ...gradingBreakdown, 
+                                 midtermExam: halfValue + remainder, 
+                                 finalExam: halfValue
+                               });
+                             }} />
+                      <small className="text-muted">Will be split equally between midterm and final exam</small>
+                    </FormGroup>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Form>
+          
+          <div className="mt-3 p-3 bg-light rounded">
+            <div className="row">
+              <div className="col-md-6">
+                <strong>Grading Total: {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.midtermExam + gradingBreakdown.finalExam}%</strong>
+                {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.midtermExam + gradingBreakdown.finalExam !== 100 && (
+                  <div className="text-warning mt-1">
+                    <small>⚠️ Should equal 100%</small>
+                  </div>
+                )}
+              </div>
+              <div className="col-md-6">
+                <strong>Max Scores:</strong>
+                <div className="text-muted mt-1">
+                  <small>Attendance: {maxAttendanceScore} pts | Midterm: {maxMidtermScore} pts | Final: {maxFinalExamScore} pts</small>
+                </div>
+                <div className="text-muted">
+                  <small>Present/Excused = 1pt, Late = 0.7pt, Absent = 0pt</small>
+                </div>
+                <div className="text-muted mt-2">
+                  <small><strong>Note:</strong> Midterm and Final Exam scores are now customizable per task. Set the points when creating each exam task.</small>
+                </div>
+                <div className="text-muted mt-2">
+                  <small><strong>Formula:</strong> PS = (Raw Score / Max Possible Score) × 100. Example: (51 / 68) × 100 = 75.00%</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={()=>setShowWeightsModal(false)}>Close</Button>
+          <Button color="primary" onClick={()=>setShowWeightsModal(false)}>Save</Button>
+        </ModalFooter>
+      </Modal>
       {/* Attachment Preview Modal */}
       <Modal
         isOpen={previewModalOpen}
@@ -8324,7 +9116,6 @@ useEffect(() => {
           )}
         </ModalBody>
       </Modal>
-
       {/* Camera Modal */}
       <Modal isOpen={showCameraModal} toggle={() => { setShowCameraModal(false); stopCamera(); }} centered size="lg" contentClassName="border-0">
         <div style={{ borderRadius: 20, background: '#fff', padding: 0, boxShadow: '0 8px 32px rgba(44,62,80,.12)' }}>
@@ -8798,9 +9589,11 @@ useEffect(() => {
                 >
                   <option value="Assignment">Assignment</option>
                   <option value="Quiz">Quiz</option>
+                  <option value="Activity">Activity</option>
                   <option value="Project">Project</option>
                   <option value="Exam">Exam</option>
-                  <option value="Homework">Homework</option>
+                  <option value="Midterm Exam">Midterm Exam</option>
+                  <option value="Final Exam">Final Exam</option>
                 </select>
                 {editTaskForm.submitted && !editTaskForm.type && (
                   <small className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>Task type is required.</small>
@@ -9071,121 +9864,7 @@ useEffect(() => {
           </Button>
         </ModalFooter>
       </Modal>
-
-      {/* Export Grades Modal */}
-      <Modal isOpen={showExportModal} toggle={() => setShowExportModal(false)} size="lg">
-        <ModalHeader toggle={() => setShowExportModal(false)}>
-          <i className="ni ni-chart-bar-32 mr-2"></i>
-          Export Grades with Custom Grading Breakdown
-        </ModalHeader>
-        <ModalBody>
-          <div className="mb-4">
-            <h5>Grading Breakdown Configuration</h5>
-            <p className="text-muted">Customize the percentage weights for each grading category:</p>
-            
-            <div className="row">
-              <div className="col-md-6">
-                <FormGroup>
-                  <Label for="attendance">Attendance (%)</Label>
-                  <Input
-                    type="number"
-                    id="attendance"
-                    value={gradingBreakdown.attendance}
-                    onChange={(e) => setGradingBreakdown({
-                      ...gradingBreakdown,
-                      attendance: parseInt(e.target.value) || 0
-                    })}
-                    min="0"
-                    max="100"
-                  />
-                </FormGroup>
-              </div>
-              <div className="col-md-6">
-                <FormGroup>
-                  <Label for="activity">Activity (%)</Label>
-                  <Input
-                    type="number"
-                    id="activity"
-                    value={gradingBreakdown.activity}
-                    onChange={(e) => setGradingBreakdown({
-                      ...gradingBreakdown,
-                      activity: parseInt(e.target.value) || 0
-                    })}
-                    min="0"
-                    max="100"
-                  />
-                </FormGroup>
-              </div>
-            </div>
-            
-            <div className="row">
-              <div className="col-md-6">
-                <FormGroup>
-                  <Label for="assignment">Assignment/Quiz (%)</Label>
-                  <Input
-                    type="number"
-                    id="assignment"
-                    value={gradingBreakdown.assignment}
-                    onChange={(e) => setGradingBreakdown({
-                      ...gradingBreakdown,
-                      assignment: parseInt(e.target.value) || 0
-                    })}
-                    min="0"
-                    max="100"
-                  />
-                </FormGroup>
-              </div>
-              <div className="col-md-6">
-                <FormGroup>
-                  <Label for="majorExam">Major Exam (%)</Label>
-                  <Input
-                    type="number"
-                    id="majorExam"
-                    value={gradingBreakdown.majorExam}
-                    onChange={(e) => setGradingBreakdown({
-                      ...gradingBreakdown,
-                      majorExam: parseInt(e.target.value) || 0
-                    })}
-                    min="0"
-                    max="100"
-                  />
-                </FormGroup>
-              </div>
-            </div>
-            
-            <div className="mt-3 p-3 bg-light rounded">
-              <strong>Total: {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam}%</strong>
-              {gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam !== 100 && (
-                <div className="text-warning mt-1">
-                  <small>⚠️ Total should equal 100%</small>
-                </div>
-              )}
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button color="secondary" onClick={() => setShowExportModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            color="success" 
-            onClick={handleExportGrades}
-            disabled={exportLoading || gradingBreakdown.attendance + gradingBreakdown.activity + gradingBreakdown.assignment + gradingBreakdown.majorExam !== 100}
-          >
-            {exportLoading ? (
-              <>
-                <i className="ni ni-spin ni-spinner mr-2"></i>
-                Exporting...
-              </>
-            ) : (
-              <>
-                <i className="ni ni-chart-bar-32 mr-2"></i>
-                Export to XLSX
-              </>
-            )}
-          </Button>
-        </ModalFooter>
-      </Modal>
+      {/* Export modal removed - export uses current grading settings directly */}
 
       {/* Copy Toast */}
       <div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999 }}>

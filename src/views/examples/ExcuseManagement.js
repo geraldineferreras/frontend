@@ -368,12 +368,7 @@ const ExcuseManagement = () => {
           </Alert>
         )}
 
-        {/* Loading Spinner */}
-        {showLoader && (
-          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LottieLoader message="Loading excuse letters..." width={150} height={150} centered minHeight={'60vh'} desiredDurationSec={1.4} />
-          </div>
-        )}
+        {/* Loading Spinner moved below filters; table will render after loading */}
 
         {/* Excuse Management Summary Cards */}
         <Row className="mb-4">
@@ -501,119 +496,124 @@ const ExcuseManagement = () => {
           </CardBody>
         </Card>
 
-        {/* Excuse Letters Table Card */}
-        <Card className="shadow border-0">
-          <CardBody>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h3 className="mb-0 text-dark font-weight-bold">Excuse Letters</h3>
-                             <div className="d-flex flex-column flex-sm-row gap-2">
-                 <Button color="secondary" size="sm" className="mb-2 mb-sm-0" onClick={loadExcuseLetters}>
-                   <i className="fas fa-sync-alt mr-1"></i>
-                   <span className="d-none d-sm-inline">Refresh</span>
-                 </Button>
-                 <Button color="info" size="sm">
-                   <i className="fas fa-download mr-1"></i>
-                   <span className="d-none d-sm-inline">Export Data</span>
-                 </Button>
-                 
-               </div>
-            </div>
-            
-            <Table className="align-items-center table-flush" style={{ width: '100%', minWidth: 'auto' }}>
-              <thead className="thead-light">
-                <tr>
-                  <th scope="col" className="text-uppercase text-muted" style={{ width: '35%' }}>Student</th>
-                  <th scope="col" className="text-uppercase text-muted d-none d-sm-table-cell" style={{ width: '12%' }}>Date</th>
-                  <th scope="col" className="text-uppercase text-muted d-none d-md-table-cell" style={{ width: '18%' }}>Reason</th>
-                  <th scope="col" className="text-uppercase text-muted d-none d-lg-table-cell" style={{ width: '10%' }}>Attachment</th>
-                  <th scope="col" className="text-uppercase text-muted" style={{ width: '10%' }}>Status</th>
-                  <th scope="col" className="text-uppercase text-muted" style={{ width: '15%' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredExcuses.length === 0 ? (
+        {/* Excuse Letters Table Card or Loader */}
+        {showLoader ? (
+          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading excuse letters..." width={150} height={150} centered minHeight={'40vh'} desiredDurationSec={1.4} />
+          </div>
+        ) : (
+          <Card className="shadow border-0">
+            <CardBody>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h3 className="mb-0 text-dark font-weight-bold">Excuse Letters</h3>
+                <div className="d-flex flex-column flex-sm-row gap-2">
+                  <Button color="secondary" size="sm" className="mb-2 mb-sm-0" onClick={loadExcuseLetters}>
+                    <i className="fas fa-sync-alt mr-1"></i>
+                    <span className="d-none d-sm-inline">Refresh</span>
+                  </Button>
+                  <Button color="info" size="sm">
+                    <i className="fas fa-download mr-1"></i>
+                    <span className="d-none d-sm-inline">Export Data</span>
+                  </Button>
+                </div>
+              </div>
+
+              <Table className="align-items-center table-flush" style={{ width: '100%', minWidth: 'auto' }}>
+                <thead className="thead-light">
                   <tr>
-                    <td colSpan={6} className="text-center text-muted py-4">
-                      <i className="fas fa-inbox fa-2x mb-3 d-block"></i>
-                      {loading ? "Loading excuse letters..." : "No excuse letters found."}
-                    </td>
+                    <th scope="col" className="text-uppercase text-muted" style={{ width: '35%' }}>Student</th>
+                    <th scope="col" className="text-uppercase text-muted d-none d-sm-table-cell" style={{ width: '12%' }}>Date</th>
+                    <th scope="col" className="text-uppercase text-muted d-none d-md-table-cell" style={{ width: '18%' }}>Reason</th>
+                    <th scope="col" className="text-uppercase text-muted d-none d-lg-table-cell" style={{ width: '10%' }}>Attachment</th>
+                    <th scope="col" className="text-uppercase text-muted" style={{ width: '10%' }}>Status</th>
+                    <th scope="col" className="text-uppercase text-muted" style={{ width: '15%' }}>Actions</th>
                   </tr>
-                ) : (
-                  filteredExcuses.map(e => (
-                                         <tr key={e.letter_id} className={getRowClass(e.status)}>
-                      <td style={{ maxWidth: '0', width: '35%' }}>
-                        <div className="media align-items-center">
-                          <div 
-                            className="bg-gradient-primary mr-3" 
-                            style={{ 
-                              width: '40px', 
-                              height: '40px', 
-                              borderRadius: '50%',
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              flexShrink: 0
-                            }}
-                          >
-                            <i className="fas fa-user text-white" style={{ fontSize: '16px' }}></i>
-                          </div>
-                          <div className="media-body" style={{ minWidth: '0', overflow: 'hidden' }}>
-                            <span className="font-weight-bold text-dark d-block" style={{ wordBreak: 'break-word', lineHeight: '1.2' }}>{e.student_name}</span>
-                            <div className="text-muted small">ID: {e.student_id}</div>
-                            <div className="text-muted small">Section: {e.section_name}</div>
-                                                         {/* Mobile-only info */}
-                             <div className="d-sm-none mt-2">
-                               <small className="text-muted d-block">Date: {e.date_absent}</small>
-                               <small className="text-muted d-block">Reason: {e.reason?.length > 20 ? e.reason.slice(0, 20) + "..." : e.reason}</small>
-                             </div>
-                          </div>
-                        </div>
-                      </td>
-                                             <td className="d-none d-sm-table-cell" style={{ width: '12%' }}>
-                         <span className="text-dark">{e.date_absent}</span>
-                       </td>
-                      <td className="d-none d-md-table-cell" style={{ width: '18%' }}>
-                        <span style={{ cursor: "pointer", color: "#007bff" }} onClick={() => setDetailModal({ open: true, excuse: e })} className="text-truncate d-block">
-                          {e.reason?.length > 18 ? e.reason.slice(0, 18) + "..." : e.reason}
-                        </span>
-                      </td>
-                                             <td className="d-none d-lg-table-cell text-center" style={{ width: '10%' }}>
-                         {e.image_path && (
-                           <Button color="link" className="p-0" onClick={() => setDetailModal({ open: true, excuse: e })}>
-                             <i className="fas fa-file-image text-primary"></i>
-                           </Button>
-                         )}
-                       </td>
-                      <td style={{ width: '10%' }}>
-                        <Badge color={statusColors[e.status]} className="badge-pill">{e.status}</Badge>
-                      </td>
-                      <td style={{ width: '15%' }}>
-                        <div className="d-flex flex-column flex-sm-row gap-1">
-                          {e.status === "pending" && (
-                            <>
-                              <Button color="success" size="sm" className="mb-1 mb-sm-0 mr-sm-1" onClick={() => handleReview(e, "approve")}>
-                                <i className="fas fa-check mr-1"></i>
-                                <span className="d-none d-sm-inline">Approve</span>
-                              </Button>
-                              <Button color="danger" size="sm" className="mb-1 mb-sm-0" onClick={() => handleReview(e, "reject")}>
-                                <i className="fas fa-times mr-1"></i>
-                                <span className="d-none d-sm-inline">Reject</span>
-                              </Button>
-                            </>
-                          )}
-                          <Button color="info" outline size="sm" onClick={() => setDetailModal({ open: true, excuse: e })}>
-                            <i className="fas fa-eye mr-1"></i>
-                            <span className="d-none d-sm-inline">View</span>
-                          </Button>
-                        </div>
+                </thead>
+                <tbody>
+                  {filteredExcuses.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center text-muted py-4">
+                        <i className="fas fa-inbox fa-2x mb-3 d-block"></i>
+                        No excuse letters found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </Table>
-          </CardBody>
-        </Card>
+                  ) : (
+                    filteredExcuses.map(e => (
+                      <tr key={e.letter_id} className={getRowClass(e.status)}>
+                        <td style={{ maxWidth: '0', width: '35%' }}>
+                          <div className="media align-items-center">
+                            <div
+                              className="bg-gradient-primary mr-3"
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}
+                            >
+                              <i className="fas fa-user text-white" style={{ fontSize: '16px' }}></i>
+                            </div>
+                            <div className="media-body" style={{ minWidth: '0', overflow: 'hidden' }}>
+                              <span className="font-weight-bold text-dark d-block" style={{ wordBreak: 'break-word', lineHeight: '1.2' }}>{e.student_name}</span>
+                              <div className="text-muted small">ID: {e.student_id}</div>
+                              <div className="text-muted small">Section: {e.section_name}</div>
+                              {/* Mobile-only info */}
+                              <div className="d-sm-none mt-2">
+                                <small className="text-muted d-block">Date: {e.date_absent}</small>
+                                <small className="text-muted d-block">Reason: {e.reason?.length > 20 ? e.reason.slice(0, 20) + "..." : e.reason}</small>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="d-none d-sm-table-cell" style={{ width: '12%' }}>
+                          <span className="text-dark">{e.date_absent}</span>
+                        </td>
+                        <td className="d-none d-md-table-cell" style={{ width: '18%' }}>
+                          <span style={{ cursor: "pointer", color: "#007bff" }} onClick={() => setDetailModal({ open: true, excuse: e })} className="text-truncate d-block">
+                            {e.reason?.length > 18 ? e.reason.slice(0, 18) + "..." : e.reason}
+                          </span>
+                        </td>
+                        <td className="d-none d-lg-table-cell text-center" style={{ width: '10%' }}>
+                          {e.image_path && (
+                            <Button color="link" className="p-0" onClick={() => setDetailModal({ open: true, excuse: e })}>
+                              <i className="fas fa-file-image text-primary"></i>
+                            </Button>
+                          )}
+                        </td>
+                        <td style={{ width: '10%' }}>
+                          <Badge color={statusColors[e.status]} className="badge-pill">{e.status}</Badge>
+                        </td>
+                        <td style={{ width: '15%' }}>
+                          <div className="d-flex flex-column flex-sm-row gap-1">
+                            {e.status === "pending" && (
+                              <>
+                                <Button color="success" size="sm" className="mb-1 mb-sm-0 mr-sm-1" onClick={() => handleReview(e, "approve")}>
+                                  <i className="fas fa-check mr-1"></i>
+                                  <span className="d-none d-sm-inline">Approve</span>
+                                </Button>
+                                <Button color="danger" size="sm" className="mb-1 mb-sm-0" onClick={() => handleReview(e, "reject")}>
+                                  <i className="fas fa-times mr-1"></i>
+                                  <span className="d-none d-sm-inline">Reject</span>
+                                </Button>
+                              </>
+                            )}
+                            <Button color="info" outline size="sm" onClick={() => setDetailModal({ open: true, excuse: e })}>
+                              <i className="fas fa-eye mr-1"></i>
+                              <span className="d-none d-sm-inline">View</span>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </Table>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Excuse Detail Modal */}
         <Modal isOpen={detailModal.open} toggle={() => setDetailModal({ open: false, excuse: null })} size="md" centered>

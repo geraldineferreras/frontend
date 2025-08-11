@@ -69,8 +69,8 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-          if (code && code.data) {
-            // Parse student ID from QR code (expects: IDNo: 2021305973)
+            if (code && code.data) {
+              // Parse student ID from QR code (expects: IDNo: 2021305973)
             const idMatch = code.data.match(/IDNo:\s*(\d{1,})/);
             if (idMatch) {
               const info = {};
@@ -81,16 +81,24 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
               });
               info.IDNo = idMatch[1];
               setScannedInfo(info);
-              setScannerStatus("success");
-              setScannerMessage("Student found: " + idMatch[1]);
-              // Call parent to update grade
-              onGradeSubmit({
-                studentId: idMatch[1],
-                score,
-                feedback,
-                attachments: attachmentFiles,
-                dateGraded: new Date().toLocaleString(),
-              });
+                const numericScore = parseFloat(score);
+                // Always show success UI for a valid scan; submit only if score is present
+                setScannerStatus("success");
+                if (!Number.isFinite(numericScore)) {
+                  setScannerMessage("Scan OK. Enter a score, then rescan to save.");
+                } else {
+                  setScannerMessage("Student found: " + idMatch[1]);
+                  onGradeSubmit({
+                    studentId: idMatch[1],
+                    score: numericScore,
+                    feedback,
+                    attachments: attachmentFiles,
+                    dateGraded: new Date().toLocaleString(),
+                    qrData: code.data,
+                  });
+                  // After submitting, briefly flash a saved message
+                  setScannerMessage("Saved ✓");
+                }
               // Reset form fields for next scan
               setScore("");
               setFeedback("");
@@ -283,9 +291,10 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
           const scannedName = (scannedInfo["Full Name"] || scannedInfo.name || '').toLowerCase().trim();
           // Robust match: check id (string/number) and name (case-insensitive, trimmed)
           const found = studentList.some(s => {
-            const sid = (s.id || '').toString().trim();
-            const sname = (s.name || '').toLowerCase().trim();
-            return (sid && scannedId && sid === scannedId) || (sname && scannedName && sname === scannedName);
+            const sidCandidates = [s.student_num, s.student_id, s.id]
+              .map(v => (v === undefined || v === null) ? '' : String(v).trim());
+            const sname = (s.student_name || s.name || '').toLowerCase().trim();
+            return (scannedId && sidCandidates.includes(scannedId)) || (scannedName && sname === scannedName);
           });
           if (found) {
             const audioSrc = audioType === 'female'
@@ -312,18 +321,21 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
                 fontWeight: 700,
                 fontSize: 13
               }}>
-                Student Not Found ✗
+                {Number.isFinite(parseFloat(score)) ? 'Student Not Found ✗' : 'Scan OK'}
                 <div style={{ color: '#dc3545', fontWeight: 400, fontSize: 11, marginTop: 2 }}>
-                  Please scan another student.
+                  {Number.isFinite(parseFloat(score))
+                    ? 'Please scan another student.'
+                    : (scannerMessage || 'Enter a score, then rescan to save.')}
                 </div>
               </div>
             );
           }
           // If found, show the green box
           const matchedStudent = studentList.find(s => {
-            const sid = (s.id || '').toString().trim();
-            const sname = (s.name || '').toLowerCase().trim();
-            return (sid && scannedId && sid === scannedId) || (sname && scannedName && sname === scannedName);
+            const sidCandidates = [s.student_num, s.student_id, s.id]
+              .map(v => (v === undefined || v === null) ? '' : String(v).trim());
+            const sname = (s.student_name || s.name || '').toLowerCase().trim();
+            return (scannedId && sidCandidates.includes(scannedId)) || (scannedName && sname === scannedName);
           });
           return (
             <div style={{
@@ -348,6 +360,11 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
                   <div style={{ color: '#888', fontWeight: 500, fontSize: 11 }}>Program: {scannedInfo.Program || scannedInfo.program || ''}</div>
                 </div>
               </div>
+              {!Number.isFinite(parseFloat(score)) && (
+                <div style={{ color: '#27ae60', fontWeight: 600, fontSize: 12 }}>
+                  {scannerMessage || 'Enter a score, then rescan to save.'}
+                </div>
+              )}
             </div>
           );
         })()

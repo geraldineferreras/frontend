@@ -359,16 +359,20 @@ const TeacherAttendance = () => {
   };
 
   const getStatusBadge = (status) => {
-    const statusColors = {
-      'Present': 'success',
-      'Late': 'warning',
-      'Absent': 'danger',
-      'Excused': 'info',
-      'Not Recorded': 'secondary'
+    const normalized = (status || '').toString().toLowerCase();
+    const statusColorsByNormalized = {
+      present: 'success',
+      late: 'warning',
+      absent: 'danger', // ensure red for any "ABSENT"/"absent" variant
+      excused: 'info',
+      'not recorded': 'secondary',
+      'not_recorded': 'secondary'
     };
-    
+
+    const color = statusColorsByNormalized[normalized] || 'secondary';
+
     return (
-      <Badge color={statusColors[status] || 'secondary'} className="font-weight-bold">
+      <Badge color={color} className="font-weight-bold">
         {status}
       </Badge>
     );
@@ -391,13 +395,6 @@ const TeacherAttendance = () => {
             <i className="fas fa-check-circle mr-2" />
             {successMessage}
           </Alert>
-        )}
-
-        {/* Loading Spinner */}
-        {showLoader && (
-          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LottieLoader message="Loading..." width={150} height={150} centered minHeight={'60vh'} desiredDurationSec={1.4} />
-          </div>
         )}
 
         {/* Attendance Summary Cards - Always Visible */}
@@ -595,6 +592,13 @@ const TeacherAttendance = () => {
             </Row>
           </CardBody>
         </Card>
+
+        {/* Loading Spinner - moved below main controls */}
+        {showLoader && (
+          <div className="mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LottieLoader message="Loading..." width={150} height={150} centered minHeight={'40vh'} desiredDurationSec={1.4} />
+          </div>
+        )}
 
         {/* Attendance Log Table */}
         <Card className="shadow mt-4">

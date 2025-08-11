@@ -235,6 +235,54 @@ const AssignmentDetailStudent = () => {
               console.log('No submission found or error fetching submission:', submissionError);
               // This is normal if no submission exists yet
             }
+
+            // Fallback: If no submission or no grade yet, try fetching all submissions and pick current student's
+            try {
+              if (!submission || submission?.grade === undefined || submission?.grade === null) {
+                const allSubsResp = await apiService.getTaskSubmissions(assignmentId);
+                const allSubs = allSubsResp?.data?.submissions || allSubsResp?.data || [];
+                // Determine current student's identifiers
+                let current = null;
+                try {
+                  current = JSON.parse(localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user') || '{}');
+                } catch (_) { current = {}; }
+                const candidateIds = [current.student_num, current.student_id, current.id]
+                  .filter((v) => v !== undefined && v !== null)
+                  .map((v) => String(v));
+                const mine = allSubs.find((s) => {
+                  const sidCandidates = [s.student_num, s.student_id, s.id]
+                    .filter((v) => v !== undefined && v !== null)
+                    .map((v) => String(v));
+                  return candidateIds.some((id) => sidCandidates.includes(id));
+                });
+                if (mine) {
+                  setSubmission(mine);
+                }
+              }
+            } catch (fallbackErr) {
+              console.warn('Fallback to all submissions failed:', fallbackErr);
+            }
+
+            // Final fallback: use student/assigned endpoint (contains grade/status even without file submissions)
+            try {
+              if (!submission || submission?.grade === undefined || submission?.grade === null) {
+                const assignedResp = await apiService.getStudentAssignedTasks(finalClassCode);
+                const list = assignedResp?.data || [];
+                const found = list.find((t) => String(t.task_id || t.id) === String(assignmentId));
+                if (found && (found.grade !== undefined || found.submission_status)) {
+                  setSubmission({
+                    submission_id: found.submission_id,
+                    grade: found.grade !== undefined && found.grade !== null ? Number(found.grade) : null,
+                    status: found.submission_status || 'graded',
+                    submitted_at: found.submitted_at,
+                    feedback: found.feedback,
+                    attachments: [],
+                  });
+                }
+              }
+            } catch (assignedErr) {
+              console.warn('Fallback to assigned tasks failed:', assignedErr);
+            }
           }
         } else {
           console.error('Invalid response format:', response);

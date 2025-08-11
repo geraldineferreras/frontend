@@ -70,20 +70,33 @@ const sectionManagementStyles = `
 // Mock Data - Replace with your actual data fetching logic
 
 
-// Helper function to generate consistent avatars for students
-const getAvatarForStudent = (student) => {
-  if (student && student.id) {
-    const avatarUrls = [
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
-    ];
-    const index = student.id % avatarUrls.length;
-    return avatarUrls[index];
+// Build full URL for a profile picture path
+const buildProfileImageUrl = (profilePic) => {
+  if (!profilePic) return null;
+  if (profilePic.startsWith('http://') || profilePic.startsWith('https://') || profilePic.startsWith('data:')) {
+    return profilePic;
   }
-  return userDefault;
+  const rawBase = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+  const base = rawBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
+  if (profilePic.startsWith('uploads/')) {
+    return `${base}/${profilePic}`;
+  }
+  return `${base}/uploads/profile/${profilePic}`;
+};
+
+// Helper: prefer backend profile image; otherwise return null (UI will render initials)
+const getAvatarForStudent = (student) => {
+  const pic = student?.profile_pic || student?.profile_picture || student?.avatar || null;
+  return buildProfileImageUrl(pic);
+};
+
+// Helper to get initials when no avatar is available
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.charAt(0).toUpperCase() || '';
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0).toUpperCase() : '';
+  return (first + last) || first || '?';
 };
 
 // Helper function to format section name with program and year
@@ -466,8 +479,43 @@ const SectionManagement = () => {
   const loadSectionStudents = async (sectionId) => {
     try {
       setLoadingStudents(true);
-      // For now, return empty array since the endpoint might not exist
-      setSectionStudents([]);
+
+      const normalizeStudent = (s) => ({
+        id: s.id || s.user_id || s.userId || s.student_id || s.studentId || s.student_number || s.student_num || '',
+        name: s.full_name || s.name || s.student_name || s.user_name || '',
+        email: s.email || '',
+        section_id: s.section_id || s.sectionId || (s.section && (s.section.id || s.section.section_id)) || null,
+        profile_pic: s.profile_pic || s.profile_picture || s.avatar || '',
+        student_num: s.student_num || s.student_number || '',
+        raw: s,
+      });
+
+      // 1) Try dedicated endpoint first
+      try {
+        const res = await apiService.getSectionStudents(sectionId);
+        const list = res?.data || res || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const normalized = list.map(normalizeStudent);
+          setSectionStudents(normalized);
+          return;
+        }
+      } catch (e) {
+        // Fall through to fallback
+        console.warn('getSectionStudents endpoint not available or returned empty. Falling back to filtering students by section_id.', e);
+      }
+
+      // 2) Fallback: fetch all students and filter by section_id
+      try {
+        const allStudentsRes = await apiService.getUsersByRole('student');
+        const allStudents = allStudentsRes?.data || allStudentsRes || [];
+        const normalizedAll = (allStudents || []).map(normalizeStudent);
+        const filtered = normalizedAll.filter((s) => String(s.section_id || '') === String(sectionId));
+        setSectionStudents(filtered);
+        return;
+      } catch (e2) {
+        console.warn('Fallback getUsersByRole("student") failed. Returning empty list.', e2);
+        setSectionStudents([]);
+      }
     } catch (error) {
       console.error('Error loading section students:', error);
       setSectionStudents([]);
@@ -1070,19 +1118,52 @@ const SectionManagement = () => {
                       e.currentTarget.style.borderColor = '#e9ecef';
                     }}
                   >
-                    <div className="position-relative mr-2">
-                      <img 
-                        src={getAvatarForStudent(student)} 
-                        alt={student.name} 
-                        style={{ 
-                          width: 28, 
-                          height: 28, 
-                          borderRadius: '50%', 
-                          objectFit: 'cover',
-                          border: '1px solid #fff',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.07)'
-                        }} 
-                      />
+                    <div className="position-relative mr-2" style={{ width: 28, height: 28 }}>
+                      {(() => {
+                        const avatarUrl = getAvatarForStudent(student);
+                        if (avatarUrl) {
+                          return (
+                            <img
+                              src={avatarUrl}
+                              alt={student.name}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: '1px solid #fff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.07)'
+                              }}
+                              onError={(e) => {
+                                // Fallback to initials when image fails to load
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">${getInitials(student.name)}</div>`;
+                                }
+                              }}
+                            />
+                          );
+                        }
+                        return (
+                          <div
+                            className="rounded-circle"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: 11,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.07)'
+                            }}
+                          >
+                            {getInitials(student.name)}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex-grow-1" style={{ minWidth: 0 }}>
                       <div className="d-flex align-items-center" style={{ fontSize: '0.97rem', fontWeight: 500, color: '#425466', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1092,7 +1173,7 @@ const SectionManagement = () => {
                       <div className="d-flex align-items-center" style={{ fontSize: '0.85rem', color: '#7b8a9b' }}>
                         <i className="ni ni-email-83 mr-1 text-muted" style={{ fontSize: '0.8rem' }} />
                         <span className="text-muted small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.email}</span>
-                        <span style={{ marginLeft: 8, color: '#b0b7c3', fontSize: '0.8rem' }}>ID: {student.id.toString().padStart(4, '0')}</span>
+                        <span style={{ marginLeft: 8, color: '#b0b7c3', fontSize: '0.8rem' }}>IDNo: {student.student_num || student.id}</span>
                       </div>
                     </div>
                     <div className="text-right ml-2">

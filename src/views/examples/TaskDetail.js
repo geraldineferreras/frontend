@@ -366,30 +366,52 @@ const TaskDetail = () => {
   };
 
   // Handle grade submission from QRGradingPanel
-  const handleQRGradeSubmit = async ({ studentId, score, feedback, attachments, dateGraded }) => {
+  const handleQRGradeSubmit = async ({ studentId, score, feedback, attachments, dateGraded, qrData }) => {
     setGradingLoading(true);
-    
+
+    // Resolve class code from task or local storage
+    const resolveClassCode = () => {
+      if (task && Array.isArray(task.class_codes) && task.class_codes.length > 0) return task.class_codes[0];
+      if (task && task.class_code) return task.class_code;
+      try {
+        const currentClassroom = localStorage.getItem('currentClassroom');
+        if (currentClassroom) return JSON.parse(currentClassroom)?.code;
+      } catch (_) {}
+      return undefined;
+    };
+
     try {
-      const response = await apiService.gradeSubmission(studentId, {
-        grade: parseFloat(score),
-        feedback: feedback
+      const response = await apiService.qrQuickGrade({
+        taskId,
+        studentId,
+        score: parseFloat(score),
+        feedback,
+        classCode: resolveClassCode(),
+        attachments: attachments || [],
+        qrData,
       });
-      
-      if (response.status) {
-        // Update local state
-        setSubmissionsState(prev => prev.map(s => {
-          if (String(s.submission_id) === String(studentId)) {
-            return {
-              ...s,
-              grade: parseFloat(score),
-              feedback,
-              attachments: attachments && attachments.length > 0 ? attachments : undefined,
-              dateGraded,
-              status: 'graded'
-            };
-          }
-          return s;
-        }));
+
+      if (response && (response.status || response.success)) {
+        // Update local state: match by student_id primarily; fallback to submission_id equals studentId
+        setSubmissionsState((prev) =>
+          prev.map((s) => {
+            const matchesByStudent =
+              String(s.student_id || '') === String(studentId) ||
+              String(s.student_num || '') === String(studentId);
+            const matchesBySubmission = String(s.submission_id || '') === String(studentId);
+            if (matchesByStudent || matchesBySubmission) {
+              return {
+                ...s,
+                grade: parseFloat(score),
+                feedback,
+                attachments: attachments && attachments.length > 0 ? attachments : s.attachments,
+                dateGraded: dateGraded || new Date().toISOString(),
+                status: 'graded',
+              };
+            }
+            return s;
+          })
+        );
       } else {
         setError('Failed to save QR grade');
       }
