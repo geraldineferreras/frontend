@@ -29,7 +29,9 @@ import TeacherLayout from "layouts/Teacher.js";
 import VideoConferenceLayout from "layouts/VideoConference.js";
 import RemoteCameraMobile from './components/RemoteCameraMobile';
 import { AuthProvider } from "contexts/AuthContext.js";
+import { NotificationProvider } from "contexts/NotificationContext.js";
 import GlobalRouteLoader from "components/GlobalRouteLoader";
+import NotificationToaster from "components/NotificationToaster";
 
 function SessionTimeoutModal() {
   const [open, setOpen] = useState(false);
@@ -63,17 +65,20 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <AuthProvider>
     <BrowserRouter>
-      <SessionTimeoutModal />
-      <GlobalRouteLoader minVisibleMs={1600} />
-      <Routes>
-        <Route path="/admin/*" element={<AdminLayout />} />
-        <Route path="/student/*" element={<StudentLayout />} />
-        <Route path="/teacher/*" element={<TeacherLayout />} />
-        <Route path="/video-conference/*" element={<VideoConferenceLayout />} />
-        <Route path="/auth/*" element={<AuthLayout />} />
-        <Route path="/remote-camera" element={<RemoteCameraMobile />} />
-        <Route path="*" element={<Navigate to="/auth/login" replace />} />
-      </Routes>
+      <NotificationProvider>
+        <SessionTimeoutModal />
+        <GlobalRouteLoader minVisibleMs={1600} />
+        <Routes>
+          <Route path="/admin/*" element={<AdminLayout />} />
+          <Route path="/student/*" element={<StudentLayout />} />
+          <Route path="/teacher/*" element={<TeacherLayout />} />
+          <Route path="/video-conference/*" element={<VideoConferenceLayout />} />
+          <Route path="/auth/*" element={<AuthLayout />} />
+          <Route path="/remote-camera" element={<RemoteCameraMobile />} />
+          <Route path="*" element={<Navigate to="/auth/login" replace />} />
+        </Routes>
+        <NotificationToaster />
+      </NotificationProvider>
     </BrowserRouter>
   </AuthProvider>
 );

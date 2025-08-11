@@ -1,93 +1,67 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Badge, Dropdown, DropdownToggle, DropdownMenu, DropdownItem, Spinner } from 'reactstrap';
-import { Bell, Check, X } from 'react-icons/fa';
-import notificationService from '../services/notificationService';
+import React, { useEffect, useState, useCallback } from "react";
+import api from "../services/api";
 
-const RealTimeNotification = ({ userId, userRole }) => {
+// Notification type mapping
+const typeMap = {
+  excuse: { icon: "📄", color: "#e91e63", title: "Excuse Letter" },
+  attendance: { icon: "✅", color: "#4caf50", title: "Attendance" },
+  submission: { icon: "📝", color: "#ff9800", title: "Submission" },
+  grade: { icon: "📊", color: "#2196f3", title: "Grade" },
+  announcement: { icon: "📢", color: "#9c27b0", title: "Announcement" },
+  classroom: { icon: "🏫", color: "#607d8b", title: "Classroom" },
+  general: { icon: "❗", color: "#888", title: "General" },
+  task: { icon: "📋", color: "#795548", title: "Task" },
+  stream_post: { icon: "💬", color: "#00bcd4", title: "Stream Post" },
+};
+
+// Time formatting helper
+function timeAgo(dateStr) {
+  const now = new Date();
+  const date = new Date(dateStr.replace(/-/g, "/"));
+  const diff = (now - date) / 1000;
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 172800) return "Yesterday";
+  return date.toLocaleDateString();
+}
+
+const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, maxNotifications = 5 }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const audioRef = useRef(null);
 
-  // Initialize notification service
-  useEffect(() => {
-    if (userId && userRole) {
-      // Connect to notification service
-      notificationService.connect(userId, userRole);
-      
-      // Set up notification handler
-      const handleNotification = (notification) => {
-        console.log('Received real-time notification:', notification);
-        
-        // Add new notification to the top
-        setNotifications(prev => [notification, ...prev]);
-        
-        // Update unread count
-        setUnreadCount(prev => prev + 1);
-        
-        // Play notification sound
-        if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-        }
-        
-        // Show browser notification if permitted
-        if (Notification.permission === 'granted') {
-          new Notification('SCMS Notification', {
-            body: notification.message,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico'
-          });
-        }
-      };
-
-      notificationService.onNotification(handleNotification);
-
-      // Load existing notifications
-      loadNotifications();
-
-      // Request notification permission
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-
-      return () => {
-        notificationService.offNotification(handleNotification);
-        notificationService.disconnect();
-      };
-    }
-  }, [userId, userRole]);
-
-  // Load existing notifications from API
-  const loadNotifications = async () => {
+  // Fetch notifications from API
+  const fetchNotifications = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/notifications/user/${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data);
-        setUnreadCount(data.filter(n => !n.is_read).length);
+      const response = await api.get('/notifications/recent');
+      if (response.success && response.data) {
+        const recentNotifications = response.data.notifications || [];
+        setNotifications(recentNotifications);
+        
+        // Get unread count
+        const unreadResponse = await api.get('/notifications/unread-count');
+        if (unreadResponse.success && unreadResponse.data) {
+          setUnreadCount(unreadResponse.data.count || 0);
+        }
       }
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      console.error('Error fetching notifications:', error);
+      setError('Failed to load notifications');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      await notificationService.markAsRead(notificationId);
-      
-      // Update local state
+      await api.put(`/notifications/${notificationId}/read`);
       setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId ? { ...n, is_read: true } : n
-        )
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
-      
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -97,213 +71,246 @@ const RealTimeNotification = ({ userId, userRole }) => {
   // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
-      await notificationService.markAllAsRead();
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => ({ ...n, is_read: true }))
-      );
-      
+      await api.put('/notifications/mark-all-read');
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
   };
 
-  // Get notification icon based on type
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'grade':
-        return '📊';
-      case 'announcement':
-        return '📢';
-      case 'assignment':
-        return '📝';
-      case 'attendance':
-        return '✅';
-      case 'excuse':
-        return '📄';
-      default:
-        return '🔔';
+  // Load notifications on mount and set up polling
+  useEffect(() => {
+    fetchNotifications();
+    
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Handle notification click
+  const handleNotificationClick = (notification) => {
+    if (!notification.is_read) {
+      markAsRead(notification.id);
     }
-  };
-
-  // Get notification color based on type
-  const getNotificationColor = (type) => {
-    switch (type) {
-      case 'grade':
-        return 'success';
-      case 'announcement':
-        return 'primary';
-      case 'assignment':
-        return 'warning';
-      case 'attendance':
-        return 'info';
-      case 'excuse':
-        return 'secondary';
-      default:
-        return 'light';
+    if (onNotificationClick) {
+      onNotificationClick(notification);
     }
+    setIsOpen(false);
   };
 
-  // Format timestamp
-  const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
+  const displayNotifications = notifications.slice(0, maxNotifications);
 
   return (
-    <>
-      {/* Hidden audio element for notification sound */}
-      <audio ref={audioRef} preload="auto">
-        <source src="/grading-success-female.mp3" type="audio/mpeg" />
-      </audio>
+    <div style={{ position: 'relative' }}>
+      {/* Notification Bell */}
+      <div 
+        style={{ 
+          position: 'relative', 
+          cursor: 'pointer',
+          padding: '8px',
+          borderRadius: '50%',
+          transition: 'background-color 0.2s'
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+      >
+        <span role="img" aria-label="notifications" style={{ fontSize: '20px' }}>
+          🔔
+        </span>
+        
+        {/* Unread Badge */}
+        {showUnreadCount && unreadCount > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: '0',
+            right: '0',
+            background: '#f44336',
+            color: 'white',
+            borderRadius: '50%',
+            width: '18px',
+            height: '18px',
+            fontSize: '11px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold'
+          }}>
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </div>
 
-      <Dropdown isOpen={isOpen} toggle={() => setIsOpen(!isOpen)}>
-        <DropdownToggle
-          tag="div"
-          className="position-relative"
-          style={{ cursor: 'pointer' }}
-        >
-          <Bell size={20} className="text-white" />
-          {unreadCount > 0 && (
-            <Badge
-              color="danger"
-              className="position-absolute"
-              style={{
-                top: '-8px',
-                right: '-8px',
-                fontSize: '0.7rem',
-                minWidth: '18px',
-                height: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </DropdownToggle>
-
-        <DropdownMenu
-          right
-          className="notification-dropdown"
-          style={{
-            width: '350px',
-            maxHeight: '400px',
-            overflowY: 'auto',
-            padding: '0'
-          }}
-        >
-          <div className="p-3 border-bottom">
-            <div className="d-flex justify-content-between align-items-center">
-              <h6 className="mb-0">Notifications</h6>
-              {unreadCount > 0 && (
-                <button
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={markAllAsRead}
-                >
-                  Mark all read
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="notification-list">
-            {loading ? (
-              <div className="text-center p-3">
-                <Spinner size="sm" />
-                <span className="ml-2">Loading...</span>
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="text-center p-3 text-muted">
-                No notifications yet
-              </div>
-            ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`notification-item p-3 border-bottom ${
-                    !notification.is_read ? 'bg-light' : ''
-                  }`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => markAsRead(notification.id)}
-                >
-                  <div className="d-flex align-items-start">
-                    <div className="mr-3" style={{ fontSize: '1.2rem' }}>
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-grow-1">
-                      <div className="d-flex justify-content-between align-items-start">
-                        <p className="mb-1" style={{ fontSize: '0.9rem' }}>
-                          {notification.message}
-                        </p>
-                        {!notification.is_read && (
-                          <Badge color="primary" size="sm">
-                            New
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <small className="text-muted">
-                          {formatTimestamp(notification.created_at)}
-                        </small>
-                        <Badge color={getNotificationColor(notification.type)} size="sm">
-                          {notification.type}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
+      {/* Notification Dropdown */}
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: '0',
+          width: '400px',
+          maxHeight: '500px',
+          background: 'white',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          overflow: 'hidden'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '16px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontWeight: 'bold', fontSize: '16px' }}>Notifications</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                style={{
+                  background: '#1976d2',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                Mark all read
+              </button>
             )}
           </div>
 
-          {notifications.length > 0 && (
-            <div className="p-2 text-center">
-              <small className="text-muted">
-                {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
-              </small>
+          {/* Notifications List */}
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {loading ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                Loading...
+              </div>
+            ) : error ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#f44336' }}>
+                {error}
+                <button 
+                  onClick={fetchNotifications}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#f44336', 
+                    textDecoration: 'underline', 
+                    cursor: 'pointer', 
+                    marginLeft: '8px' 
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : displayNotifications.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                No notifications
+              </div>
+            ) : (
+              displayNotifications.map(notification => {
+                const meta = typeMap[notification.type] || typeMap.general;
+                return (
+                  <div
+                    key={notification.id}
+                    onClick={() => handleNotificationClick(notification)}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #eee',
+                      cursor: 'pointer',
+                      background: notification.is_read ? 'white' : '#f8f9fa',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = notification.is_read ? 'white' : '#f8f9fa'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <span style={{ fontSize: '20px', color: meta.color }}>{meta.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ 
+                          fontWeight: notification.is_read ? 'normal' : 'bold',
+                          fontSize: '14px',
+                          color: meta.color,
+                          marginBottom: '4px'
+                        }}>
+                          {meta.title}
+                        </div>
+                        <div style={{ 
+                          fontSize: '13px',
+                          color: '#333',
+                          marginBottom: '4px',
+                          lineHeight: '1.4'
+                        }}>
+                          {notification.message}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          {timeAgo(notification.created_at)}
+                        </div>
+                      </div>
+                      {!notification.is_read && (
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          background: '#1976d2',
+                          borderRadius: '50%',
+                          flexShrink: 0
+                        }} />
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          {displayNotifications.length > 0 && (
+            <div style={{
+              padding: '12px 16px',
+              borderTop: '1px solid #eee',
+              textAlign: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  // Navigate to full notifications page
+                  window.location.href = '/notifications';
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#1976d2',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  textDecoration: 'underline'
+                }}
+              >
+                View all notifications
+              </button>
             </div>
           )}
-        </DropdownMenu>
-      </Dropdown>
+        </div>
+      )}
 
-      <style jsx>{`
-        .notification-dropdown {
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          border: none;
-          border-radius: 8px;
-        }
-
-        .notification-item:hover {
-          background-color: #f8f9fa;
-        }
-
-        .notification-item:last-child {
-          border-bottom: none !important;
-        }
-
-        @media (max-width: 768px) {
-          .notification-dropdown {
-            width: 300px !important;
-            right: 0 !important;
-            left: auto !important;
-          }
-        }
-      `}</style>
-    </>
+      {/* Click outside to close */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999
+          }}
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
   );
 };
 

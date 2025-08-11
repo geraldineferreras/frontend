@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import api from "../../services/api";
 
 // Notification type mapping
 const typeMap = {
@@ -6,6 +7,10 @@ const typeMap = {
   grade: { icon: "✅", color: "#43a047", title: "New Grade Posted" },
   assignment: { icon: "📝", color: "#ffc107", title: "Assignment" },
   general: { icon: "❗", color: "#888", title: "Notification" },
+  task: { icon: "📋", color: "#795548", title: "Task Update" },
+  stream_post: { icon: "💬", color: "#00bcd4", title: "New Stream Post" },
+  excuse: { icon: "📄", color: "#e91e63", title: "Excuse Letter Update" },
+  attendance: { icon: "✅", color: "#4caf50", title: "Attendance Update" },
 };
 
 // Time formatting helper
@@ -50,7 +55,7 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
       </div>
       {!is_read && (
         <button
-          onClick={e => { e.stopPropagation(); onMarkRead(notification.notification_id); }}
+          onClick={e => { e.stopPropagation(); onMarkRead(notification.id); }}
           style={{ background: meta.color, color: "#fff", border: "none", borderRadius: 8, padding: "4px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginLeft: 8 }}
         >
           Mark as read
@@ -60,70 +65,68 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
   );
 }
 
-// Mock fetchNotifications (replace with real API call)
-const mockNotifications = [
-  {
-    notification_id: 12,
-    type: "grade",
-    message: "You got 95 in Exam #1.",
-    is_read: false,
-    created_at: "2025-07-06 10:10:00"
-  },
-  {
-    notification_id: 13,
-    type: "announcement",
-    message: "Class is suspended tomorrow.",
-    is_read: false,
-    created_at: "2025-07-06 09:00:00"
-  },
-  {
-    notification_id: 14,
-    type: "assignment",
-    message: "New assignment: Project Proposal.",
-    is_read: true,
-    created_at: "2025-07-05 15:00:00"
-  },
-  {
-    notification_id: 15,
-    type: "general",
-    message: "Welcome to the portal!",
-    is_read: true,
-    created_at: "2025-07-01 08:00:00"
-  }
-];
-
+// Real API calls for student notifications
 const fetchNotifications = async () => {
-  // Replace with real API call
-  // const res = await fetch('/api/student/notifications', { headers: { Authorization: 'Bearer ...' } });
-  // return await res.json();
-  return new Promise(resolve => setTimeout(() => resolve(mockNotifications), 400));
+  try {
+    const response = await api.get('/notifications');
+    if (response.success && response.data) {
+      return response.data.notifications || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching student notifications:', error);
+    return [];
+  }
 };
 
-const markAsRead = async (notification_id) => {
-  // Replace with real API call
-  // await fetch('/api/student/notifications/markRead', { method: 'POST', body: JSON.stringify({ notification_id }) });
-  return true;
+const markAsRead = async (notificationId) => {
+  try {
+    await api.put(`/notifications/${notificationId}/read`);
+    return true;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return false;
+  }
 };
 
 const markAllAsRead = async () => {
-  // Replace with real API call
-  // await fetch('/api/student/notifications/markAllRead', { method: 'POST' });
-  return true;
+  try {
+    await api.put('/notifications/mark-all-read');
+    return true;
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return false;
+  }
 };
 
 const StudentNotifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const loadNotifications = useCallback(async () => {
-    setRefreshing(true);
-    const data = await fetchNotifications();
-    // Unread first
-    data.sort((a, b) => (a.is_read === b.is_read ? 0 : a.is_read ? 1 : -1));
-    setNotifications(data);
-    setLoading(false);
-    setRefreshing(false);
+    try {
+      setRefreshing(true);
+      setError(null);
+      const data = await fetchNotifications();
+      
+      // Sort: unread first, then by creation date (newest first)
+      data.sort((a, b) => {
+        if (a.is_read !== b.is_read) {
+          return a.is_read ? 1 : -1;
+        }
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+      
+      setNotifications(data);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+      setError('Failed to load notifications. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -133,13 +136,29 @@ const StudentNotifications = () => {
   }, [loadNotifications]);
 
   const handleMarkRead = async (id) => {
-    await markAsRead(id);
-    setNotifications(notifications => notifications.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
+    try {
+      const success = await markAsRead(id);
+      if (success) {
+        setNotifications(notifications => 
+          notifications.map(n => n.id === id ? { ...n, is_read: true } : n)
+        );
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
   const handleMarkAllRead = async () => {
-    await markAllAsRead();
-    setNotifications(notifications => notifications.map(n => ({ ...n, is_read: true })));
+    try {
+      const success = await markAllAsRead();
+      if (success) {
+        setNotifications(notifications => 
+          notifications.map(n => ({ ...n, is_read: true }))
+        );
+      }
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -157,22 +176,66 @@ const StudentNotifications = () => {
         </div>
         <button
           onClick={handleMarkAllRead}
-          disabled={unreadCount === 0}
-          style={{ background: unreadCount === 0 ? '#bbb' : '#1976d2', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 700, fontSize: 14, cursor: unreadCount === 0 ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}
+          disabled={unreadCount === 0 || refreshing}
+          style={{ 
+            background: unreadCount === 0 || refreshing ? '#bbb' : '#1976d2', 
+            color: '#fff', 
+            border: 'none', 
+            borderRadius: 8, 
+            padding: '8px 18px', 
+            fontWeight: 700, 
+            fontSize: 14, 
+            cursor: unreadCount === 0 || refreshing ? 'not-allowed' : 'pointer', 
+            transition: 'background 0.2s' 
+          }}
         >
-          Mark all as read
+          {refreshing ? 'Updating...' : 'Mark all as read'}
         </button>
       </div>
+      
+      {/* Error Message */}
+      {error && (
+        <div style={{ 
+          background: '#ffebee', 
+          color: '#c62828', 
+          padding: '12px 16px', 
+          borderRadius: 8, 
+          marginBottom: 16,
+          border: '1px solid #ffcdd2'
+        }}>
+          {error}
+          <button 
+            onClick={loadNotifications}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: '#c62828', 
+              textDecoration: 'underline', 
+              cursor: 'pointer', 
+              marginLeft: 8 
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
       {/* Notification Feed */}
       <div style={{ marginTop: 8 }}>
         {loading ? (
-          <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>Loading notifications...</div>
+          <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+            Loading notifications...
+          </div>
         ) : notifications.length === 0 ? (
-          <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>No notifications yet.</div>
-        ) : (
+          <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>🔔</div>
+            No notifications yet.
+          </div>
+          ) : (
           notifications.map(n => (
             <NotificationCard
-              key={n.notification_id}
+              key={n.id}
               notification={n}
               onMarkRead={handleMarkRead}
               onClick={() => { /* Optionally navigate to detail */ }}
