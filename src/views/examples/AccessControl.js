@@ -153,7 +153,9 @@ export default function AccessControl() {
   // Open modal and set toggles
   const handleManageAccess = (user) => {
     setSelectedUser(user);
-    setModuleToggles(systemModules.map(m => user.allowedModules.includes(m.key)));
+    // Initialize toggles based on user's allowed modules for their role
+    const userRoleModules = roleModules[user.role] || [];
+    setModuleToggles(userRoleModules.map(moduleKey => user.allowedModules.includes(moduleKey)));
     setModal(true);
     setSaveStatus(null);
   };
@@ -163,6 +165,11 @@ export default function AccessControl() {
     setModuleToggles(toggles => toggles.map((t, i) => i === idx ? !t : t));
   };
 
+  // Toggle all modules
+  const handleToggleAll = (enable) => {
+    setModuleToggles(Array(roleModules[selectedUser?.role]?.length || 0).fill(enable));
+  };
+
   // Save changes
   const handleSave = () => {
     if (selectedUser.role === "admin") {
@@ -170,21 +177,56 @@ export default function AccessControl() {
       return;
     }
     if (!moduleToggles.some(Boolean)) {
-      setSaveStatus({ type: "error", msg: "This user will lose access to all modules." });
+      setSaveStatus({ type: "error", msg: "This user will lose access to all modules. Please enable at least one module." });
       return;
     }
+    
+    // Check if this is a significant change (more than 50% of modules affected)
+    const currentEnabled = selectedUser.allowedModules.length;
+    const newEnabled = moduleToggles.filter(Boolean).length;
+    const changePercentage = Math.abs(newEnabled - currentEnabled) / currentEnabled;
+    
+    if (changePercentage > 0.5) {
+      setSaveStatus({ type: "warning", msg: "This is a significant change to user permissions. Please review carefully." });
+      setTimeout(() => setSaveStatus(null), 3000);
+      return;
+    }
+    
     // Simulate save
-    setSaveStatus({ type: "success", msg: `Access permissions updated for ${selectedUser.name}` });
+    setSaveStatus({ type: "success", msg: `Access permissions updated for ${selectedUser.name}. ${newEnabled} modules enabled.` });
     if (!modifiedUsers.includes(selectedUser.id)) {
       setModifiedUsers([...modifiedUsers, selectedUser.id]);
     }
-    setTimeout(() => setModal(false), 1200);
+    setTimeout(() => setModal(false), 2000);
   };
 
   // Cancel changes
   const handleCancel = () => {
     setModal(false);
     setSaveStatus(null);
+  };
+
+  // Export access control data
+  const handleExport = () => {
+    const csvContent = [
+      ["Name", "Email", "Role", "Status", "Modules Access", "Allowed Modules"].join(","),
+      ...filteredUsers.map(user => [
+        user.name,
+        user.email,
+        user.role,
+        user.status,
+        user.allowedModules.length,
+        user.allowedModules.join(";")
+      ].join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "access_control_report.csv";
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   // Count enabled modules
@@ -202,6 +244,15 @@ export default function AccessControl() {
             Access Control
             <span className="float-right" style={{ fontSize: 16, fontWeight: 400 }}>
               {modifiedUsers.length > 0 && <Badge color="info">{modifiedUsers.length} user(s) with modified permissions</Badge>}
+              <Button 
+                color="secondary" 
+                size="sm" 
+                className="ml-3"
+                onClick={handleExport}
+                title="Export access control data to CSV"
+              >
+                📊 Export
+              </Button>
             </span>
           </CardHeader>
           <CardBody>
@@ -240,12 +291,13 @@ export default function AccessControl() {
                     <th>Email</th>
                     <th>Role</th>
                     <th>Status</th>
+                    <th>Modules Access</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center text-muted">No users found.</td></tr>
+                    <tr><td colSpan={6} className="text-center text-muted">No users found.</td></tr>
                   ) : filteredUsers.map(user => (
                     <tr key={user.id}>
                       <td className="d-flex align-items-center">
@@ -255,6 +307,11 @@ export default function AccessControl() {
                       <td>{user.email}</td>
                       <td>{roleBadge(user.role)}</td>
                       <td>{statusBadge(user.status)}</td>
+                      <td>
+                        <Badge color="info" style={{ fontSize: 12 }} title={user.allowedModules.join(", ")}>
+                          {user.allowedModules.length} modules
+                        </Badge>
+                      </td>
                       <td>
                         <Button color="info" size="sm" onClick={() => handleManageAccess(user)}>
                           <FaLock className="mr-1" /> Manage Access
@@ -287,26 +344,57 @@ export default function AccessControl() {
                 </div>
               </div>
               <div className="mb-2" style={{ fontWeight: 600, fontSize: 16 }}>Module Access</div>
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                {(selectedUser ? systemModules.filter(mod => roleModules[selectedUser.role]?.includes(mod.key)) : []).map((mod, idx) => (
-                  <div key={mod.key} className="d-flex align-items-center justify-content-between mb-2 p-2" style={{ background: idx % 2 === 0 ? "#f8fafd" : "#fff", borderRadius: 8 }}>
-                    <div>
-                      <span style={{ fontWeight: 500 }}>{mod.key}</span>
-                      <span className="text-muted ml-2" style={{ fontSize: 13 }}>{mod.desc}</span>
-                    </div>
-                    <div>
-                      <label className="switch mb-0">
-                        <input
-                          type="checkbox"
-                          checked={moduleToggles[roleModules[selectedUser.role].indexOf(mod.key)] || false}
-                          onChange={() => handleToggle(roleModules[selectedUser.role].indexOf(mod.key))}
-                          disabled={selectedUser.role === "admin"}
-                        />
-                        <span className="slider round" style={{ background: moduleToggles[roleModules[selectedUser.role].indexOf(mod.key)] ? "#2dce89" : "#adb5bd" }}></span>
-                      </label>
-                    </div>
+              <div className="mb-3 p-2" style={{ background: "#e3f2fd", borderRadius: 8, border: "1px solid #bbdefb" }}>
+                <span className="text-info" style={{ fontSize: 14 }}>
+                  <strong>{enabledCount}</strong> of <strong>{roleModules[selectedUser.role]?.length || 0}</strong> modules enabled for this role
+                </span>
+                {selectedUser && selectedUser.role !== "admin" && (
+                  <div className="mt-2">
+                    <Button 
+                      color="success" 
+                      size="sm" 
+                      className="mr-2"
+                      onClick={() => handleToggleAll(true)}
+                      disabled={enabledCount === roleModules[selectedUser.role]?.length}
+                    >
+                      <FaCheckCircle className="mr-1" /> Enable All
+                    </Button>
+                    <Button 
+                      color="warning" 
+                      size="sm"
+                      onClick={() => handleToggleAll(false)}
+                      disabled={enabledCount === 0}
+                    >
+                      <FaTimesCircle className="mr-1" /> Disable All
+                    </Button>
                   </div>
-                ))}
+                )}
+              </div>
+              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                {(selectedUser ? roleModules[selectedUser.role] || [] : []).map((moduleKey, idx) => {
+                  const module = systemModules.find(m => m.key === moduleKey);
+                  if (!module) return null;
+                  
+                  return (
+                    <div key={moduleKey} className="d-flex align-items-center justify-content-between mb-2 p-2" style={{ background: idx % 2 === 0 ? "#f8fafd" : "#fff", borderRadius: 8 }}>
+                      <div>
+                        <span style={{ fontWeight: 500 }}>{module.key}</span>
+                        <span className="text-muted ml-2" style={{ fontSize: 13 }}>{module.desc}</span>
+                      </div>
+                      <div>
+                        <label className="switch mb-0">
+                          <input
+                            type="checkbox"
+                            checked={moduleToggles[idx] || false}
+                            onChange={() => handleToggle(idx)}
+                            disabled={selectedUser.role === "admin"}
+                          />
+                          <span className="slider round" style={{ background: moduleToggles[idx] ? "#2dce89" : "#adb5bd" }}></span>
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {saveStatus && (
                 <Alert color={saveStatus.type === "success" ? "success" : "danger"} className="text-center py-2">

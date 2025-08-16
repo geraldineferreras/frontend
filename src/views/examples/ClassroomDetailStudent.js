@@ -9,6 +9,7 @@ import apiService from '../../services/api';
 import axios from "axios";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
 import useMinDelay from "utils/useMinDelay";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 // Mock data removed - now using real API data
 
@@ -167,6 +168,7 @@ function formatRelativeTime(dateString) {
 const ClassroomDetailStudent = () => {
   const { code } = useParams();
   const navigate = useNavigate();
+  const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState("stream");
   // Initialize active tab from URL query (?tab=class)
   useEffect(() => {
@@ -202,6 +204,19 @@ const ClassroomDetailStudent = () => {
   const [attachmentDropdownOpenId, setAttachmentDropdownOpenId] = useState(null); // id of announcement or 'new' for new post
   const attachmentMenuRef = useRef();
   const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+  const notifyUnderDevelopment = () => {
+    try {
+      addNotification({
+        type: 'info',
+        title: 'Feature Under Development',
+        message: 'This section is currently under development.',
+        duration: 4000,
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert('Feature Under Development');
+    }
+  };
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [modalUrl, setModalUrl] = useState("");
@@ -246,12 +261,15 @@ const ClassroomDetailStudent = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const visualizerIntervalRef = useRef(null);
+  const wavePathRef = useRef(null);
+  
   useEffect(() => {
     const interval = setInterval(() => {
       setMp3BgIndex(idx => (idx + 1) % mp3Backgrounds.length);
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+  
   useEffect(() => {
     if (previewAttachment && previewAttachment.file && previewAttachment.file.type && previewAttachment.file.type.startsWith('audio/')) {
       const url = typeof previewAttachment.file === 'string' ? previewAttachment.file : URL.createObjectURL(previewAttachment.file);
@@ -259,6 +277,7 @@ const ClassroomDetailStudent = () => {
       return () => { if (typeof previewAttachment.file !== 'string') URL.revokeObjectURL(url); };
     }
   }, [previewAttachment]);
+  
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -974,24 +993,30 @@ const ClassroomDetailStudent = () => {
     const wordExts = ['doc', 'docx', 'dot', 'dotx', 'docm', 'dotm'];
     const excelExts = ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'csv'];
     const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'pptm', 'potx', 'potm', 'ppsm'];
+    
     if (att.type === 'link') {
-      return <i className="fa fa-globe" style={{ fontSize: 32, color: '#888', marginRight: 14 }} />;
+      return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">LINK</text></svg>;
     }
     if (att.type === 'youtube') {
-      return <i className="fa fa-youtube-play" style={{ fontSize: 32, color: '#f00', marginRight: 14 }} />;
+      return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>;
     }
     if (att.type === 'drive') {
-      return <i className="fa fa-cloud-upload" style={{ fontSize: 32, color: '#1976d2', marginRight: 14 }} />;
+      return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">DRIVE</text></svg>;
     }
     if (att.type === 'file' && att.file && att.file.type && att.file.type.startsWith('image')) {
       return <img src={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)} alt={att.name} style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', marginRight: 14 }} />;
     }
+    
+    // Enhanced MP3 icon matching teacher role design
     if (att.type === 'file' && att.file && att.file.type && att.file.type.startsWith('audio')) {
       return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/><circle cx="16" cy="20" r="7" fill="#43a047"/><rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text></svg>;
     }
+    
+    // Enhanced MP4 icon matching teacher role design
     if (att.type === 'file' && att.file && att.file.type && att.file.type.startsWith('video')) {
       return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#8e24aa" strokeWidth="2"/><polygon points="13,14 25,20 13,26" fill="#8e24aa"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#8e24aa" fontWeight="bold">MP4</text></svg>;
     }
+    
     if (att.type === 'file' && ext === 'pdf') {
       return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text></svg>;
     }
@@ -1013,8 +1038,6 @@ const ClassroomDetailStudent = () => {
     return null;
   }
 
-  // Add at the top of the component
-  const wavePathRef = useRef(null);
   // Animate the wave at the bottom
   useEffect(() => {
     let t = 0;
@@ -1435,7 +1458,7 @@ const ClassroomDetailStudent = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, gap: 12 }}>
               <button
                 type="button"
-                onClick={() => setActiveStreamTab(activeStreamTab === 'scheduled' ? null : 'scheduled')}
+                onClick={() => { notifyUnderDevelopment(); setActiveStreamTab(activeStreamTab === 'scheduled' ? null : 'scheduled'); }}
                 style={{
                   borderRadius: 8,
                   fontWeight: 500,
@@ -1457,7 +1480,7 @@ const ClassroomDetailStudent = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveStreamTab(activeStreamTab === 'drafts' ? null : 'drafts')}
+                onClick={() => { notifyUnderDevelopment(); setActiveStreamTab(activeStreamTab === 'drafts' ? null : 'drafts'); }}
                 style={{
                   borderRadius: 8,
                   fontWeight: 500,
@@ -1797,8 +1820,15 @@ const ClassroomDetailStudent = () => {
                       const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
                       const linkColor = typeColor;
                       const isFile = att.type === 'file' && att.file;
+                      let url = undefined;
+                      if (!isFile && att.url) url = att.url;
+                      const typeStr = String(att.type || att.attachment_type || '').toLowerCase();
+                      const isLink = (!!url && (!att.file || typeStr !== 'file')) && (
+                        typeStr === 'link' || typeStr === 'youtube' || typeStr === 'google drive' || typeStr === 'google_drive' || typeStr === 'drive' || typeStr === ''
+                      );
                       // Truncate file name and type string
-                      const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
+                      const displayNameRaw = isLink ? url : (att.name || att.url || 'Attachment');
+                      const displayName = displayNameRaw.length > 22 ? displayNameRaw.slice(0, 19) + '...' : displayNameRaw;
                       let typeString = '';
                       if (isFile && att.file && att.file.type && !isMp3 && !isPdf && !isMp4 && !isWord) {
                         typeString = att.file.type.toUpperCase();
@@ -1809,8 +1839,8 @@ const ClassroomDetailStudent = () => {
                       return (
                         <div
                           key={idx}
-                          style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isFile ? 'pointer' : 'default' }}
-                          onClick={isFile ? () => handlePreviewAttachment(att) : undefined}
+                          style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isLink ? 'pointer' : (isFile ? 'pointer' : 'default') }}
+                          onClick={() => { if (isLink && url) { window.open(url, '_blank', 'noopener,noreferrer'); } else if (isFile) { handlePreviewAttachment(att); } }}
                         >
                           {/* File icon */}
                           {isMp3 ? (
@@ -1855,14 +1885,12 @@ const ClassroomDetailStudent = () => {
                                   Download
                                 </a>
                               ) : null}
-                              {/* Always open modal instead of new tab */}
-                              <a
-                                href="#"
-                                style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
-                              >
-                                Open
-                              </a>
+                              {isLink && url && (
+                                <>
+                                  <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>
+                                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: linkColor, fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>View Link</a>
+                                </>
+                              )}
                                   </div>
                                 </div>
                         </div>
@@ -3586,10 +3614,276 @@ const ClassroomDetailStudent = () => {
               }
               if (fileType.startsWith('audio/') || /(\.mp3|\.mpeg)(\?.*)?$/.test(lower)) {
                 return (
-                  <audio controls style={{ width: '100%' }} src={url}>
-                    <source src={url} type={fileType || 'audio/mpeg'} />
-                    Your browser does not support the audio element.
-                  </audio>
+                  <div 
+                    id="mp3-container"
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      padding: '30px 15px',
+                      background: mp3Backgrounds[mp3BgIndex],
+                      borderRadius: '16px',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all 2s cubic-bezier(0.4,0,0.2,1)',
+                      boxShadow: isPlaying 
+                        ? '0 20px 60px rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.1)' 
+                        : '0 8px 32px rgba(0,0,0,0.2)',
+                      maxHeight: '600px'
+                    }}
+                  >
+                    {/* Enhanced Animated Disk - scales up and rotates faster when playing */}
+                    <div 
+                      id="mp3-disk"
+                      style={{
+                        width: '120px',
+                        height: '120px',
+                        borderRadius: '50%',
+                        background: 'conic-gradient(from 0deg, #333 0deg, #666 90deg, #333 180deg, #666 270deg, #333 360deg)',
+                        border: '6px solid #fff',
+                        boxShadow: isPlaying 
+                          ? '0 8px 32px rgba(0,0,0,0.5), 0 0 15px rgba(255,255,255,0.2)' 
+                          : '0 6px 24px rgba(0,0,0,0.3)',
+                        marginBottom: '20px',
+                        position: 'relative',
+                        transition: 'all 0.3s ease',
+                        zIndex: 2,
+                        transform: isPlaying ? 'scale(1.1)' : 'scale(1)',
+                        animation: isPlaying ? 'rotate 2s linear infinite' : 'none'
+                      }}
+                    >
+                      {/* Disk Center */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: '#fff',
+                        border: '2px solid #333',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#333'
+                        }} />
+                      </div>
+                      {/* Disk Grooves */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '96px',
+                        height: '96px',
+                        borderRadius: '50%',
+                        background: 'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 2deg, rgba(255,255,255,0.1) 2deg, rgba(255,255,255,0.1) 4deg)'
+                      }} />
+                    </div>
+
+                    {/* Audio Visualizer - 20 animated bars that respond to music playback */}
+                    <div id="audio-visualizer" style={{
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      gap: '2px',
+                      height: '40px',
+                      marginBottom: '15px',
+                      opacity: isPlaying ? 1 : 0,
+                      transition: 'opacity 0.3s ease',
+                      zIndex: 2
+                    }}>
+                      {[...Array(20)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="visualizer-bar"
+                          style={{
+                            width: '3px',
+                            background: 'rgba(255, 255, 255, 0.8)',
+                            borderRadius: '1.5px',
+                            height: '8px',
+                            transition: 'height 0.1s ease',
+                            boxShadow: '0 0 6px 1px rgba(255,255,255,0.3)'
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Audio Player */}
+                    <div style={{ width: '100%', maxWidth: '500px', zIndex: 2, position: 'relative' }}>
+                      <audio 
+                        ref={audioRef}
+                        id="mp3-player"
+                        controls 
+                        src={audioUrl || ''}
+                        style={{ 
+                          width: '100%',
+                          borderRadius: '20px'
+                        }}
+                      >
+                        <source src={audioUrl || ''} type={
+                          previewAttachment?.file?.type || 
+                          (previewAttachment?.name?.toLowerCase().endsWith('.mp3') ? 'audio/mp3' :
+                           previewAttachment?.name?.toLowerCase().endsWith('.wav') ? 'audio/wav' :
+                           previewAttachment?.name?.toLowerCase().endsWith('.ogg') ? 'audio/ogg' :
+                           previewAttachment?.name?.toLowerCase().endsWith('.aac') ? 'audio/aac' :
+                           previewAttachment?.name?.toLowerCase().endsWith('.flac') ? 'audio/flac' :
+                           'audio/mp3')
+                        } />
+                        Your browser does not support the audio tag.
+                      </audio>
+                    </div>
+
+                    {/* File Info */}
+                    <div style={{ 
+                      marginTop: '6px',
+                      textAlign: 'center',
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      padding: '8px 12px',
+                      borderRadius: '12px',
+                      boxShadow: '0 6px 24px rgba(0,0,0,0.1)',
+                      width: '100%',
+                      maxWidth: '500px',
+                      fontWeight: 500,
+                      position: 'relative',
+                      zIndex: 2,
+                      transition: 'all 0.3s ease'
+                    }}>
+                      {/* Enhanced Music Note SVG */}
+                      <div style={{ margin: 0, padding: 0, height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transition: 'all 2s cubic-bezier(0.4,0,0.2,1)' }}>
+                          <circle cx="24" cy="24" r="24" fill={`url(#music-gradient-${mp3BgIndex})`} style={{ transition: 'fill 2s cubic-bezier(0.4,0,0.2,1)' }} />
+                          <defs>
+                            {mp3Backgrounds.map((gradient, idx) => (
+                              <linearGradient id={`music-gradient-${idx}`} key={idx} x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                                {/* Parse the gradient string to extract colors */}
+                                {(() => {
+                                  // Extract color stops from the gradient string
+                                  const stops = gradient.match(/#([0-9a-fA-F]{6,8})/g);
+                                  if (!stops) return null;
+                                  return stops.map((color, i) => (
+                                    <stop key={i} offset={i / (stops.length - 1)} stopColor={color} />
+                                  ));
+                                })()}
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <path d="M32 12V30.5C32 33.5376 29.5376 36 26.5 36C23.4624 36 21 33.5376 21 30.5C21 27.4624 23.4624 25 26.5 25C27.8807 25 29.0784 25.3358 29.5858 25.8787C29.8358 26.1287 30 26.4886 30 26.8787V16H18V30.5C18 33.5376 15.5376 36 12.5 36C9.46243 36 7 33.5376 7 30.5C7 27.4624 9.46243 25 12.5 25C13.8807 25 15.0784 25.3358 15.5858 25.8787C15.8358 26.1287 16 26.4886 16 26.8787V12C16 11.4477 16.4477 11 17 11H31C31.5523 11 32 11.4477 32 12Z" fill="white"/>
+                        </svg>
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '3px', color: '#2c3e50' }}>
+                        {previewAttachment.name}
+                      </div>
+                      <div style={{ fontSize: '13px', opacity: '0.8', color: '#7f8c8d' }}>
+                        MP3 Audio File
+                      </div>
+                    </div>
+
+                    {/* Enhanced CSS Animations */}
+                    <style>
+                      {`
+                        @keyframes rotate {
+                          from { transform: rotate(0deg); }
+                          to { transform: rotate(360deg); }
+                        }
+                        
+                        @keyframes float {
+                          0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
+                          50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
+                        }
+                        
+                        @keyframes pulse {
+                          0%, 100% { transform: scale(1); }
+                          50% { transform: scale(1.05); }
+                        }
+                        
+                        #mp3-disk:hover {
+                          transform: scale(1.1);
+                          box-shadow: 0 12px 48px rgba(0,0,0,0.4);
+                        }
+                        
+                        .particle {
+                          animation-delay: calc(var(--i) * -0.5s);
+                        }
+                        
+                        .visualizer-bar {
+                          animation: visualizerPulse 0.5s ease-in-out infinite alternate;
+                        }
+                        
+                        @keyframes visualizerPulse {
+                          from { height: 10px; }
+                          to { height: 40px; }
+                        }
+                        
+                        /* Enhanced hover effects */
+                        #mp3-disk:hover {
+                          transform: scale(1.1);
+                          box-shadow: 0 12px 48px rgba(0,0,0,0.4);
+                        }
+                        
+                        /* Smooth transitions for all interactive elements */
+                        * {
+                          transition: all 0.3s ease;
+                        }
+                      `}
+                    </style>
+
+                    {/* Animated Floating Particles - 20 particles that appear when music plays */}
+                    <div id="particles-container" style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                      opacity: isPlaying ? 1 : 0,
+                      transition: 'opacity 0.5s ease',
+                    }}>
+                      {[...Array(20)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="particle"
+                          style={{
+                            position: 'absolute',
+                            width: `${Math.random() * 8 + 4}px`,
+                            height: `${Math.random() * 8 + 4}px`,
+                            background: 'rgba(255, 255, 255, 0.7)',
+                            borderRadius: '50%',
+                            left: `${Math.random() * 90 + 5}%`,
+                            top: `${Math.random() * 80 + 10}%`,
+                            boxShadow: '0 0 12px 2px rgba(255,255,255,0.3)',
+                            animation: isPlaying ? `float ${3 + Math.random() * 4}s ease-in-out infinite` : 'none',
+                            animationDelay: `${Math.random() * 2}s`,
+                            transform: `rotate(${Math.random() * 360}deg)`,
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Subtle Animated Wave at Bottom */}
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      bottom: 0,
+                      width: '100%',
+                      height: '80px',
+                      zIndex: 1,
+                      pointerEvents: 'none',
+                      overflow: 'hidden',
+                    }}>
+                      <svg width="100%" height="100%" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+                        <path ref={wavePathRef} d="M0,40 Q360,80 720,40 T1440,40 V80 H0 Z" fill="rgba(255,255,255,0.10)" />
+                      </svg>
+                    </div>
+                  </div>
                 );
               }
               if (fileType === 'application/pdf' || /(\.pdf)(\?.*)?$/.test(lower)) {

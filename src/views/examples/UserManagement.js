@@ -65,6 +65,13 @@ import autoTable from 'jspdf-autotable';
 const defaultCoverPhotoSvg =
   "data:image/svg+xml;utf8,<svg width='600' height='240' viewBox='0 0 600 240' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='600' height='240' fill='%23f7f7f7'/><path d='M0 180 Q150 120 300 180 T600 180 V240 H0 Z' fill='%23e3eafc'/><path d='M0 200 Q200 140 400 200 T600 200 V240 H0 Z' fill='%23cfd8dc' opacity='0.7'/></svg>";
 
+// Helper function to add cache busting to image URLs
+const addCacheBuster = (url) => {
+  if (!url || url.startsWith('data:')) return url;
+  const cacheBuster = `t=${Date.now()}`;
+  return url + (url.includes('?') ? '&' : '?') + cacheBuster;
+};
+
 // Floating effect for content over header
 const userManagementStyles = `
   .section-content-container {
@@ -131,16 +138,22 @@ const userManagementStyles = `
 
 const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
-   const [activeTab, setActiveTab] = useState("admin");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  
+  // Initialize active tab from URL parameter, default to "admin" if not specified
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabFromUrl = searchParams.get('tab');
+    return tabFromUrl && ['admin', 'teacher', 'student'].includes(tabFromUrl) ? tabFromUrl : 'admin';
+  });
+  
   const [entriesToShow, setEntriesToShow] = useState(10);
   const [sortBy, setSortBy] = useState("created_at"); // Default to 'Recently Added'
   const [sortOrder, setSortOrder] = useState("desc"); // Default to most recent first
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isMobile, setIsMobile] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
   const [users, setUsers] = useState([]);
   const [admins, setAdmins] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -154,7 +167,11 @@ const UserManagement = () => {
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
-  const [viewMode, setViewMode] = useState("table");
+  // Initialize view mode from URL parameter, default to "table" if not specified
+  const [viewMode, setViewMode] = useState(() => {
+    const viewFromUrl = searchParams.get('view');
+    return viewFromUrl && ['table', 'blocks'].includes(viewFromUrl) ? viewFromUrl : 'table';
+  });
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -227,19 +244,51 @@ const UserManagement = () => {
         const sectionIds = [...new Set(usersArr.map(user => user.section_id).filter(Boolean))];
         const sectionsData = {};
         
-        for (const sectionId of sectionIds) {
-          try {
-            const sectionData = await ApiService.getSectionById(sectionId);
-            if (sectionData && sectionData.data) {
-              sectionsData[sectionId] = sectionData.data;
+        // First get all sections to build a lookup map
+        try {
+          const allSectionsResponse = await ApiService.getSections();
+          const allSections = allSectionsResponse?.data || allSectionsResponse || [];
+          
+          // Create a lookup map for all sections
+          const sectionLookup = {};
+          allSections.forEach(section => {
+            const sectionId = section.id || section.section_id;
+            if (sectionId) {
+              sectionLookup[sectionId] = section;
             }
-          } catch (error) {
-            console.error(`Failed to fetch section ${sectionId}:`, error);
-            sectionsData[sectionId] = { name: `Section ${sectionId}`, id: sectionId };
+          });
+          
+          // Update users with section names
+          usersArr = usersArr.map(user => {
+            if (user.section_id && sectionLookup[user.section_id]) {
+              const sectionInfo = sectionLookup[user.section_id];
+              return {
+                ...user,
+                section_name: sectionInfo.section_name || sectionInfo.name || `Section ${user.section_id}`,
+                section_info: sectionInfo
+              };
+            }
+            return user;
+          });
+          
+          // Store section data for later use
+          setSections(sectionLookup);
+        } catch (error) {
+          console.error('Failed to fetch sections:', error);
+          // Fallback: fetch individual sections
+          for (const sectionId of sectionIds) {
+            try {
+              const sectionData = await ApiService.getSectionById(sectionId);
+              if (sectionData && sectionData.data) {
+                sectionsData[sectionId] = sectionData.data;
+              }
+            } catch (error) {
+              console.error(`Failed to fetch section ${sectionId}:`, error);
+              sectionsData[sectionId] = { name: `Section ${sectionId}`, id: sectionId };
+            }
           }
+          setSections(sectionsData);
         }
-        
-        setSections(sectionsData);
       }
       
       setUsers(usersArr);
@@ -250,6 +299,21 @@ const UserManagement = () => {
       setLoading(false);
     }
   };
+
+  // Handle URL changes and update active tab and view mode accordingly
+  useEffect(() => {
+    const currentSearchParams = new URLSearchParams(location.search);
+    const tabFromUrl = currentSearchParams.get('tab');
+    const viewFromUrl = currentSearchParams.get('view');
+    
+    if (tabFromUrl && ['admin', 'teacher', 'student'].includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+    
+    if (viewFromUrl && ['table', 'blocks'].includes(viewFromUrl) && viewFromUrl !== viewMode) {
+      setViewMode(viewFromUrl);
+    }
+  }, [location.search, activeTab, viewMode]);
 
   // Initial fetch when component mounts or activeTab changes
   useEffect(() => {
@@ -283,7 +347,10 @@ const UserManagement = () => {
   useEffect(() => {
     const refreshParam = searchParams.get('refresh');
     if (refreshParam === 'true') {
-      fetchUsersAndSections();
+      // Force a refresh with a small delay to ensure any backend changes are reflected
+      setTimeout(() => {
+        fetchUsersAndSections();
+      }, 500);
       // Remove the refresh parameter from URL
       const newSearchParams = new URLSearchParams(location.search);
       newSearchParams.delete('refresh');
@@ -468,6 +535,17 @@ const UserManagement = () => {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setCurrentPage(1);
+    
+    // Update URL to include the active tab
+    const newSearchParams = new URLSearchParams(location.search);
+    newSearchParams.set('tab', tab);
+    
+    // Preserve other URL parameters like view mode
+    const currentView = newSearchParams.get('view') || 'table';
+    newSearchParams.set('view', currentView);
+    
+    // Navigate to the new URL without triggering a page reload
+    navigate(`${location.pathname}?${newSearchParams.toString()}`, { replace: true });
   };
 
   const handleDeleteUser = (id, name) => {
@@ -562,19 +640,21 @@ const UserManagement = () => {
       if (user.profile_pic.startsWith('uploads/')) {
         imageUrl = `http://localhost/scms_new_backup/${user.profile_pic}`;
       }
-      // If it's already a full URL, return as is
+      // If it's already a full URL, use as is
       else if (user.profile_pic.startsWith('http://') || user.profile_pic.startsWith('https://')) {
         imageUrl = user.profile_pic;
       }
-      // If it's a base64 data URL, return as is
+      // If it's a base64 data URL, return as is (no cache busting needed)
       else if (user.profile_pic.startsWith('data:')) {
-        imageUrl = user.profile_pic;
+        return user.profile_pic;
       }
       // For other cases, try to construct the full URL
       else {
         imageUrl = `http://localhost/scms_new_backup/uploads/profile/${user.profile_pic}`;
       }
       
+      // Add cache busting to prevent browser caching
+      imageUrl = addCacheBuster(imageUrl);
       console.log(`Avatar URL for ${user.full_name}: ${imageUrl}`);
       return imageUrl;
     }
@@ -590,19 +670,21 @@ const UserManagement = () => {
       if (user.cover_pic.startsWith('uploads/')) {
         imageUrl = `http://localhost/scms_new_backup/${user.cover_pic}`;
       }
-      // If it's already a full URL, return as is
+      // If it's already a full URL, use as is
       else if (user.cover_pic.startsWith('http://') || user.cover_pic.startsWith('https://')) {
         imageUrl = user.cover_pic;
       }
-      // If it's a base64 data URL, return as is
+      // If it's a base64 data URL, return as is (no cache busting needed)
       else if (user.cover_pic.startsWith('data:')) {
-        imageUrl = user.cover_pic;
+        return user.cover_pic;
       }
       // For other cases, try to construct the full URL
       else {
         imageUrl = `http://localhost/scms_new_backup/uploads/cover/${user.cover_pic}`;
       }
       
+      // Add cache busting to prevent browser caching
+      imageUrl = addCacheBuster(imageUrl);
       console.log(`Cover URL for ${user.full_name}: ${imageUrl}`);
       return imageUrl;
     }
@@ -621,8 +703,12 @@ const UserManagement = () => {
 
   // Edit user navigation
   const handleEditUser = (user) => {
-    // Navigate to EditUser page with user ID and role
-    navigate(`/admin/edit-user/${user.id}?role=${user.role}`);
+    // Navigate to EditUser page with user ID, role, and preserve current tab and view
+    const currentSearchParams = new URLSearchParams(location.search);
+    const currentTab = currentSearchParams.get('tab') || activeTab;
+    const currentView = currentSearchParams.get('view') || 'table';
+    
+    navigate(`/admin/edit-user/${user.id}?role=${user.role}&tab=${currentTab}&view=${currentView}`);
   };
 
   // Helper to abbreviate course names
@@ -645,6 +731,11 @@ const UserManagement = () => {
     // Use section_name from the API response if available
     if (user.section_name) {
       return user.section_name;
+    }
+    // Try to get from sections lookup
+    if (user.section_id && sections[user.section_id]) {
+      const sectionInfo = sections[user.section_id];
+      return sectionInfo.section_name || sectionInfo.name || `Section ${user.section_id}`;
     }
     // Fallback to section_id if section_name is not available
     if (user.section_id) {
@@ -1009,14 +1100,14 @@ const UserManagement = () => {
                               alt="..."
                               src={getAvatarForUser(user)}
                               onError={(e) => {
-                                // Try alternative URL patterns if the first one fails
-                                const currentSrc = e.target.src;
+                                // Remove cache busting parameters for fallback attempts
+                                const currentSrc = e.target.src.split('?')[0];
                                 if (currentSrc.includes('uploads/profile/')) {
                                   // Try without the profile subdirectory
-                                  e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                                  e.target.src = addCacheBuster(currentSrc.replace('/uploads/profile/', '/uploads/'));
                                 } else if (currentSrc.includes('/uploads/')) {
                                   // Try with profile subdirectory
-                                  e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                                  e.target.src = addCacheBuster(currentSrc.replace('/uploads/', '/uploads/profile/'));
                                 } else {
                                   // Fallback to default avatar
                                   e.target.src = userDefault;
@@ -1107,14 +1198,14 @@ const UserManagement = () => {
                   alt="Cover"
                   style={{ height: '120px', objectFit: 'cover' }}
                   onError={(e) => {
-                    // Try alternative URL patterns if the first one fails
-                    const currentSrc = e.target.src;
+                    // Remove cache busting parameters for fallback attempts
+                    const currentSrc = e.target.src.split('?')[0];
                     if (currentSrc.includes('uploads/cover/')) {
                       // Try without the cover subdirectory
-                      e.target.src = currentSrc.replace('/uploads/cover/', '/uploads/');
+                      e.target.src = addCacheBuster(currentSrc.replace('/uploads/cover/', '/uploads/'));
                     } else if (currentSrc.includes('/uploads/')) {
                       // Try with cover subdirectory
-                      e.target.src = currentSrc.replace('/uploads/', '/uploads/cover/');
+                      e.target.src = addCacheBuster(currentSrc.replace('/uploads/', '/uploads/cover/'));
                     } else {
                       // Fallback to default cover
                       e.target.src = defaultCoverPhotoSvg;
@@ -1128,14 +1219,14 @@ const UserManagement = () => {
                     alt="Profile"
                     style={{ width: '60px', height: '60px', objectFit: 'cover' }}
                     onError={(e) => {
-                      // Try alternative URL patterns if the first one fails
-                      const currentSrc = e.target.src;
+                      // Remove cache busting parameters for fallback attempts
+                      const currentSrc = e.target.src.split('?')[0];
                       if (currentSrc.includes('uploads/profile/')) {
                         // Try without the profile subdirectory
-                        e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                        e.target.src = addCacheBuster(currentSrc.replace('/uploads/profile/', '/uploads/'));
                       } else if (currentSrc.includes('/uploads/')) {
                         // Try with profile subdirectory
-                        e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                        e.target.src = addCacheBuster(currentSrc.replace('/uploads/', '/uploads/profile/'));
                       } else {
                         // Fallback to default avatar
                         e.target.src = userDefault;
@@ -1370,7 +1461,13 @@ const UserManagement = () => {
                     <Button
                       color="primary"
                       size="sm"
-                      onClick={() => navigate('/admin/create-user')}
+                      onClick={() => {
+                        // Preserve current tab and view when navigating to create user
+                        const currentSearchParams = new URLSearchParams(location.search);
+                        const currentTab = currentSearchParams.get('tab') || activeTab;
+                        const currentView = currentSearchParams.get('view') || 'table';
+                        navigate(`/admin/create-user?tab=${currentTab}&view=${currentView}`);
+                      }}
                       style={{
                         backgroundColor: '#5e72e4',
                         border: '1px solid #5e72e4',
@@ -1394,7 +1491,13 @@ const UserManagement = () => {
                     color={viewMode === "table" ? "primary" : "secondary"}
                     size="sm"
                     className="mr-2"
-                    onClick={() => setViewMode("table")}
+                    onClick={() => {
+                      setViewMode("table");
+                      // Update URL to persist view mode
+                      const newSearchParams = new URLSearchParams(location.search);
+                      newSearchParams.set('view', 'table');
+                      navigate(`${location.pathname}?${newSearchParams.toString()}`, { replace: true });
+                    }}
                   >
                     <i className="fas fa-table mr-1" />
                     Table
@@ -1402,7 +1505,13 @@ const UserManagement = () => {
                   <Button
                     color={viewMode === "blocks" ? "primary" : "secondary"}
                     size="sm"
-                    onClick={() => setViewMode("blocks")}
+                    onClick={() => {
+                      setViewMode("blocks");
+                      // Update URL to persist view mode
+                      const newSearchParams = new URLSearchParams(location.search);
+                      newSearchParams.set('view', 'blocks');
+                      navigate(`${location.pathname}?${newSearchParams.toString()}`, { replace: true });
+                    }}
                   >
                     <i className="fas fa-th-large mr-1" />
                     Cards
@@ -1578,14 +1687,14 @@ const UserManagement = () => {
                    className="img-fluid rounded"
                    style={{ width: '100%', height: '200px', objectFit: 'cover' }}
                    onError={(e) => {
-                     // Try alternative URL patterns if the first one fails
-                     const currentSrc = e.target.src;
+                     // Remove cache busting parameters for fallback attempts
+                     const currentSrc = e.target.src.split('?')[0];
                      if (currentSrc.includes('uploads/cover/')) {
                        // Try without the cover subdirectory
-                       e.target.src = currentSrc.replace('/uploads/cover/', '/uploads/');
+                       e.target.src = addCacheBuster(currentSrc.replace('/uploads/cover/', '/uploads/'));
                      } else if (currentSrc.includes('/uploads/')) {
                        // Try with cover subdirectory
-                       e.target.src = currentSrc.replace('/uploads/', '/uploads/cover/');
+                       e.target.src = addCacheBuster(currentSrc.replace('/uploads/', '/uploads/cover/'));
                      } else {
                        // Fallback to default cover
                        e.target.src = defaultCoverPhotoSvg;
@@ -1604,14 +1713,14 @@ const UserManagement = () => {
                        borderColor: '#343a40'
                      }}
                      onError={(e) => {
-                       // Try alternative URL patterns if the first one fails
-                       const currentSrc = e.target.src;
+                       // Remove cache busting parameters for fallback attempts
+                       const currentSrc = e.target.src.split('?')[0];
                        if (currentSrc.includes('uploads/profile/')) {
                          // Try without the profile subdirectory
-                         e.target.src = currentSrc.replace('/uploads/profile/', '/uploads/');
+                         e.target.src = addCacheBuster(currentSrc.replace('/uploads/profile/', '/uploads/'));
                        } else if (currentSrc.includes('/uploads/')) {
                          // Try with profile subdirectory
-                         e.target.src = currentSrc.replace('/uploads/', '/uploads/profile/');
+                         e.target.src = addCacheBuster(currentSrc.replace('/uploads/', '/uploads/profile/'));
                        } else {
                          // Fallback to default avatar
                          e.target.src = userDefault;

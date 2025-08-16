@@ -221,6 +221,14 @@ class ApiService {
     });
   }
 
+  // New method using the correct endpoint for sections by year level
+  async getSectionsByYearLevel(yearLevel) {
+    return this.makeRequest(`/admin/sections/year?year_level=${yearLevel}`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async getSectionsByCourse(course) {
     // Map course IDs to full program names to match database
     const programMap = {

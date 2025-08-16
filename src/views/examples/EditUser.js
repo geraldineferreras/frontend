@@ -55,6 +55,10 @@ const EditUser = () => {
   const [qrData, setQrData] = useState("");
   const [status, setStatus] = useState("active");
 
+  // Section management state
+  const [availableSections, setAvailableSections] = useState([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+
   // Image states
   const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [profileImageName, setProfileImageName] = useState("");
@@ -126,8 +130,31 @@ const EditUser = () => {
         setPassword(""); // Don't prefill password for security
         setDepartment(user.program || user.department || "");
         setStudentNumber(user.student_num || user.studentNumber || "");
-        setSection(user.section_id || user.section || "");
-        setYear(user.year || "");
+        
+        // Handle section data properly
+        if (user.section_name) {
+          setSection(user.section_name); // Use section name if available
+        } else if (user.section_id) {
+          setSection(user.section_id); // Fallback to section ID
+        } else {
+          setSection(user.section || "");
+        }
+        
+        // Handle year data properly - look for year field in various formats
+        let userYear = user.year || user.year_level || "";
+        if (userYear && !userYear.includes('Year')) {
+          // If it's just a number like "1", convert to "1st Year"
+          const yearMap = {
+            '1': '1st Year',
+            '2': '2nd Year', 
+            '3': '3rd Year',
+            '4': '4th Year',
+            '5': '5th Year'
+          };
+          userYear = yearMap[userYear] || userYear;
+        }
+        setYear(userYear);
+        
         setQrData(user.qr_code || user.qrData || "");
         setStatus(user.status || "active");
         
@@ -135,9 +162,12 @@ const EditUser = () => {
         if (user.profile_pic || user.profileImageUrl) {
           const profileUrl = user.profile_pic || user.profileImageUrl;
           if (profileUrl.startsWith('http')) {
-            setProfileImageUrl(profileUrl);
+            // Add cache busting parameter to existing URLs
+            const cacheBuster = `?t=${Date.now()}`;
+            setProfileImageUrl(profileUrl + (profileUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
           } else {
-            setProfileImageUrl(`http://localhost/scms_new/${profileUrl}`);
+            // Construct full URL with cache busting
+            setProfileImageUrl(`http://localhost/scms_new_backup/${profileUrl}?t=${Date.now()}`);
           }
         }
         
@@ -145,9 +175,11 @@ const EditUser = () => {
         if (user.cover_pic || user.coverPhotoUrl) {
           const coverUrl = user.cover_pic || user.coverPhotoUrl;
           if (coverUrl.startsWith('http')) {
-            setCoverPhotoUrl(coverUrl);
+            // Add cache busting parameter to existing URLs
+            setCoverPhotoUrl(coverUrl + (coverUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
           } else {
-            setCoverPhotoUrl(`http://localhost/scms_new/${coverUrl}`);
+            // Construct full URL with cache busting
+            setCoverPhotoUrl(`http://localhost/scms_new_backup/${coverUrl}?t=${Date.now()}`);
           }
         }
         
@@ -161,6 +193,210 @@ const EditUser = () => {
 
     fetchUserData();
   }, [id, role]);
+
+  // Function to fetch sections based on year and program
+  const fetchSectionsByYearAndProgram = async (selectedYear, selectedProgram) => {
+    if (!selectedYear || !selectedProgram || formRole !== 'student') {
+      setAvailableSections([]);
+      return;
+    }
+
+    setLoadingSections(true);
+    console.log('Fetching sections for:', { selectedYear, selectedProgram });
+    
+    try {
+      // Extract year number from year string (e.g., "1st Year" -> "1")
+      const yearNumber = selectedYear.replace(/[^0-9]/g, '');
+      console.log('Extracted year number:', yearNumber);
+      
+      let sections = [];
+      
+      // Try multiple approaches to get sections
+      
+      // Method 1: Try the new correct API endpoint for sections by year level
+      try {
+        console.log('Method 1: Trying getSectionsByYearLevel with yearNumber:', yearNumber);
+        const response = await ApiService.getSectionsByYearLevel(yearNumber);
+        console.log('getSectionsByYearLevel response:', response);
+        
+        if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+          sections = response.data;
+          console.log('Method 1 successful, found sections:', sections);
+        } else if (Array.isArray(response) && response.length > 0) {
+          sections = response;
+          console.log('Method 1 successful, found sections:', sections);
+        } else {
+          throw new Error('No sections returned from year level API');
+        }
+      } catch (yearLevelError) {
+        console.warn('Method 1 (year level API) failed:', yearLevelError);
+        
+        // Method 1b: Try the old program and year method as backup
+        try {
+          console.log('Method 1b: Trying getSectionsByProgramAndYear...');
+          const response = await ApiService.getSectionsByProgramAndYear(selectedProgram, yearNumber);
+          console.log('getSectionsByProgramAndYear response:', response);
+          
+          if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+            sections = response.data;
+            console.log('Method 1b successful, found sections:', sections);
+          } else if (Array.isArray(response) && response.length > 0) {
+            sections = response;
+            console.log('Method 1b successful, found sections:', sections);
+          } else {
+            throw new Error('No sections returned from program and year API');
+          }
+        } catch (specificError) {
+          console.warn('Method 1b failed:', specificError);
+        }
+        
+        // Method 2: Try getting sections by program only
+        try {
+          console.log('Method 2: Trying getSectionsByProgram...');
+          let response;
+          
+          // Try different program-based methods
+          const programMethods = [
+            () => ApiService.getSectionsByProgram(selectedProgram),
+            () => ApiService.getSectionsBSIT(),
+            () => ApiService.getSectionsBSCS(),
+            () => ApiService.getSectionsBSIS(),
+            () => ApiService.getSectionsACT()
+          ];
+          
+          for (const method of programMethods) {
+            try {
+              response = await method();
+              if (response && (response.data || Array.isArray(response))) {
+                break;
+              }
+            } catch (methodError) {
+              console.warn('Program method failed:', methodError);
+            }
+          }
+          
+          console.log('getSectionsByProgram response:', response);
+          
+          const allSections = response?.data || response || [];
+          if (Array.isArray(allSections) && allSections.length > 0) {
+            // Filter by year
+            sections = allSections.filter(section => {
+              const sectionYear = section.year_level || section.year || '';
+              const yearMatch = sectionYear === yearNumber || sectionYear === selectedYear || 
+                               sectionYear.toString() === yearNumber;
+              console.log('Method 2 filtering:', {
+                name: section.section_name || section.name,
+                year: sectionYear,
+                yearMatch: yearMatch
+              });
+              return yearMatch;
+            });
+            console.log('Method 2 filtered sections:', sections);
+          } else {
+            throw new Error('No sections returned from program API');
+          }
+        } catch (programError) {
+          console.warn('Method 2 failed:', programError);
+          
+          // Method 3: Get all sections and filter them
+          try {
+            console.log('Method 3: Trying to get all sections and filter...');
+            const allSectionsResponse = await ApiService.getSections();
+            console.log('All sections response:', allSectionsResponse);
+            
+            const allSections = allSectionsResponse?.data || allSectionsResponse || [];
+            console.log('All sections array:', allSections);
+            
+            if (Array.isArray(allSections)) {
+              // Filter sections by program and year
+              sections = allSections.filter(section => {
+                const sectionProgram = section.program || '';
+                const sectionYear = section.year_level || section.year || '';
+                
+                console.log('Method 3 checking section:', {
+                  name: section.section_name || section.name,
+                  program: sectionProgram,
+                  year: sectionYear,
+                  programMatch: sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase()),
+                  yearMatch: sectionYear === yearNumber || sectionYear === selectedYear
+                });
+                
+                const programMatch = sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase()) ||
+                                    selectedProgram.toLowerCase().includes(sectionProgram.toLowerCase()) ||
+                                    sectionProgram.toLowerCase().includes('information technology') && selectedProgram.toLowerCase().includes('information technology');
+                const yearMatch = sectionYear === yearNumber || sectionYear === selectedYear || 
+                                 sectionYear.toString() === yearNumber;
+                
+                return programMatch && yearMatch;
+              });
+              
+              console.log('Method 3 filtered sections:', sections);
+              
+              // If no sections found with filtering, show all sections for debugging
+              if (sections.length === 0) {
+                console.warn('No sections found with filtering, showing all sections for debugging');
+                sections = allSections.slice(0, 10); // Show first 10 sections
+              }
+            } else {
+              console.error('All sections is not an array:', allSections);
+            }
+          } catch (allSectionsError) {
+            console.error('Method 3 failed:', allSectionsError);
+          }
+        }
+      }
+      
+      // If still no sections found after trying all methods, create some sample sections for testing
+      if (sections.length === 0) {
+        console.warn('⚠️ No real sections found from any API method. Creating temporary sample sections for testing.');
+        console.warn('💡 This suggests the API endpoints may not be working or no sections exist in the database.');
+        const courseAbbr = selectedProgram.includes('Information Technology') ? 'BSIT' : 
+                          selectedProgram.includes('Computer Science') ? 'BSCS' :
+                          selectedProgram.includes('Information Systems') ? 'BSIS' : 'ACT';
+        
+        sections = [
+          { id: `temp-1`, section_name: `${courseAbbr} ${yearNumber}A (Sample)`, name: `${courseAbbr} ${yearNumber}A (Sample)` },
+          { id: `temp-2`, section_name: `${courseAbbr} ${yearNumber}B (Sample)`, name: `${courseAbbr} ${yearNumber}B (Sample)` },
+          { id: `temp-3`, section_name: `${courseAbbr} ${yearNumber}C (Sample)`, name: `${courseAbbr} ${yearNumber}C (Sample)` }
+        ];
+        console.log('📝 Created temporary sample sections:', sections);
+        console.log('🔧 Please check your database and API endpoints to ensure sections exist.');
+      }
+
+      // Sort sections by name for better UX
+      sections.sort((a, b) => {
+        const nameA = a.section_name || a.name || '';
+        const nameB = b.section_name || b.name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      console.log('Final sections to display:', sections);
+      setAvailableSections(sections);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+      setAvailableSections([]);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+
+  // Fetch sections when year or program changes
+  useEffect(() => {
+    if (formRole === 'student' && year && department) {
+      console.log('useEffect triggered - fetching sections for:', { year, department, formRole });
+      fetchSectionsByYearAndProgram(year, department);
+    } else {
+      console.log('useEffect skipped:', { year, department, formRole, condition: formRole === 'student' && year && department });
+    }
+  }, [year, department, formRole]);
+
+  // Also fetch sections when the component mounts and all required data is available
+  useEffect(() => {
+    if (formRole === 'student' && year && department && !loadingSections && availableSections.length === 0) {
+      console.log('Component mounted - fetching sections for student:', { year, department });
+      fetchSectionsByYearAndProgram(year, department);
+    }
+  }, [formRole, year, department, loadingSections, availableSections.length]);
 
   // Auto-generate QR code for students
   useEffect(() => {
@@ -424,56 +660,71 @@ const EditUser = () => {
     setSubmitting(true);
     
     try {
-      // Resolve section_id when editing a student: if text letter provided and not numeric, auto-create or find
+      // Resolve section_id when editing a student
       let resolvedSectionId = '';
       if (formRole === 'student' && section && section.trim()) {
         const trimmed = section.trim();
         const isNumeric = /^[0-9]+$/.test(trimmed);
+        
         if (isNumeric) {
+          // If section is numeric, use it as section_id directly
           resolvedSectionId = String(parseInt(trimmed, 10));
         } else {
+          // If section is a name, find the corresponding section_id
           try {
-            const programToAbbr = {
-              'Associate in Computer Technology': 'ACT',
-              'Bachelor of Science in Information Technology': 'BSIT',
-              'Bachelor of Science in Information Systems': 'BSIS',
-              'Bachelor of Science in Computer Science': 'BSCS',
-            };
-            const abbr = programToAbbr[department] || (department ? department.substring(0, 4).toUpperCase() : '');
-            const yearNum = (year || '').toString().replace(/[^0-9]/g, '') || '';
-            const letter = trimmed.toUpperCase().slice(0, 1);
-            const desiredSectionName = yearNum ? `${abbr} ${yearNum}${letter}` : `${abbr} ${letter}`;
-
-            const sectionsResp = await ApiService.getSections();
-            const sectionsArr = sectionsResp?.data || sectionsResp || [];
-            const found = (sectionsArr || []).find((s) => {
-              const name = s.name || s.section_name || '';
-              return name.toLowerCase() === desiredSectionName.toLowerCase();
+            // First, try to find from the currently loaded sections
+            const foundSection = availableSections.find((s) => {
+              const name = s.section_name || s.name || '';
+              return name.toLowerCase() === trimmed.toLowerCase();
             });
-            if (found) {
-              resolvedSectionId = String(found.id || found.section_id || '');
+            
+            if (foundSection) {
+              resolvedSectionId = String(foundSection.id || foundSection.section_id || '');
             } else {
-              const payload = {
-                section_name: desiredSectionName,
-                program: department,
-                year_level: yearNum || (year || ''),
-                adviser_id: '',
-                semester: '1st',
-                academic_year: (() => {
-                  const now = new Date();
-                  const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-                  return `${startYear}-${startYear + 1}`;
-                })(),
-                student_ids: [],
-              };
-              try {
-                const createRes = await ApiService.createSection(payload);
-                const createdId = createRes?.data?.id || createRes?.id || createRes?.section_id;
-                if (createdId) {
-                  resolvedSectionId = String(createdId);
+              // Fallback: search all sections
+              const sectionsResp = await ApiService.getSections();
+              const sectionsArr = sectionsResp?.data || sectionsResp || [];
+              const found = (sectionsArr || []).find((s) => {
+                const name = s.name || s.section_name || '';
+                return name.toLowerCase() === trimmed.toLowerCase();
+              });
+              
+              if (found) {
+                resolvedSectionId = String(found.id || found.section_id || '');
+              } else {
+                // Create a new section if it doesn't exist
+                const programToAbbr = {
+                  'Associate in Computer Technology': 'ACT',
+                  'Bachelor of Science in Information Technology': 'BSIT',
+                  'Bachelor of Science in Information Systems': 'BSIS',
+                  'Bachelor of Science in Computer Science': 'BSCS',
+                };
+                const abbr = programToAbbr[department] || (department ? department.substring(0, 4).toUpperCase() : '');
+                const yearNum = (year || '').toString().replace(/[^0-9]/g, '') || '';
+                
+                const payload = {
+                  section_name: trimmed,
+                  program: department,
+                  year_level: yearNum || (year || ''),
+                  adviser_id: '',
+                  semester: '1st',
+                  academic_year: (() => {
+                    const now = new Date();
+                    const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+                    return `${startYear}-${startYear + 1}`;
+                  })(),
+                  student_ids: [],
+                };
+                
+                try {
+                  const createRes = await ApiService.createSection(payload);
+                  const createdId = createRes?.data?.id || createRes?.id || createRes?.section_id;
+                  if (createdId) {
+                    resolvedSectionId = String(createdId);
+                  }
+                } catch (createErr) {
+                  console.warn('Auto-create section (edit) failed; proceeding without section assignment:', createErr);
                 }
-              } catch (createErr) {
-                console.warn('Auto-create section (edit) failed; proceeding without section assignment:', createErr);
               }
             }
           } catch (secErr) {
@@ -531,10 +782,42 @@ const EditUser = () => {
       setSubmitting(false);
       setShowSuccessModal(true);
       
-      // Hide success modal after 1.5 seconds and navigate
+      // Refresh user data to get updated profile/cover images
+      try {
+        const refreshedUserResponse = await ApiService.getUserById(id, role);
+        const refreshedUser = refreshedUserResponse.data || refreshedUserResponse.user || refreshedUserResponse;
+        
+        if (refreshedUser) {
+          // Update profile image URL with cache busting
+          if (refreshedUser.profile_pic || refreshedUser.profileImageUrl) {
+            const profileUrl = refreshedUser.profile_pic || refreshedUser.profileImageUrl;
+            if (profileUrl.startsWith('http')) {
+              setProfileImageUrl(profileUrl + (profileUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
+            } else {
+              setProfileImageUrl(`http://localhost/scms_new_backup/${profileUrl}?t=${Date.now()}`);
+            }
+          }
+          
+          // Update cover photo URL with cache busting
+          if (refreshedUser.cover_pic || refreshedUser.coverPhotoUrl) {
+            const coverUrl = refreshedUser.cover_pic || refreshedUser.coverPhotoUrl;
+            if (coverUrl.startsWith('http')) {
+              setCoverPhotoUrl(coverUrl + (coverUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
+            } else {
+              setCoverPhotoUrl(`http://localhost/scms_new_backup/${coverUrl}?t=${Date.now()}`);
+            }
+          }
+        }
+      } catch (refreshError) {
+        console.warn('Failed to refresh user data after update:', refreshError);
+      }
+      
+      // Hide success modal after 1.5 seconds and navigate back with preserved tab and view
       setTimeout(() => {
         setShowSuccessModal(false);
-        navigate(`/admin/user-management?tab=${tab}&view=${view}`);
+        const backTab = tab || 'admin';
+        const backView = view || 'table';
+        navigate(`/admin/user-management?tab=${backTab}&view=${backView}&refresh=true`);
       }, 1500);
       
     } catch (error) {
@@ -581,7 +864,11 @@ const EditUser = () => {
                     <p>{error}</p>
                     <Button 
                       color="primary" 
-                      onClick={() => navigate(`/admin/user-management?tab=${tab}&view=${view}`)}
+                      onClick={() => {
+                        const backTab = tab || 'admin';
+                        const backView = view || 'table';
+                        navigate(`/admin/user-management?tab=${backTab}&view=${backView}`);
+                      }}
                     >
                       Back to User Management
                     </Button>
@@ -993,7 +1280,10 @@ const EditUser = () => {
                                 type="select" 
                                 id="course" 
                                 value={department} 
-                                onChange={e => setDepartment(e.target.value)}
+                                onChange={e => {
+                                  setDepartment(e.target.value);
+                                  setSection(""); // Clear section when course changes
+                                }}
                                 required
                               >
                                 <option value="">Select Course</option>
@@ -1009,7 +1299,16 @@ const EditUser = () => {
                           <Col lg="6">
                             <FormGroup>
                               <label className="form-control-label" htmlFor="year">Year</label>
-                              <Input type="select" className="form-control-alternative" id="year" value={year} onChange={e => setYear(e.target.value)}>
+                              <Input 
+                                type="select" 
+                                className="form-control-alternative" 
+                                id="year" 
+                                value={year} 
+                                onChange={e => {
+                                  setYear(e.target.value);
+                                  setSection(""); // Clear section when year changes
+                                }}
+                              >
                                 <option value="">Select Year</option>
                                 <option value="1st Year">1st Year</option>
                                 <option value="2nd Year">2nd Year</option>
@@ -1022,7 +1321,58 @@ const EditUser = () => {
                           <Col lg="6">
                             <FormGroup>
                               <label className="form-control-label" htmlFor="section">Section</label>
-                              <Input className="form-control-alternative" type="text" id="section" value={section} onChange={e => setSection(e.target.value)} />
+                              <div className="d-flex">
+                                <Input 
+                                  type="select" 
+                                  className="form-control-alternative" 
+                                  id="section" 
+                                  value={section} 
+                                  onChange={e => setSection(e.target.value)}
+                                  disabled={!year || !department || loadingSections}
+                                  style={{ marginRight: '8px' }}
+                                >
+                                  <option value="">
+                                    {loadingSections ? "Loading sections..." : 
+                                     !year || !department ? "Select year and course first" : 
+                                     availableSections.length === 0 ? "No sections found" :
+                                     "Select Section"}
+                                  </option>
+                                  {availableSections.map((sectionOption) => (
+                                    <option 
+                                      key={sectionOption.id || sectionOption.section_id} 
+                                      value={sectionOption.section_name || sectionOption.name}
+                                    >
+                                      {sectionOption.section_name || sectionOption.name}
+                                    </option>
+                                  ))}
+                                </Input>
+                                {year && department && (
+                                  <Button
+                                    color="light"
+                                    size="sm"
+                                    onClick={() => fetchSectionsByYearAndProgram(year, department)}
+                                    disabled={loadingSections}
+                                    style={{ 
+                                      minWidth: '40px',
+                                      backgroundColor: 'white',
+                                      border: '1px solid #ccc',
+                                      color: '#666'
+                                    }}
+                                  >
+                                    <i className={`fas ${loadingSections ? 'fa-spinner fa-spin' : 'fa-sync-alt'}`}></i>
+                                  </Button>
+                                )}
+                              </div>
+                              {year && department && availableSections.length === 0 && !loadingSections && (
+                                <small className="text-muted">
+                                  No sections available for {year} in {department.split(' ').pop()}. Try clicking the refresh button.
+                                </small>
+                              )}
+                              {year && department && availableSections.length > 0 && (
+                                <small className="text-success">
+                                  Found {availableSections.length} section(s) for {year} in {department.split(' ').pop()}
+                                </small>
+                              )}
                             </FormGroup>
                           </Col>
                         </Row>
@@ -1060,7 +1410,11 @@ const EditUser = () => {
                     <Button 
                       color="secondary" 
                       className="ml-2" 
-                      onClick={() => navigate(`/admin/user-management?tab=${tab}&view=${view}`)}
+                      onClick={() => {
+                        const backTab = tab || 'admin';
+                        const backView = view || 'table';
+                        navigate(`/admin/user-management?tab=${backTab}&view=${backView}`);
+                      }}
                     >
                       Cancel
                     </Button>

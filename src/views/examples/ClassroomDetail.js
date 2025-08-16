@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react"; // Force rebuild
+import { useNotifications } from "../../contexts/NotificationContext";
 import Select, { components } from 'react-select';
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
@@ -423,6 +424,7 @@ const fileToBase64 = (file) => {
 const truncate = (str, n) => (str && str.length > n ? str.substr(0, n - 1) + '...' : str);
 
 const ClassroomDetail = () => {
+  const { addNotification } = useNotifications();
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
 
   // Build absolute URL for profile_pic regardless of API base format
@@ -991,8 +993,10 @@ const ClassroomDetail = () => {
   const [attachments, setAttachments] = useState([]);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+  const [showDriveModal, setShowDriveModal] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [youtubeInput, setYouTubeInput] = useState("");
+  const [driveInput, setDriveInput] = useState("");
   const [linkError, setLinkError] = useState("");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -2447,7 +2451,11 @@ useEffect(() => {
               dueDate: draft.due_date,
               allowComments: draft.allow_comments,
               lastEdited: draft.created_at,
-              attachments: draft.attachment_url ? [{ url: draft.attachment_url, type: draft.attachment_type }] : [],
+              attachments: draft.attachment_url ? [{ 
+                url: draft.attachment_url, 
+                name: draft.attachment_url.split('/').pop(),
+                type: 'file'
+              }] : [],
               visibleTo: draft.assigned_students || [],
               status: 'draft',
               api_response: draft
@@ -2478,7 +2486,11 @@ useEffect(() => {
               allowComments: task.allow_comments,
               scheduledFor: task.scheduled_at,
               lastEdited: task.created_at,
-              attachments: task.attachment_url ? [{ url: task.attachment_url, type: task.attachment_type }] : [],
+              attachments: task.attachment_url ? [{ 
+                url: task.attachment_url, 
+                name: task.attachment_url.split('/').pop(),
+                type: 'file'
+              }] : [],
               visibleTo: task.assigned_students || [],
               status: 'scheduled',
               api_response: task
@@ -2583,7 +2595,7 @@ useEffect(() => {
 
   const handleAddAttachment = (type) => {
     if (type === "Google Drive") {
-      alert("Google Drive integration coming soon!");
+      setShowDriveModal(true);
     } else if (type === "Link") {
       setShowLinkModal(true);
     } else if (type === "File") {
@@ -2645,6 +2657,19 @@ useEffect(() => {
       setYouTubeInput("");
       setShowYouTubeModal(false);
     }
+  };
+
+  const handleAddDrive = () => {
+    const url = (driveInput || '').trim();
+    if (!url) return;
+    // Basic formatting: ensure it looks like a URL
+    let formatted = url;
+    if (!/^https?:\/\//i.test(formatted)) {
+      formatted = `https://${formatted}`;
+    }
+    setAttachments(prev => [...prev, { type: 'Google Drive', url: formatted }]);
+    setDriveInput('');
+    setShowDriveModal(false);
   };
   const handleRemoveAttachment = (idx) => {
     setAttachments(attachments.filter((_, i) => i !== idx));
@@ -5527,7 +5552,7 @@ useEffect(() => {
                   <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                     <button
                       type="button"
-                      onClick={() => setShowScheduledCollapse(!showScheduledCollapse)}
+                      onClick={() => { try { addNotification({ type: 'info', title: 'Feature Under Development', message: 'This section is currently under development.', duration: 4000 }); } catch (_) { alert('Feature Under Development'); } setShowScheduledCollapse(!showScheduledCollapse); }}
                       style={{
                         borderRadius: 6,
                         border: '1.2px solid #222',
@@ -5551,7 +5576,7 @@ useEffect(() => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowDraftsCollapse(!showDraftsCollapse)}
+                      onClick={() => { try { addNotification({ type: 'info', title: 'Feature Under Development', message: 'This section is currently under development.', duration: 4000 }); } catch (_) { alert('Feature Under Development'); } setShowDraftsCollapse(!showDraftsCollapse); }}
                       style={{
                         borderRadius: 6,
                         border: '1.2px solid #222',
@@ -5897,50 +5922,43 @@ useEffect(() => {
                                   } else if (att.url) {
                                     url = att.url;
                                   }
-                                  const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
-                                  const displayName = isLink ? att.url : att.name;
+                                  const typeStr = String(att.type || att.attachment_type || '').toLowerCase();
+                                  const isLink = (!!url && (!att.file || typeStr !== 'file')) && (
+                                    typeStr === 'link' || typeStr === 'youtube' || typeStr === 'google drive' || typeStr === 'google_drive' || typeStr === 'drive' || typeStr === '' // treat empty type with URL as link in composer
+                                  );
+                                  const displayName = isLink ? url : att.name;
                                   return (
                                     <div
                                       key={idx}
-                                      style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, display: 'flex', alignItems: 'center', gap: 12 }}
+                                      style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, display: 'flex', alignItems: 'center', gap: 12, cursor: isLink ? 'pointer' : 'default', position: 'relative' }}
+                                      onClick={() => { if (isLink && url) { window.open(url, '_blank', 'noopener,noreferrer'); } }}
                                     >
                                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
                                         <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                           {type}
-                                          {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                          {url && (<>
+                                            <span style={{ margin: '0 6px', color: '#b0b0b0' }}>•</span>
+                                            <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a>
+                                          </>)}
+                                          {isLink && url && (<>
+                                            <span style={{ margin: '0 6px', color: '#b0b0b0' }}>•</span>
+                                            <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a>
+                                          </>)}
                                         </div>
                                       </div>
                                       <button
-                                      type="button"
-                                      onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
-                                      style={{
-                                        position: 'absolute',
-                                        right: 16, // or 18, to match your card padding
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#888',
-                                        fontWeight: 700,
-                                        fontSize: 22,
-                                        cursor: 'pointer',
-                                        borderRadius: '50%',
-                                        width: 32,
-                                        height: 32,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background 0.2s'
-                                      }}
-                                      title="Remove attachment"
-                                      aria-label="Remove attachment"
-                                      tabIndex={0}
-                                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
-                                    >
-                                      &times;
-                                    </button>
+                                        type="button"
+                                        onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
+                                        style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontWeight: 700, fontSize: 22, cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+                                        title="Remove attachment"
+                                        aria-label="Remove attachment"
+                                        tabIndex={0}
+                                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleRemoveAttachment(idx); } }}
+                                      >
+                                        &times;
+                                      </button>
                                     </div>
                                   );
                                 })}
@@ -8155,13 +8173,13 @@ useEffect(() => {
                         <th style={{ fontWeight: 700, color: '#111111', fontSize: '14px' }}>Email</th>
                         <th style={{ fontWeight: 700, color: '#111111', fontSize: '14px' }}>Student ID</th>
                         <th style={{ fontWeight: 700, color: '#111111', fontSize: '14px' }}>Joined</th>
-                        <th style={{ fontWeight: 700, color: '#111111', fontSize: '14px' }}>Actions</th>
+                        {/* Actions column removed */}
                       </tr>
                     </thead>
                     <tbody>
                       {students.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="text-center py-4 text-muted">
+                          <td colSpan="4" className="text-center py-4 text-muted">
                             No students enrolled in this class yet.
                           </td>
                         </tr>
@@ -8170,18 +8188,45 @@ useEffect(() => {
                           <tr key={student.id} style={{ minHeight: '32px', height: '36px' }}>
                             <td style={{ paddingTop: '6px', paddingBottom: '6px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <img 
-                                  src={getAvatarForUser(student)} 
-                                  alt={student.name}
-                                  style={{ 
-                                    width: '40px', 
-                                    height: '40px', 
-                                    borderRadius: '50%', 
-                                    objectFit: 'cover',
-                                    border: '2px solid #e9ecef',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                  }}
-                                />
+                                {(() => {
+                                  const displayName = student.name || student.full_name || 'User';
+                                  const avatarUrl = getProfilePictureUrl(student);
+                                  const initials = getUserInitials({ name: displayName, full_name: displayName });
+                                  const bgColor = getAvatarColor({ name: displayName, full_name: displayName });
+                                  return (
+                                    <div
+                                      style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '50%',
+                                        overflow: 'hidden',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: avatarUrl ? '#e9ecef' : bgColor,
+                                        border: '2px solid #e9ecef',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                      }}
+                                    >
+                                      {avatarUrl && (
+                                        <img
+                                          src={avatarUrl}
+                                          alt={displayName}
+                                          style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) {
+                                              e.target.nextSibling.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                      <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
+                                        {initials}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                                 <span style={{ fontWeight: 600, color: '#232b3b', fontSize: '14px' }}>{student.name}</span>
                               </div>
                             </td>
@@ -8192,14 +8237,7 @@ useEffect(() => {
                             <td style={{ fontWeight: 500, color: '#232b3b', fontSize: '14px', verticalAlign: 'middle', paddingTop: '6px', paddingBottom: '6px' }}>
                               {student.joinedDate ? new Date(student.joinedDate).toLocaleString() : ''}
                             </td>
-                            <td style={{ verticalAlign: 'middle', paddingTop: '6px', paddingBottom: '6px' }}>
-                              <Button color="link" size="sm" className="p-0 mr-2">
-                                <i className="ni ni-single-02"></i>
-                              </Button>
-                              <Button color="link" size="sm" className="p-0 text-danger">
-                                <i className="ni ni-fat-remove"></i>
-                              </Button>
-                            </td>
+                            {/* Actions column removed */}
                           </tr>
                         ))
                       )}
@@ -8701,6 +8739,54 @@ useEffect(() => {
         <ModalFooter>
           <Button color="secondary" onClick={()=>setShowWeightsModal(false)}>Close</Button>
           <Button color="primary" onClick={()=>setShowWeightsModal(false)}>Save</Button>
+        </ModalFooter>
+      </Modal>
+      {/* Link Modal */}
+      <Modal isOpen={showLinkModal} toggle={() => setShowLinkModal(false)} centered>
+        <ModalHeader toggle={() => setShowLinkModal(false)}>Attach Link</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="https://example.com"
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+          />
+          {linkError && <div style={{ color: '#e74c3c', marginTop: 8, fontSize: 13 }}>{linkError}</div>}
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowLinkModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddLink}>Add</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* YouTube Modal */}
+      <Modal isOpen={showYouTubeModal} toggle={() => setShowYouTubeModal(false)} centered>
+        <ModalHeader toggle={() => setShowYouTubeModal(false)}>Attach YouTube</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="Paste YouTube URL"
+            value={youtubeInput}
+            onChange={(e) => setYouTubeInput(e.target.value)}
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowYouTubeModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddYouTube}>Add</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Google Drive Modal */}
+      <Modal isOpen={showDriveModal} toggle={() => setShowDriveModal(false)} centered>
+        <ModalHeader toggle={() => setShowDriveModal(false)}>Attach Google Drive</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="Paste Google Drive link"
+            value={driveInput}
+            onChange={(e) => setDriveInput(e.target.value)}
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowDriveModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddDrive}>Add</Button>
         </ModalFooter>
       </Modal>
       {/* Attachment Preview Modal */}

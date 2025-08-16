@@ -139,11 +139,77 @@ export const NotificationProvider = ({ children }) => {
     if (!preferences.soundEnabled) return;
     const soundKey = type === 'error' ? 'error' : 'notification';
     const audio = soundRefs.current[soundKey];
-    if (audio) {
+    if (!audio) {
+      // eslint-disable-next-line no-console
+      console.warn('[Notifications] Audio element missing for key:', soundKey);
+      return;
+    }
+    try {
+      audio.volume = 1.0;
       audio.currentTime = 0;
-      audio.play().catch(() => {}); // ignore play errors
+      audio.play()
+        // eslint-disable-next-line no-console
+        .then(() => console.debug('[Notifications] Played sound for type:', type))
+        // eslint-disable-next-line no-console
+        .catch((err) => console.warn('[Notifications] Audio play blocked or failed:', err));
+    } catch (_) {
+      // ignore
     }
   };
+
+  // Proactively unlock audio on first user interaction (required by browsers)
+  const audioUnlockedRef = useRef(false);
+  useEffect(() => {
+    const unlock = async () => {
+      if (audioUnlockedRef.current) return;
+      const notif = soundRefs.current.notification;
+      const err = soundRefs.current.error;
+      try {
+        if (notif) {
+          notif.muted = true;
+          await notif.play();
+          notif.pause();
+          notif.currentTime = 0;
+          notif.muted = false;
+        }
+        if (err) {
+          err.muted = true;
+          await err.play();
+          err.pause();
+          err.currentTime = 0;
+          err.muted = false;
+        }
+        audioUnlockedRef.current = true;
+        // eslint-disable-next-line no-console
+        console.debug('[Notifications] Audio unlocked');
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.debug('[Notifications] Audio unlock attempt failed (will retry on next interaction):', e?.message || e);
+      }
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('touchstart', unlock, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
+
+  // Dev helper for manual testing from console: window._testNotifSound()
+  useEffect(() => {
+    // expose only in non-production or when debugging
+    // eslint-disable-next-line no-underscore-dangle
+    window._testNotifSound = () => {
+      maybePlaySound('info');
+      maybePlaySound('error');
+    };
+    return () => {
+      // eslint-disable-next-line no-underscore-dangle
+      delete window._testNotifSound;
+    };
+  }, [preferences.soundEnabled]);
 
   // SSE connection management
   useEffect(() => {
@@ -201,6 +267,9 @@ export const NotificationProvider = ({ children }) => {
             data: item.data,
             link: item.data?.link,
           });
+          // Also surface OS and sound cues during polling fallback
+          maybeDesktopNotify(item);
+          maybePlaySound(item.type || 'info');
         });
       } catch (_) {
         // ignore
@@ -320,6 +389,23 @@ export const NotificationProvider = ({ children }) => {
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      {/* Hidden audio elements for notification sounds. Place files in public/sounds/. */}
+      <audio
+        ref={(el) => { if (el) soundRefs.current.notification = el; }}
+        src={`${process.env.PUBLIC_URL || ''}/sounds/notification.mp3`}
+        preload="auto"
+        style={{ display: 'none' }}
+        onCanPlay={() => console.debug('[Notifications] notification.mp3 ready')}
+        onError={(e) => console.warn('[Notifications] Failed to load notification.mp3', e)}
+      />
+      <audio
+        ref={(el) => { if (el) soundRefs.current.error = el; }}
+        src={`${process.env.PUBLIC_URL || ''}/sounds/error.mp3`}
+        preload="auto"
+        style={{ display: 'none' }}
+        onCanPlay={() => console.debug('[Notifications] error.mp3 ready')}
+        onError={(e) => console.warn('[Notifications] Failed to load error.mp3', e)}
+      />
     </NotificationContext.Provider>
   );
 };

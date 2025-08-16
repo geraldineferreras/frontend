@@ -29,6 +29,7 @@ const TaskDetail = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [qrGradingMode, setQrGradingMode] = useState(false);
   const [resolvedTaskFileName, setResolvedTaskFileName] = useState(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   
   // Loading and error states
   const [loading, setLoading] = useState(true);
@@ -282,6 +283,222 @@ const TaskDetail = () => {
 
   // Get selected student from submissions
   const selectedStudent = submissionsState.find(s => s.submission_id === selectedStudentId) || submissionsState[0];
+
+  // Helper: get file type icon
+  const getFileTypeIcon = (att) => {
+    if (!att) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #90A4AE 0%, #78909C 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(144, 164, 174, 0.3)'
+      }}>FILE</div>;
+    }
+
+    // Handle link attachments
+    if (att.type === "Link" && att.url) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #1976D2 0%, #1565C0 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)'
+      }}>LINK</div>;
+    }
+
+    // Handle YouTube attachments
+    if (att.type === "YouTube" && att.url) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #FF0000 0%, #D32F2F 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(255, 0, 0, 0.3)'
+      }}>YT</div>;
+    }
+
+    // Handle file attachments
+    const fileName = att.name || att.original_name || att.file_name;
+    if (!fileName || typeof fileName !== 'string') {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #90A4AE 0%, #78909C 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(144, 164, 174, 0.3)'
+      }}>FILE</div>;
+    }
+
+    const ext = fileName.split('.').pop().toLowerCase();
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+
+    // Microsoft Word
+    const wordExts = ['doc', 'docx', 'dot', 'dotx', 'docm', 'dotm'];
+    if (wordExts.includes(ext)) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #1976D2 0%, #1565C0 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)'
+      }}>WORD</div>;
+    }
+    // Microsoft Excel (including CSV)
+    const excelExts = ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'csv'];
+    if (excelExts.includes(ext)) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #388E3C 0%, #2E7D32 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(56, 142, 60, 0.3)'
+      }}>EXCEL</div>;
+    }
+    // Microsoft PowerPoint
+    const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'pptm', 'potx', 'potm', 'ppsm'];
+    if (pptExts.includes(ext)) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(255, 152, 0, 0.3)'
+      }}>PPT</div>;
+    }
+    // TXT
+    if (ext === 'txt') {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #607d8b 0%, #455a64 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(96, 125, 139, 0.3)'
+      }}>TXT</div>;
+    }
+
+    if (imageTypes.includes(ext)) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #4CAF50 0%, #388E3C 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)'
+      }}>IMG</div>;
+    }
+    if (ext === 'mp4') {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #8e24aa 0%, #6a1b9a 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(142, 36, 170, 0.3)'
+      }}>MP4</div>;
+    }
+    if (ext === 'mp3') {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #43a047 0%, #388E3C 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(67, 160, 71, 0.3)'
+      }}>MP3</div>;
+    }
+    if (ext === 'pdf') {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #F44336 0%, #D32F2F 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(244, 67, 54, 0.3)'
+      }}>PDF</div>;
+    }
+    return <div style={{ 
+      width: 60, 
+      height: 80, 
+      background: 'linear-gradient(135deg, #90A4AE 0%, #78909C 100%)', 
+      borderRadius: 12,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 14,
+      boxShadow: '0 4px 12px rgba(144, 164, 174, 0.3)'
+    }}>{ext.toUpperCase()}</div>;
+  };
 
   // Helper: check file type
   const isImage = (file) => file && file.url && (file.url.endsWith('.jpg') || file.url.endsWith('.jpeg') || file.url.endsWith('.png') || file.url.endsWith('.gif') || file.url.endsWith('.webp'));
@@ -886,14 +1103,14 @@ const TaskDetail = () => {
                         fontSize: 14,
                         boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
                       }}>
-                        {(att.attachment_url || att.file_path || '').startsWith('http') ? 'LINK' : 'PDF'}
+                        {getFileTypeIcon(att)}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 16, marginBottom: 4 }}>
                           {att.original_name || att.file_name || (att.attachment_url ? att.attachment_url.split('/').pop() : 'Attachment')}
                         </div>
                         <div style={{ color: '#718096', fontSize: 14 }}>
-                          {(att.attachment_url || '').startsWith('http') ? 'External Link' : (att.mime_type || 'File')} • Click to preview
+                          {(att.attachment_url || '').startsWith('http') ? 'External Link' : (att.original_name || att.file_name || att.name || 'File').split('.').pop().toUpperCase() || 'FILE'} • Click to preview
                         </div>
                       </div>
                       <div style={{
@@ -936,7 +1153,7 @@ const TaskDetail = () => {
                       fontSize: 14,
                       boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
                     }}>
-                      {task.attachment_url.startsWith('http') ? 'LINK' : 'PDF'}
+                      {getFileTypeIcon({ name: task.attachment_url.split('/').pop(), type: 'file' })}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 16, marginBottom: 4 }}>
@@ -946,7 +1163,7 @@ const TaskDetail = () => {
                         }
                       </div>
                       <div style={{ color: '#718096', fontSize: 14 }}>
-                        {task.attachment_url.startsWith('http') ? 'External Link' : 'PDF Document'} • Click to preview
+                        {task.attachment_url.startsWith('http') ? 'External Link' : (task.attachment_url.split('/').pop().split('.').pop().toUpperCase() || 'FILE')} • Click to preview
                       </div>
                     </div>
                     <div style={{
@@ -1446,26 +1663,14 @@ const TaskDetail = () => {
                  justifyContent: 'space-between'
                }}>
                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                   <div style={{ 
-                     width: 40, 
-                     height: 50, 
-                     background: '#fff', 
-                     border: '2px solid #e74c3c', 
-                     borderRadius: 6,
-                     display: 'flex',
-                     alignItems: 'center',
-                     justifyContent: 'center',
-                     color: '#e74c3c',
-                     fontWeight: 'bold',
-                     fontSize: 12
-                   }}>
-                     PDF
-                   </div>
+                   {getFileTypeIcon({ name: pdfModalFile?.name, type: 'file' })}
                    <div>
                      <div style={{ fontWeight: 600, color: '#333', fontSize: 16 }}>
                        {pdfModalFile?.name || 'Document'}
                      </div>
-                     <div style={{ color: '#666', fontSize: 12 }}>PDF Document</div>
+                     <div style={{ color: '#666', fontSize: 12 }}>
+                       {(pdfModalFile?.name || '').split('.').pop().toUpperCase() || 'FILE'} Document
+                     </div>
                    </div>
                  </div>
                   {/* Zoom controls are hidden when using iframe preview */}
@@ -1474,17 +1679,114 @@ const TaskDetail = () => {
                 {/* File Content */}
                 <div style={{ flex: 1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
                   {pdfModalFile && (() => {
-                    const url = (pdfModalFile.url || '').toLowerCase();
+                    const rawUrl = (pdfModalFile.url || '');
+                    const url = rawUrl.toLowerCase();
                     const isPdf = url.endsWith('.pdf');
                     const isImage = /\.(png|jpg|jpeg|gif|webp)$/.test(url);
+                    const isVideo = /\.(mp4|webm|ogg|mov|mkv|avi)$/.test(url);
+                    const isAudio = /\.(mp3|wav|ogg|aac|flac|m4a)$/.test(url);
                     if (isPdf) {
                       return (
-                        <iframe title="PDF Preview" src={pdfModalFile.url} style={{ width: '100%', height: '100%', border: 'none' }} />
+                        <iframe title="PDF Preview" src={pdfModalFile.url} style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }} />
                       );
                     }
                     if (isImage) {
                       return (
                         <img alt={pdfModalFile.name} src={pdfModalFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />
+                      );
+                    }
+                    if (isVideo) {
+                      return (
+                        <video controls style={{ width: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022', background: '#000' }}>
+                          <source src={pdfModalFile.url} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      );
+                    }
+                    if (isAudio) {
+                      return (
+                        <div style={{
+                          width: '100%',
+                          maxWidth: 900,
+                          background: 'linear-gradient(135deg, #232526 0%, #414345 100%)',
+                          borderRadius: 24,
+                          padding: 28,
+                          boxShadow: '0 16px 32px rgba(0,0,0,0.35)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          {/* Animated Disk */}
+                          <div style={{
+                            width: 110,
+                            height: 110,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle at 30% 30%, #d9d9d9 0%, #bdbdbd 45%, #9e9e9e 60%, #757575 100%)',
+                            boxShadow: audioPlaying ? '0 12px 28px rgba(0,0,0,0.45)' : '0 6px 14px rgba(0,0,0,0.25)',
+                            marginBottom: 20,
+                            animation: audioPlaying ? 'spin 6s linear infinite' : 'none'
+                          }} />
+
+                          {/* Visualizer bars */}
+                          <div style={{ display: 'flex', gap: 4, height: 40, marginBottom: 16 }}>
+                            {[...Array(24)].map((_, i) => (
+                              <div key={i} style={{
+                                width: 6,
+                                borderRadius: 3,
+                                background: 'rgba(255,255,255,0.35)',
+                                height: audioPlaying ? (12 + Math.abs(Math.sin((Date.now()/150)+(i*0.7))) * 28) : 14,
+                                transition: 'height 120ms linear'
+                              }} />
+                            ))}
+                          </div>
+
+                          {/* Audio element */}
+                          <audio
+                            controls
+                            style={{ width: '100%', maxWidth: 640, borderRadius: 12, background: '#fff', zIndex: 2 }}
+                            src={pdfModalFile.url}
+                            onPlay={() => setAudioPlaying(true)}
+                            onPause={() => setAudioPlaying(false)}
+                            onEnded={() => setAudioPlaying(false)}
+                          />
+
+                          {/* File info */}
+                          <div style={{
+                            marginTop: 14,
+                            color: '#e0e0e0',
+                            fontWeight: 700,
+                            letterSpacing: 0.3
+                          }}>{pdfModalFile.name || 'Audio'}</div>
+
+                          {/* Floating particles */}
+                          {[...Array(18)].map((_, i) => (
+                            <div key={i} style={{
+                              position: 'absolute',
+                              top: `${Math.random()*100}%`,
+                              left: `${Math.random()*100}%`,
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              background: 'rgba(255,255,255,0.08)',
+                              filter: 'blur(1px)',
+                              animation: `floatY ${6 + Math.random()*6}s ease-in-out ${Math.random()*2}s infinite`
+                            }} />
+                          ))}
+
+                          {/* bottom wave */}
+                          <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, opacity: 0.12 }}>
+                            <svg height="60" width="100%" preserveAspectRatio="none" viewBox="0 0 1440 80">
+                              <path d="M0,40 Q360,80 720,40 T1440,40 V80 H0 Z" fill="#ffffff" />
+                            </svg>
+                          </div>
+
+                          <style>{`
+                            @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+                            @keyframes floatY { 0% { transform: translateY(0);} 50% { transform: translateY(-12px);} 100% { transform: translateY(0);} }
+                          `}</style>
+                        </div>
                       );
                     }
                     return (
