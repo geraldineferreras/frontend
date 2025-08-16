@@ -82,26 +82,66 @@ const formatSemesterForAPI = (semesterValue) => {
   return '1st'; // default
 };
 
-// Helper function to generate consistent avatars for students
+// Helper function to get initials from a name
+const getInitials = (fullName) => {
+  if (!fullName) return 'U';
+  const names = fullName.trim().split(' ');
+  let initials = '';
+  
+  if (names.length >= 2) {
+    // Take first letter of first name and first letter of last name
+    initials = (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+  } else if (names.length === 1) {
+    // If only one name, take first two letters
+    initials = names[0].substring(0, 2).toUpperCase();
+  } else {
+    initials = 'U';
+  }
+  
+  return initials;
+};
+
+// Helper function to generate initials avatar URL
+const getInitialsAvatar = (fullName) => {
+  const initials = getInitials(fullName);
+  
+  // Generate a consistent color based on the name
+  const colors = ['f093fb', 'f5576c', '4facfe', '00f2fe', '43e97b', '38f9d7', 'fa709a', 'fee140', 'a8edea', 'fed6e3'];
+  const color = colors[fullName.length % colors.length];
+  
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${color}&color=fff&size=128&bold=true`;
+};
+
+// Helper function to get student avatar URL or initials
 const getStudentAvatar = (student) => {
-  if (student && student.profile_pic) {
-    return student.profile_pic;
+  if (!student) return getInitialsAvatar('User');
+  
+  // Check for profile picture in various formats
+  if (student.profile_pic) {
+    let imageUrl;
+    
+    // If it's a relative path, construct the full URL
+    if (student.profile_pic.startsWith('uploads/')) {
+      imageUrl = `http://localhost/scms_new_backup/${student.profile_pic}`;
+    }
+    // If it's already a full URL, use as is
+    else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
+      imageUrl = student.profile_pic;
+    }
+    // If it's a base64 data URL, return as is
+    else if (student.profile_pic.startsWith('data:')) {
+      return student.profile_pic;
+    }
+    // For other cases, try to construct the full URL
+    else {
+      imageUrl = `http://localhost/scms_new_backup/uploads/profile/${student.profile_pic}`;
+    }
+    
+    return imageUrl;
   }
-  if (student && student.profile_picture) {
-    return student.profile_picture;
-  }
-  if (student && student.id) {
-    const avatarUrls = [
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face",
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
-    ];
-    const index = student.id % avatarUrls.length;
-    return avatarUrls[index];
-  }
-  return userDefault;
+  
+  // Fallback to initials avatar
+  return getInitialsAvatar(student.full_name || student.name || 'User');
 };
 
 const EditSection = () => {
@@ -482,16 +522,7 @@ const EditSection = () => {
     </div>
   );
 
-  // Helper to get student avatar URL
-  const getStudentAvatar = (student) => {
-    if (student.profile_pic) {
-      if (student.profile_pic.startsWith('uploads/')) {
-        return `http://localhost/scms_new/${student.profile_pic}`;
-      }
-      return student.profile_pic;
-    }
-    return student.avatar || require('../../assets/img/theme/team-1-800x800.jpg');
-  };
+
 
   return (
     <>
@@ -743,7 +774,15 @@ const EditSection = () => {
                                     const s = students.find(stu => stu.id === id);
                                     return s ? (
                                       <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                        <img src={getStudentAvatar(s)} alt={s.full_name} style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }} />
+                                        <img 
+                                          src={getStudentAvatar(s)} 
+                                          alt={s.full_name} 
+                                          style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }}
+                                          onError={(e) => {
+                                            // Fallback to initials avatar if image fails to load
+                                            e.target.src = getInitialsAvatar(s.full_name || s.name || 'User');
+                                          }}
+                                        />
                                         <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                           <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                           <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>
@@ -814,6 +853,10 @@ const EditSection = () => {
                                     alt="Profile"
                                     className="rounded-circle mr-3"
                                     style={{ width: '35px', height: '35px', objectFit: 'cover' }}
+                                    onError={(e) => {
+                                      // Fallback to initials avatar if image fails to load
+                                      e.target.src = getInitialsAvatar(student.full_name || student.name || 'User');
+                                    }}
                                   />
                                   <div className="flex-grow-1">
                                     <div className="font-weight-bold">{student.full_name}</div>
@@ -840,7 +883,15 @@ const EditSection = () => {
                                   const s = students.find(stu => stu.id === id);
                                   return s ? (
                                     <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                      <img src={getStudentAvatar(s)} alt={s.full_name} style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }} />
+                                      <img 
+                                        src={getStudentAvatar(s)} 
+                                        alt={s.full_name} 
+                                        style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }}
+                                        onError={(e) => {
+                                          // Fallback to initials avatar if image fails to load
+                                          e.target.src = getInitialsAvatar(s.full_name || s.name || 'User');
+                                        }}
+                                      />
                                       <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                         <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                         <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>
@@ -860,9 +911,17 @@ const EditSection = () => {
                         </ModalFooter>
                       </Modal>
 
-                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: 20 }}>
                         <Button color="primary" type="submit" disabled={isSubmitting}>
                           {isSubmitting ? "Updating..." : "Update Section"}
+                        </Button>
+                        <Button 
+                          color="secondary" 
+                          type="button" 
+                          onClick={() => navigate('/admin/section-management')}
+                          disabled={isSubmitting}
+                        >
+                          Cancel
                         </Button>
                       </div>
                       {showSuccess && (

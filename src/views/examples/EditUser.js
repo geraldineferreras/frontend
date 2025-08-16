@@ -142,17 +142,45 @@ const EditUser = () => {
         
         // Handle year data properly - look for year field in various formats
         let userYear = user.year || user.year_level || "";
-        if (userYear && !userYear.includes('Year')) {
-          // If it's just a number like "1", convert to "1st Year"
-          const yearMap = {
-            '1': '1st Year',
-            '2': '2nd Year', 
-            '3': '3rd Year',
-            '4': '4th Year',
-            '5': '5th Year'
-          };
-          userYear = yearMap[userYear] || userYear;
+        console.log('Raw year data from API:', {
+          year: user.year,
+          year_level: user.year_level,
+          userYear: userYear,
+          section_name: user.section_name,
+          fullUserObject: user
+        });
+        
+        // If year is still empty but we have a year_level, use it
+        if (!userYear && user.year_level) {
+          userYear = user.year_level;
         }
+        
+        // Handle different year formats from API
+        if (userYear) {
+          const yearStr = userYear.toString().toLowerCase();
+          
+          // If it's already in proper format (case insensitive), normalize the case
+          if (yearStr.includes('year')) {
+            // Convert "1st year" to "1st Year", "2nd year" to "2nd Year", etc.
+            userYear = yearStr.split(' ').map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+          } 
+          // If it's just a number, convert to proper format
+          else if (!isNaN(yearStr)) {
+            const yearNumber = yearStr.toString();
+            const yearMap = {
+              '1': '1st Year',
+              '2': '2nd Year', 
+              '3': '3rd Year',
+              '4': '4th Year',
+              '5': '5th Year'
+            };
+            userYear = yearMap[yearNumber] || `${yearNumber}${yearNumber === '1' ? 'st' : yearNumber === '2' ? 'nd' : yearNumber === '3' ? 'rd' : 'th'} Year`;
+          }
+        }
+        
+        console.log('Processed year for display:', userYear);
         setYear(userYear);
         
         setQrData(user.qr_code || user.qrData || "");
@@ -881,6 +909,11 @@ const EditUser = () => {
       </>
     );
   }
+
+  // Debug logging right before render
+  console.log('Current year state value:', year);
+  console.log('Current formRole:', formRole);
+  console.log('Is loading:', isLoading);
 
   return (
     <>

@@ -230,14 +230,30 @@ export default function OfferingsManagement() {
     }
   };
 
+  // Helper function to normalize semester value for dropdown
+  const normalizeSemesterForDropdown = (semesterValue) => {
+    if (!semesterValue) return "";
+    
+    const normalized = semesterValue.toLowerCase();
+    if (normalized.includes('1st') || normalized.includes('first')) {
+      return "1st";
+    } else if (normalized.includes('2nd') || normalized.includes('second')) {
+      return "2nd";
+    }
+    
+    // If it's already in the correct format, return as is
+    return semesterValue;
+  };
+
   // Edit offering
   const openEdit = (group) => {
+    console.log('Opening edit for group:', group); // Debug log to see actual data
     setEditOffering(group);
     setEditFields({
       subject: group.subject_id?.toString() || "",
       teacher: group.teacher_id || "",
       section: "", // We'll handle sections differently for grouped data
-      semester: group.semester || "",
+      semester: normalizeSemesterForDropdown(group.semester) || "",
       schoolYear: group.school_year || ""
     });
     setEditError("");
@@ -249,50 +265,54 @@ export default function OfferingsManagement() {
       setEditError("All fields are required.");
       return;
     }
-    
-    // For grouped data, we need to handle multiple sections
-    // This is a simplified approach - in a real implementation, you might want to edit individual sections
-    setEditError("Editing grouped offerings is not supported yet. Please delete and recreate individual offerings.");
-    return;
-
-    // Original edit logic commented out for grouped data
-    /*
-    // Prevent duplicate assignment (except for the current one)
-    if (offerings.some(o => o.class_id !== editOffering.class_id && o.subject_id === Number(editFields.subject) && o.section_id === Number(editFields.section) && o.semester === editFields.semester && o.school_year === editFields.schoolYear)) {
-      setEditError("This subject is already assigned to this section for the selected term.");
-      return;
-    }
 
     try {
       setUpdatingOffering(true);
       setEditError("");
 
-      const classData = {
-        subject_id: Number(editFields.subject),
-        teacher_id: editFields.teacher,
-        section_id: Number(editFields.section),
-        semester: editFields.semester.toUpperCase(),
-        school_year: editFields.schoolYear
-      };
+      // For grouped offerings, we need to update all sections in the group
+      const updatePromises = editOffering.sections.map(section => {
+        // Check for potential duplicates for each section (excluding the current offering)
+        const isDuplicate = offerings.some(o => 
+          o.class_id !== section.class_id && 
+          o.subject_id === Number(editFields.subject) && 
+          o.section_id === section.section_id && 
+          o.semester === editFields.semester.toUpperCase() && 
+          o.school_year === editFields.schoolYear
+        );
 
-      console.log('Updating class with data:', classData);
-      
-      const response = await apiService.updateClass(editOffering.class_id, classData);
-      console.log('Update class response:', response);
+        if (isDuplicate) {
+          throw new Error(`Subject is already assigned to section ${section.section_name} for the selected term.`);
+        }
+
+        const classData = {
+          subject_id: Number(editFields.subject),
+          teacher_id: editFields.teacher,
+          section_id: section.section_id,
+          semester: editFields.semester.toUpperCase(),
+          school_year: editFields.schoolYear
+        };
+
+        console.log(`Updating class ${section.class_id} with data:`, classData);
+        return apiService.updateClass(section.class_id, classData);
+      });
+
+      // Wait for all updates to complete
+      const responses = await Promise.all(updatePromises);
+      console.log('Update responses:', responses);
 
       // Reload the classes to get the updated list
       await loadClasses();
 
       setEditModal(false);
-      setShowToast("Subject offering successfully updated.");
-      setTimeout(() => setShowToast(""), 2000);
+      setShowToast("Subject offering successfully updated for all sections.");
+      setTimeout(() => setShowToast(""), 3000);
     } catch (error) {
-      console.error('Error updating class:', error);
+      console.error('Error updating grouped offering:', error);
       setEditError(error.message || "Failed to update offering. Please try again.");
     } finally {
       setUpdatingOffering(false);
     }
-    */
   };
 
   // Delete offering
@@ -519,7 +539,10 @@ export default function OfferingsManagement() {
                   <Badge key={section.section_id} color="secondary" className="mr-1 mb-1">{section.section_name}</Badge>
                 ))}
               </div>
-              <small className="text-muted">Editing grouped offerings is not supported yet. Please delete and recreate individual offerings.</small>
+              <small className="text-info">
+                <i className="fa fa-info-circle mr-1"></i>
+                Changes will be applied to all sections listed above.
+              </small>
             </FormGroup>
             <FormGroup>
               <Label>Semester</Label>

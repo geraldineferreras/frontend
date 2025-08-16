@@ -33,6 +33,7 @@ import {
 import Header from "components/Headers/Header.js";
 import classnames from "classnames";
 import api from "services/api.js";
+import { getProfilePictureUrl, getUserInitials } from "utils/profilePictureUtils.js";
 
 const AttendanceLog = () => {
   // State management
@@ -60,6 +61,10 @@ const AttendanceLog = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
+  // User profile states for fetching profile pictures
+  const [userProfiles, setUserProfiles] = useState({});
+  const [profileLoading, setProfileLoading] = useState(false);
+
   // Available options for filters
   const courses = [
     { id: "bsit", abbr: "BSIT", name: "Info Tech" },
@@ -73,7 +78,67 @@ const AttendanceLog = () => {
   const attendanceStatuses = ["Present", "Absent", "Late", "Excused"];
   const excuseStatuses = ["N/A", "Pending", "Approved", "Rejected"];
 
-  // Helper functions
+  // Helper function to get student initials
+  const getStudentInitials = (studentName) => {
+    if (!studentName) return 'U';
+    
+    const name = studentName.trim();
+    const names = name.split(' ');
+    
+    if (names.length === 1) {
+      return names[0].charAt(0).toUpperCase();
+    }
+    
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+  };
+
+  // Helper functions for profile management
+  const fetchUserProfile = async (studentId, studentName) => {
+    try {
+      if (!studentId && !studentName) return null;
+      
+      console.log(`Fetching profile for student ${studentId} (${studentName})`);
+      
+      // Try to get user profile by student ID first
+      if (studentId) {
+        try {
+          const userData = await api.getUserById(studentId, 'student');
+          console.log('User profile data:', userData);
+          if (userData && (userData.data || userData)) {
+            return userData.data || userData;
+          }
+        } catch (error) {
+          console.log(`Failed to fetch by ID ${studentId}:`, error);
+        }
+      }
+      
+      // Fallback: try to get all students and find by name or ID
+      if (studentName || studentId) {
+        try {
+          const studentsResponse = await api.getUsersByRole('student');
+          if (studentsResponse && studentsResponse.data) {
+            const students = Array.isArray(studentsResponse.data) ? studentsResponse.data : [studentsResponse.data];
+            const student = students.find(u => 
+              (studentId && (u.student_num === studentId || u.id === studentId || u.student_id === studentId)) ||
+              (studentName && (u.full_name === studentName || u.name === studentName))
+            );
+            if (student) {
+              console.log('Found student by search:', student);
+              return student;
+            }
+          }
+        } catch (error) {
+          console.log(`Failed to search students:`, error);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error fetching user profile for ${studentId}:`, error);
+      return null;
+    }
+  };
+
   const getRandomAvatar = (userId) => {
     const avatarUrls = [
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
@@ -627,55 +692,119 @@ const AttendanceLog = () => {
     }
   };
 
-     // Process attendance data
-   const processData = () => {
-     const processed = [];
-     
-     console.log("Processing attendance data:", attendanceData);
-     
-     // Process attendance records
-     if (Array.isArray(attendanceData)) {
-       attendanceData.forEach((record, index) => {
-         console.log(`Processing record ${index}:`, record);
-         
-         const processedRecord = {
-           id: record.log_id || record.id || Math.random().toString(36).substr(2, 9),
-           studentName: record.student_name || record.studentName || 'Unknown',
-           studentId: record.student_id_number || record.student_id || record.studentId || 'N/A',
-           section: record.section_name || record.section || 'N/A',
-           subject: record.subject_name || record.subject || 'N/A',
-           teacherName: record.teacher_name || record.teacherName || 'N/A',
-           date: record.date || record.created_at || record.timestamp || 'N/A',
-           attendanceStatus: record.attendance_status || record.attendanceStatus || 'Unknown',
-           excuseLetterStatus: record.excuse_status || record.excuseLetterStatus || 'N/A',
-           reason: record.reason || record.remarks || '',
-           attachment: record.attachment || record.attachments || null,
-           type: 'attendance',
-           source: 'attendance_record'
-         };
-         
-         console.log(`Processed record ${index}:`, processedRecord);
-         processed.push(processedRecord);
-       });
-     }
-     
-     console.log("Final processed data:", processed);
-     return processed;
-   };
+       // Load user profiles for all students in attendance data
+  const loadUserProfiles = async (attendanceRecords) => {
+    if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
+      console.log('No attendance records to load profiles for');
+      setProfileLoading(false);
+      return;
+    }
+    
+    console.log('🔄 Starting profile loading for', attendanceRecords.length, 'records');
+    setProfileLoading(true);
+    const profiles = {};
+    
+    // Get unique student IDs from attendance records
+    const uniqueStudents = new Map();
+    attendanceRecords.forEach(record => {
+      const studentId = record.student_id_number || record.student_id || record.studentId;
+      const studentName = record.student_name || record.studentName;
+      if (studentId || studentName) {
+        const key = studentId || studentName;
+        if (!uniqueStudents.has(key)) {
+          uniqueStudents.set(key, { studentId, studentName });
+        }
+      }
+    });
+    
+    console.log('📝 Unique students to fetch profiles for:', Array.from(uniqueStudents.values()));
+    
+    // Fetch profiles for each student (limit concurrent requests)
+    const promises = Array.from(uniqueStudents).map(async ([key, { studentId, studentName }]) => {
+      try {
+        const profile = await fetchUserProfile(studentId, studentName);
+        if (profile) {
+          profiles[key] = profile;
+          console.log(`✅ Loaded profile for ${key}:`, profile);
+        } else {
+          console.log(`❌ No profile found for ${key}`);
+          // Store a placeholder to indicate we tried to fetch this profile
+          profiles[key] = { no_profile: true, name: studentName };
+        }
+      } catch (error) {
+        console.error(`❌ Error loading profile for ${key}:`, error);
+        // Store a placeholder to indicate we tried to fetch this profile
+        profiles[key] = { no_profile: true, name: studentName };
+      }
+    });
+    
+    // Wait for all profile fetches to complete
+    await Promise.all(promises);
+    
+    console.log('🎉 All profile loading completed. Final profiles:', profiles);
+    setUserProfiles(profiles);
+    setProfileLoading(false);
+  };
+
+  // Process attendance data
+  const processData = () => {
+    const processed = [];
+    
+    console.log("Processing attendance data:", attendanceData);
+    
+    // Process attendance records
+    if (Array.isArray(attendanceData)) {
+      attendanceData.forEach((record, index) => {
+        console.log(`Processing record ${index}:`, record);
+        
+        const processedRecord = {
+          id: record.log_id || record.id || Math.random().toString(36).substr(2, 9),
+          studentName: record.student_name || record.studentName || 'Unknown',
+          studentId: record.student_id_number || record.student_id || record.studentId || 'N/A',
+          section: record.section_name || record.section || 'N/A',
+          subject: record.subject_name || record.subject || 'N/A',
+          teacherName: record.teacher_name || record.teacherName || 'N/A',
+          date: record.date || record.created_at || record.timestamp || 'N/A',
+          attendanceStatus: record.attendance_status || record.attendanceStatus || 'Unknown',
+          excuseLetterStatus: record.excuse_status || record.excuseLetterStatus || 'N/A',
+          reason: record.reason || record.remarks || '',
+          attachment: record.attachment || record.attachments || record.attachment_url || record.file_path || record.image_url || null,
+          type: 'attendance',
+          source: 'attendance_record'
+        };
+        
+        console.log(`Processed record ${index}:`, processedRecord);
+        processed.push(processedRecord);
+      });
+    }
+    
+    console.log("Final processed data:", processed);
+    return processed;
+  };
 
   useEffect(() => {
     fetchData();
   }, [dateFrom, dateTo, activeCourseTab, selectedAttendanceStatus]);
 
   useEffect(() => {
-    try {
-      const processedData = processData();
-      filterData(processedData);
-    } catch (error) {
-      console.error("Error processing data:", error);
-      // Fallback to just attendance data
-      filterData(Array.isArray(attendanceData) ? attendanceData : []);
-    }
+    const processAndLoadProfiles = async () => {
+      try {
+        const processedData = processData();
+        
+        // Load user profiles for the attendance data
+        if (processedData.length > 0) {
+          await loadUserProfiles(attendanceData);
+        }
+        
+        filterData(processedData);
+      } catch (error) {
+        console.error("Error processing data:", error);
+        // Fallback to just attendance data
+        filterData(Array.isArray(attendanceData) ? attendanceData : []);
+      }
+    };
+    
+    processAndLoadProfiles();
   }, [attendanceData, searchTerm, selectedSubject, selectedSection, selectedTeacher, selectedExcuseStatus]);
 
   // Calculate pagination
@@ -1078,13 +1207,61 @@ const AttendanceLog = () => {
                              <div className="d-flex align-items-center">
                                <div
                                  className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
-                                 style={{ width: 32, height: 32, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid #e9ecef' }}
+                                 style={{ 
+                                   width: 32, 
+                                   height: 32, 
+                                   overflow: 'hidden', 
+                                   display: 'flex', 
+                                   alignItems: 'center', 
+                                   justifyContent: 'center', 
+                                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                                   border: '1px solid #e9ecef',
+                                   color: '#fff',
+                                   fontWeight: 600,
+                                   fontSize: 14
+                                 }}
                                >
-                                 <img 
-                                   src={getRandomAvatar(item.id)} 
-                                   alt={item.studentName} 
-                                   style={{ width: 32, height: 32, objectFit: 'cover' }} 
-                                 />
+                                 {(() => {
+                                   const profileKey = item.studentId || item.studentName;
+                                   const userProfile = userProfiles[profileKey];
+                                   const hasProfilePic = userProfile && userProfile.profile_pic;
+                                   
+                                   console.log('Profile check for', item.studentName, ':', {
+                                     profileKey,
+                                     userProfile,
+                                     hasProfilePic,
+                                     profileLoading
+                                   });
+                                   
+                                   return !profileLoading && hasProfilePic ? (
+                                     <img 
+                                       src={getProfilePictureUrl(userProfile)} 
+                                       alt={item.studentName} 
+                                       style={{ width: 32, height: 32, objectFit: 'cover' }} 
+                                       onError={(e) => {
+                                         console.log('Profile image failed to load for', item.studentName);
+                                         e.target.style.display = 'none';
+                                         e.target.nextSibling.style.display = 'flex';
+                                       }}
+                                     />
+                                   ) : null;
+                                 })()}
+                                 <div
+                                   style={{
+                                     display: (() => {
+                                       const profileKey = item.studentId || item.studentName;
+                                       const userProfile = userProfiles[profileKey];
+                                       const hasProfilePic = userProfile && userProfile.profile_pic;
+                                       return (!profileLoading && hasProfilePic) ? 'none' : 'flex';
+                                     })(),
+                                     alignItems: 'center',
+                                     justifyContent: 'center',
+                                     width: 32,
+                                     height: 32
+                                   }}
+                                 >
+                                   {getStudentInitials(item.studentName)}
+                                 </div>
                                </div>
                                <div>
                                  <div className="font-weight-bold">{item.studentName}</div>
@@ -1112,20 +1289,35 @@ const AttendanceLog = () => {
                             </div>
                           </td>
                           <td>
-                            {item.attachment ? (
-                              <Button
-                                color="info"
-                                size="sm"
-                                outline
-                                onClick={() => openExcuseModal(item)}
-                                style={{ borderRadius: '6px', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                              >
-                                <i className="ni ni-single-copy-04 mr-1" />
-                                View
-                              </Button>
-                            ) : (
-                              <span className="text-muted">-</span>
-                            )}
+                            {(() => {
+                              // Show attachment button if:
+                              // 1. There's an attachment AND
+                              // 2. Student is excused OR has excuse letter status (Pending, Approved, Rejected)
+                              const hasAttachment = item.attachment;
+                              const isExcused = item.attendanceStatus && item.attendanceStatus.toLowerCase() === 'excused';
+                              const hasExcuseStatus = item.excuseLetterStatus && 
+                                item.excuseLetterStatus.toLowerCase() !== 'n/a' && 
+                                item.excuseLetterStatus.toLowerCase() !== 'unknown';
+                              
+                              const shouldShowAttachment = hasAttachment && (isExcused || hasExcuseStatus);
+                              
+                              if (shouldShowAttachment) {
+                                return (
+                                  <Button
+                                    color="info"
+                                    size="sm"
+                                    outline
+                                    onClick={() => openExcuseModal(item)}
+                                    style={{ borderRadius: '6px', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                  >
+                                    <i className="ni ni-single-copy-04 mr-1" />
+                                    View
+                                  </Button>
+                                );
+                              }
+                              
+                              return <span className="text-muted">-</span>;
+                            })()}
                           </td>
                         </tr>
                       ))
@@ -1284,12 +1476,33 @@ const AttendanceLog = () => {
                 <Row>
                   <Col md={12}>
                     <h6 style={{ marginTop: '1.5rem', fontSize: '1.25rem' }}><i className="ni ni-archive-2 mr-2" style={{ color: '#5e72e4', fontSize: 18 }} />Attachment</h6>
-                    {selectedRecord.attachment && (
+                    {selectedRecord.attachment ? (
                       <div style={{ marginTop: '1rem' }}>
                         {(() => {
-                          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(selectedRecord.attachment);
-                          const isPDF = /\.(pdf)$/i.test(selectedRecord.attachment);
-                          const fileUrl = `/attachments/${selectedRecord.attachment}`; // Adjust as needed
+                          const attachment = selectedRecord.attachment;
+                          let fileUrl = '';
+                          let fileName = '';
+                          
+                          // Handle different attachment URL formats
+                          if (attachment.startsWith('http://') || attachment.startsWith('https://')) {
+                            // Full URL
+                            fileUrl = attachment;
+                            fileName = attachment.split('/').pop() || 'Attachment';
+                          } else if (attachment.startsWith('uploads/')) {
+                            // Relative path from server root
+                            fileUrl = `http://localhost/scms_new_backup/${attachment}`;
+                            fileName = attachment.split('/').pop() || 'Attachment';
+                          } else {
+                            // Assume it's just a filename in uploads directory
+                            fileUrl = `http://localhost/scms_new_backup/uploads/${attachment}`;
+                            fileName = attachment;
+                          }
+                          
+                          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                          const isPDF = /\.(pdf)$/i.test(fileName);
+                          
+                          console.log('Attachment details:', { attachment, fileUrl, fileName, isImage, isPDF });
+                          
                           if (isImage) {
                             return (
                               <div style={{ border: '1px solid #e1e5e9', borderRadius: 8, padding: 8, display: 'inline-block', background: '#f8f9fe' }}>
@@ -1297,7 +1510,17 @@ const AttendanceLog = () => {
                                   src={fileUrl}
                                   alt="Excuse Attachment"
                                   style={{ maxWidth: '350px', maxHeight: '350px', display: 'block', margin: '0 auto' }}
+                                  onError={(e) => {
+                                    console.error('Failed to load image:', fileUrl);
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'block';
+                                  }}
                                 />
+                                <div style={{ display: 'none', textAlign: 'center', padding: 20, color: '#8898aa' }}>
+                                  <i className="ni ni-image" style={{ fontSize: 32, marginBottom: 8 }} />
+                                  <div>Image could not be loaded</div>
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none' }}>Open in new tab</a>
+                                </div>
                               </div>
                             );
                           } else if (isPDF) {
@@ -1305,8 +1528,13 @@ const AttendanceLog = () => {
                               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e1e5e9', borderRadius: 8, padding: '12px 16px', background: '#f8f9fe', maxWidth: 350 }}>
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" alt="PDF" style={{ width: 40, height: 40, marginRight: 16 }} />
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: 600, color: '#32325d' }}>{selectedRecord.attachment}</div>
-                                  <div style={{ fontSize: 14, color: '#8898aa' }}>PDF &bull; <a href={fileUrl} download style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none' }}>Download</a></div>
+                                  <div style={{ fontWeight: 600, color: '#32325d' }}>{fileName}</div>
+                                  <div style={{ fontSize: 14, color: '#8898aa' }}>
+                                    PDF &bull; 
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>View</a>
+                                    &bull; 
+                                    <a href={fileUrl} download style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>Download</a>
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -1315,13 +1543,23 @@ const AttendanceLog = () => {
                               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e1e5e9', borderRadius: 8, padding: '12px 16px', background: '#f8f9fe', maxWidth: 350 }}>
                                 <i className="ni ni-single-copy-04" style={{ fontSize: 32, color: '#5e72e4', marginRight: 16 }} />
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: 600, color: '#32325d' }}>{selectedRecord.attachment}</div>
-                                  <div style={{ fontSize: 14, color: '#8898aa' }}>File &bull; <a href={fileUrl} download style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none' }}>Download</a></div>
+                                  <div style={{ fontWeight: 600, color: '#32325d' }}>{fileName}</div>
+                                  <div style={{ fontSize: 14, color: '#8898aa' }}>
+                                    File &bull; 
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>View</a>
+                                    &bull; 
+                                    <a href={fileUrl} download style={{ color: '#11cdef', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>Download</a>
+                                  </div>
                                 </div>
                               </div>
                             );
                           }
                         })()}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 20, color: '#8898aa' }}>
+                        <i className="ni ni-archive-2" style={{ fontSize: 32, marginBottom: 8 }} />
+                        <div>No attachment available</div>
                       </div>
                     )}
                   </Col>

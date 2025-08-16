@@ -76,18 +76,39 @@ const buildProfileImageUrl = (profilePic) => {
   if (profilePic.startsWith('http://') || profilePic.startsWith('https://') || profilePic.startsWith('data:')) {
     return profilePic;
   }
-  const rawBase = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
-  const base = rawBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
+  
+  // Use consistent base URL
+  const base = 'http://localhost/scms_new_backup';
+  
   if (profilePic.startsWith('uploads/')) {
     return `${base}/${profilePic}`;
   }
   return `${base}/uploads/profile/${profilePic}`;
 };
 
-// Helper: prefer backend profile image; otherwise return null (UI will render initials)
+// Helper function to generate initials avatar URL
+const getInitialsAvatar = (fullName) => {
+  const initials = getInitials(fullName);
+  
+  // Generate a consistent color based on the name
+  const colors = ['f093fb', 'f5576c', '4facfe', '00f2fe', '43e97b', '38f9d7', 'fa709a', 'fee140', 'a8edea', 'fed6e3'];
+  const color = colors[fullName.length % colors.length];
+  
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${color}&color=fff&size=128&bold=true`;
+};
+
+// Helper: prefer backend profile image; otherwise return initials avatar
 const getAvatarForStudent = (student) => {
   const pic = student?.profile_pic || student?.profile_picture || student?.avatar || null;
-  return buildProfileImageUrl(pic);
+  const profileUrl = buildProfileImageUrl(pic);
+  
+  if (profileUrl) {
+    return profileUrl;
+  }
+  
+  // Fallback to initials avatar
+  const studentName = student?.name || student?.full_name || student?.student_name || 'User';
+  return getInitialsAvatar(studentName);
 };
 
 // Helper to get initials when no avatar is available
@@ -97,6 +118,28 @@ const getInitials = (name) => {
   const first = parts[0]?.charAt(0).toUpperCase() || '';
   const last = parts.length > 1 ? parts[parts.length - 1].charAt(0).toUpperCase() : '';
   return (first + last) || first || '?';
+};
+
+// Helper to create initials avatar component
+const createInitialsAvatar = (name, size = 32) => {
+  const initials = getInitials(name);
+  return (
+    <div 
+      className="rounded-circle d-flex align-items-center justify-content-center"
+      style={{ 
+        width: `${size}px`, 
+        height: `${size}px`, 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: `${Math.max(size * 0.35, 10)}px`,
+        fontWeight: '700',
+        border: '2px solid #fff',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}
+    >
+      {initials}
+    </div>
+  );
 };
 
 // Helper function to format section name with program and year
@@ -1032,27 +1075,42 @@ const SectionManagement = () => {
                   <i className="ni ni-single-02 mr-2" style={{ color: '#4066b5', fontSize: '1.2rem' }} />
                   <span className="font-weight-bold" style={{ color: '#425466' }}>Adviser:</span>
                   <div className="d-flex align-items-center ml-2">
-                    {adviser?.profile_picture ? (
-                      <img 
-                        src={`http://localhost/scms_new/${adviser.profile_picture}`}
-                        alt={adviser?.name || 'No Adviser'} 
-                        className="rounded-circle mr-2"
-                        style={{ width: '24px', height: '24px', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    {!adviser?.profile_picture && (
-                      <div 
-                        className="rounded-circle mr-2 bg-secondary d-flex align-items-center justify-content-center"
-                        style={{ width: '24px', height: '24px', fontSize: '10px', color: 'white' }}
-                      >
-                        {adviser?.name ? adviser.name.charAt(0).toUpperCase() : '?'}
-                      </div>
-                    )}
-                    <span style={{ color: '#425466' }}>{adviser?.name || 'N/A'}</span>
+                    <div className="mr-2">
+                      {adviser?.profile_picture ? (
+                        <img 
+                          src={`http://localhost/scms_new/${adviser.profile_picture}`}
+                          alt={adviser?.name || 'No Adviser'} 
+                          className="rounded-circle"
+                          style={{ 
+                            width: '24px', 
+                            height: '24px', 
+                            objectFit: 'cover',
+                            border: '1px solid #fff',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                          }}
+                          onError={(e) => {
+                            // Replace with initials avatar when image fails to load
+                            const parent = e.currentTarget.parentElement;
+                            const initials = getInitials(adviser?.name || 'Unknown');
+                            parent.innerHTML = `<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:24px;height:24px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:9px;font-weight:700;border:1px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.1)">${initials}</div>`;
+                          }}
+                        />
+                      ) : (
+                        createInitialsAvatar(adviser?.name || 'Unknown', 24)
+                      )}
+                    </div>
+                    <span 
+                      style={{ 
+                        color: '#425466',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '120px'
+                      }}
+                      title={adviser?.name || 'N/A'}
+                    >
+                      {adviser?.name || 'N/A'}
+                    </span>
                   </div>
                 </div>
                 <div className="d-flex align-items-center">
@@ -1135,11 +1193,9 @@ const SectionManagement = () => {
                                 boxShadow: '0 1px 2px rgba(0,0,0,0.07)'
                               }}
                               onError={(e) => {
-                                // Fallback to initials when image fails to load
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  parent.innerHTML = `<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">${getInitials(student.name)}</div>`;
-                                }
+                                // Fallback to initials avatar when image fails to load
+                                const studentName = student?.name || student?.full_name || student?.student_name || 'User';
+                                e.target.src = getInitialsAvatar(studentName);
                               }}
                             />
                           );
@@ -1274,25 +1330,64 @@ const SectionManagement = () => {
                     <img 
                       src={`http://localhost/scms_new/${adviser.profile_picture}`}
                       alt={adviser?.name || 'No Adviser'} 
-                      className="avatar avatar-sm rounded-circle" 
-                      style={{width: 32, height: 32, objectFit: 'cover'}} 
+                      className="rounded-circle" 
+                      style={{
+                        width: 32, 
+                        height: 32, 
+                        objectFit: 'cover',
+                        border: '2px solid #fff',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }} 
                       onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
+                        // Replace with initials avatar when image fails to load
+                        const parent = e.currentTarget.parentElement;
+                        const initials = getInitials(adviser?.name || 'Unknown');
+                        e.currentTarget.style.display = 'none';
+                        
+                        // Create initials div if it doesn't exist
+                        if (!parent.querySelector('.initials-avatar')) {
+                          const initialsDiv = document.createElement('div');
+                          initialsDiv.className = 'initials-avatar rounded-circle d-flex align-items-center justify-content-center';
+                          initialsDiv.style.cssText = 'width:32px;height:32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.1)';
+                          initialsDiv.textContent = initials;
+                          parent.appendChild(initialsDiv);
+                        }
                       }}
                     />
-                  ) : null}
-                  {!adviser?.profile_picture && (
-                    <div 
-                      className="avatar avatar-sm rounded-circle mr-2 bg-secondary d-flex align-items-center justify-content-center"
-                      style={{ width: '32px', height: '32px', fontSize: '12px', color: 'white' }}
-                    >
-                      {adviser?.name ? adviser.name.charAt(0).toUpperCase() : '?'}
-                    </div>
+                  ) : (
+                    createInitialsAvatar(adviser?.name || 'Unknown', 32)
                   )}
-                  <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                    <span className="font-weight-bold" style={{ color: '#425466', fontSize: '0.89rem', lineHeight: 1.1 }}>{adviser?.name || 'No Adviser'}</span>
-                    <span className="text-muted" style={{ color: '#8b98a9', fontSize: '0.77rem', marginTop: 2 }}>{adviser?.email || 'No Email'}</span>
+                  <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1}}>
+                    <span 
+                      className="font-weight-bold" 
+                      style={{ 
+                        color: '#425466', 
+                        fontSize: '0.89rem', 
+                        lineHeight: 1.1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '140px'
+                      }}
+                      title={adviser?.name || 'No Adviser'}
+                    >
+                      {adviser?.name || 'No Adviser'}
+                    </span>
+                    <span 
+                      className="text-muted" 
+                      style={{ 
+                        color: '#8b98a9', 
+                        fontSize: '0.77rem', 
+                        marginTop: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '140px'
+                      }}
+                      title={adviser?.email || 'No Email'}
+                    >
+                      {adviser?.email || 'No Email'}
+                    </span>
                   </div>
                 </div>
                 <div className="mb-2" style={{marginLeft: 6, marginTop: 8}}>
@@ -1573,29 +1668,54 @@ const SectionManagement = () => {
                               <td>{section.year || 'N/A'}</td>
                               <td>
                                 <div className="d-flex align-items-center">
-                                  {adviser?.profile_picture ? (
-                                    <img 
-                                      src={`http://localhost/scms_new/${adviser.profile_picture}`}
-                                      alt={adviser?.name || 'No Adviser'} 
-                                      className="avatar avatar-sm rounded-circle mr-2"
-                                      style={{ width: '32px', height: '32px', objectFit: 'cover' }}
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        e.target.nextSibling.style.display = 'flex';
-                                      }}
-                                    />
-                                  ) : null}
-                                  {!adviser?.profile_picture && (
+                                  <div className="mr-2">
+                                    {adviser?.profile_picture ? (
+                                      <img 
+                                        src={`http://localhost/scms_new/${adviser.profile_picture}`}
+                                        alt={adviser?.name || 'No Adviser'} 
+                                        className="rounded-circle"
+                                        style={{ 
+                                          width: '32px', 
+                                          height: '32px', 
+                                          objectFit: 'cover',
+                                          border: '2px solid #fff',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}
+                                        onError={(e) => {
+                                          // Replace with initials avatar when image fails to load
+                                          const parent = e.currentTarget.parentElement;
+                                          parent.innerHTML = `<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.1)">${getInitials(adviser?.name || 'Unknown')}</div>`;
+                                        }}
+                                      />
+                                    ) : (
+                                      createInitialsAvatar(adviser?.name || 'Unknown', 32)
+                                    )}
+                                  </div>
+                                  <div style={{ minWidth: 0, flex: 1 }}>
                                     <div 
-                                      className="avatar avatar-sm rounded-circle mr-2 bg-secondary d-flex align-items-center justify-content-center"
-                                      style={{ width: '32px', height: '32px', fontSize: '12px', color: 'white' }}
+                                      className="font-weight-bold" 
+                                      style={{ 
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '150px'
+                                      }}
+                                      title={adviser?.name || 'No Adviser'}
                                     >
-                                      {adviser?.name ? adviser.name.charAt(0).toUpperCase() : '?'}
+                                      {adviser?.name || 'No Adviser'}
                                     </div>
-                                  )}
-                                  <div>
-                                    <div className="font-weight-bold">{adviser?.name || 'No Adviser'}</div>
-                                    <div className="text-muted small">{adviser?.email || 'No Email'}</div>
+                                    <div 
+                                      className="text-muted small"
+                                      style={{ 
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '150px'
+                                      }}
+                                      title={adviser?.email || 'No Email'}
+                                    >
+                                      {adviser?.email || 'No Email'}
+                                    </div>
                                   </div>
                                 </div>
                               </td>

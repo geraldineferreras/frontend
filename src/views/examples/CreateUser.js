@@ -77,6 +77,8 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
   const [coverPhotoFile, setCoverPhotoFile] = useState(null);
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState("");
+  const [availableSections, setAvailableSections] = useState([]);
+  const [loadingSections, setLoadingSections] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,6 +107,16 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
     }
   }, [editMode, editUser]);
 
+  // Load sections when year changes for students
+  useEffect(() => {
+    if (role === 'student' && year) {
+      loadSectionsForYear(year);
+    } else {
+      setAvailableSections([]);
+      setSection("");
+    }
+  }, [role, year]);
+
   // Remove QR scanner and manual generate button, and auto-generate QR code for students
   useEffect(() => {
     if (role === 'student' && studentNumber && fullName && department) {
@@ -114,6 +126,129 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
     }
     // For other roles, do not set qrData
   }, [role, studentNumber, fullName, department]);
+
+  // Function to load sections for a specific year level
+  const loadSectionsForYear = async (yearLevel) => {
+    try {
+      setLoadingSections(true);
+      setAvailableSections([]);
+      
+      // Extract year number from year level (e.g., "1st Year" -> "1")
+      const yearNumber = yearLevel.replace(/[^0-9]/g, '');
+      
+      if (!yearNumber) {
+        setLoadingSections(false);
+        return;
+      }
+      
+      console.log(`Loading sections for year level: ${yearLevel} (${yearNumber})`);
+      
+      // Get the token for authentication
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Try multiple API endpoints to find sections
+      let sections = [];
+      let apiWorked = false;
+      
+      // Method 1: Try the specific year level endpoint
+      try {
+        const apiUrl = `http://localhost/scms_new_backup/index.php/api/admin/sections/year?year_level=${yearNumber}`;
+        console.log(`Method 1 - Making API call to: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: headers,
+        });
+        
+        console.log(`Method 1 - API response status: ${response.status}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Method 1 - Raw API response:', data);
+          sections = data.data || data || [];
+          apiWorked = true;
+        } else {
+          const errorText = await response.text();
+          console.warn(`Method 1 failed: ${response.status} - ${errorText}`);
+        }
+      } catch (error) {
+        console.warn('Method 1 failed:', error.message);
+      }
+      
+      // Method 2: Try using the existing API service if Method 1 failed
+      if (!apiWorked) {
+        try {
+          console.log('Method 2 - Trying existing API service...');
+          const allSectionsResponse = await apiService.getSections();
+          const allSections = allSectionsResponse?.data || allSectionsResponse || [];
+          
+          // Filter sections by year level
+          sections = allSections.filter(section => {
+            const sectionYear = section.year_level || section.year || '';
+            return sectionYear === yearNumber || 
+                   sectionYear === `${yearNumber}st Year` || 
+                   sectionYear === `${yearNumber}nd Year` || 
+                   sectionYear === `${yearNumber}rd Year` || 
+                   sectionYear === `${yearNumber}th Year` ||
+                   sectionYear.includes(yearNumber);
+          });
+          
+          console.log(`Method 2 - Filtered ${sections.length} sections from ${allSections.length} total sections`);
+          apiWorked = true;
+        } catch (error) {
+          console.warn('Method 2 failed:', error.message);
+        }
+      }
+      
+      // Method 3: Try different API endpoint structure
+      if (!apiWorked) {
+        try {
+          const apiUrl = `http://localhost/scms_new_backup/index.php/api/sections?year_level=${yearNumber}`;
+          console.log(`Method 3 - Making API call to: ${apiUrl}`);
+          
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: headers,
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Method 3 - Raw API response:', data);
+            sections = data.data || data || [];
+            apiWorked = true;
+          }
+        } catch (error) {
+          console.warn('Method 3 failed:', error.message);
+        }
+      }
+      
+      if (!apiWorked) {
+        throw new Error('All API methods failed to load sections');
+      }
+      
+      console.log(`Loaded ${sections.length} sections for year level ${yearNumber}:`, sections);
+      
+      setAvailableSections(sections);
+    } catch (error) {
+      console.error('Error loading sections for year:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        yearLevel,
+        yearNumber: yearLevel.replace(/[^0-9]/g, '')
+      });
+      setAvailableSections([]);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
 
   const handleQrScan = (result, error) => {
     if (!!result) {
@@ -345,61 +480,18 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
       let resolvedSectionId = '';
       if (role === 'student' && section && section.trim()) {
         const trimmed = section.trim();
-        const isNumeric = /^[0-9]+$/.test(trimmed);
-        if (isNumeric) {
-          resolvedSectionId = String(parseInt(trimmed, 10));
+        
+        // Find the selected section from available sections
+        const selectedSection = availableSections.find((s) => {
+          const sectionName = s.section_name || s.name || '';
+          return sectionName === trimmed;
+        });
+        
+        if (selectedSection) {
+          resolvedSectionId = String(selectedSection.id || selectedSection.section_id || '');
+          console.log(`Found section ID ${resolvedSectionId} for section name "${trimmed}"`);
         } else {
-          try {
-            // Build intended section_name like "BSIT 1Z"
-            const programToAbbr = {
-              'Associate in Computer Technology': 'ACT',
-              'Bachelor of Science in Information Technology': 'BSIT',
-              'Bachelor of Science in Information Systems': 'BSIS',
-              'Bachelor of Science in Computer Science': 'BSCS',
-            };
-            const abbr = programToAbbr[department] || (department ? department.substring(0, 4).toUpperCase() : '');
-            const yearNum = (year || '').toString().replace(/[^0-9]/g, '') || '';
-            const letter = trimmed.toUpperCase().slice(0, 1);
-            const desiredSectionName = yearNum ? `${abbr} ${yearNum}${letter}` : `${abbr} ${letter}`;
-
-            // Look up existing sections
-            const sectionsResp = await apiService.getSections();
-            const sectionsArr = sectionsResp?.data || sectionsResp || [];
-            const found = (sectionsArr || []).find((s) => {
-              const name = s.name || s.section_name || '';
-              return name.toLowerCase() === desiredSectionName.toLowerCase();
-            });
-
-            if (found) {
-              resolvedSectionId = String(found.id || found.section_id || '');
-            } else {
-              // Create the section automatically with sensible defaults
-              const payload = {
-                section_name: desiredSectionName,
-                program: department,
-                year_level: yearNum || (year || ''),
-                adviser_id: '',
-                semester: '1st',
-                academic_year: (() => {
-                  const now = new Date();
-                  const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1; // AY starts around June
-                  return `${startYear}-${startYear + 1}`;
-                })(),
-                student_ids: [],
-              };
-              try {
-                const createRes = await apiService.createSection(payload);
-                const createdId = createRes?.data?.id || createRes?.id || createRes?.section_id;
-                if (createdId) {
-                  resolvedSectionId = String(createdId);
-                }
-              } catch (createErr) {
-                console.warn('Auto-create section failed; proceeding without section assignment:', createErr);
-              }
-            }
-          } catch (secErr) {
-            console.warn('Section resolution failed; proceeding without section assignment:', secErr);
-          }
+          console.warn(`Could not find section ID for section name "${trimmed}"`);
         }
       }
 
@@ -983,7 +1075,49 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
                           <Col lg="6">
                             <FormGroup>
                               <label className="form-control-label" htmlFor="section">Section</label>
-                              <Input className="form-control-alternative" type="text" id="section" value={section} onChange={e => setSection(e.target.value)} />
+                              <div className="d-flex">
+                                <Input 
+                                  type="select" 
+                                  className="form-control-alternative" 
+                                  id="section" 
+                                  value={section} 
+                                  onChange={e => setSection(e.target.value)}
+                                  disabled={!year || loadingSections}
+                                  style={{ marginRight: '8px' }}
+                                >
+                                  <option value="">
+                                    {loadingSections ? "Loading sections..." : 
+                                     !year ? "Select year first" : 
+                                     availableSections.length === 0 ? "No sections found - try refresh" :
+                                     "Select Section"}
+                                  </option>
+                                  {availableSections.map((sectionOption) => (
+                                    <option 
+                                      key={sectionOption.id || sectionOption.section_id} 
+                                      value={sectionOption.section_name || sectionOption.name}
+                                    >
+                                      {sectionOption.section_name || sectionOption.name}
+                                    </option>
+                                  ))}
+                                </Input>
+                                {year && (
+                                  <Button
+                                    color="info"
+                                    size="sm"
+                                    onClick={() => loadSectionsForYear(year)}
+                                    disabled={loadingSections}
+                                    style={{ minWidth: '40px', padding: '0.375rem 0.75rem' }}
+                                    title="Refresh sections"
+                                  >
+                                    <i className={`fas fa-sync-alt ${loadingSections ? 'fa-spin' : ''}`} />
+                                  </Button>
+                                )}
+                              </div>
+                              {year && availableSections.length > 0 && (
+                                <small className="text-success mt-1 d-block">
+                                  Found {availableSections.length} section(s) for {year}
+                                </small>
+                              )}
                             </FormGroup>
                           </Col>
                         </Row>
