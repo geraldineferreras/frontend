@@ -1,22 +1,4 @@
-/*!
-
-=========================================================
-* Argon Dashboard React - v1.2.4
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/argon-dashboard-react
-* Copyright 2024 Creative Tim (https://www.creative-tim.com)
-* Licensed under MIT (https://github.com/creativetimofficial/argon-dashboard-react/blob/master/LICENSE.md)
-
-* Coded by Creative Tim
-
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-*/
-
-// reactstrap components
+import React, { useState, useEffect } from "react";
 import {
   Button,
   Card,
@@ -28,17 +10,388 @@ import {
   Container,
   Row,
   Col,
+  Alert,
+  Badge,
 } from "reactstrap";
-// core components
-import UserHeader from "components/Headers/UserHeader.js";
+import { useAuth } from "../../contexts/AuthContext";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import ApiService from "../../services/api";
 
 const Profile = () => {
+  const { user } = useAuth();
+  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [userProfile, setUserProfile] = useState(null);
+  const [sections, setSections] = useState([]);
+  const [filteredSections, setFilteredSections] = useState([]);
+
+  // Fetch user profile data and sections on component mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await ApiService.getProfile();
+        if (response && response.status && response.data) {
+          setUserProfile(response.data);
+          setFormData(response.data); // Initialize form with current data
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    const fetchSections = async () => {
+      try {
+        console.log('📡 Fetching sections from API...');
+        const response = await ApiService.getAllSections();
+        console.log('📡 Sections API response:', response);
+        
+        if (response && response.status && response.data) {
+          console.log('✅ Sections data received:', response.data.length, 'sections');
+          setSections(response.data);
+        } else {
+          console.log('❌ No sections data in response:', response);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching sections:', error);
+      }
+    };
+
+    if (user) {
+      fetchProfile();
+      fetchSections();
+    }
+  }, [user]);
+
+  // Filter sections based on selected program and year level
+  useEffect(() => {
+    if (formData.course && formData.year_level) {
+      console.log('🔍 Filtering sections...');
+      console.log('Selected course:', formData.course);
+      console.log('Selected year_level:', formData.year_level);
+      console.log('Total sections:', sections.length);
+      
+      const filtered = sections.filter(section => {
+        // Handle program matching with more flexible logic
+        let programMatch = false;
+        
+        if (formData.course === "Bachelor of Science in Information Technology") {
+          programMatch = section.program === "Bachelor of Science in Information Technology" || 
+                        section.program === "BSIT" ||
+                        section.course === "Bachelor of Science in Information Technology" ||
+                        section.course === "BSIT";
+        } else if (formData.course === "Bachelor of Science in Computer Science") {
+          programMatch = section.program === "Bachelor of Science in Computer Science" || 
+                        section.program === "BSCS" ||
+                        section.course === "Bachelor of Science in Computer Science" ||
+                        section.course === "BSCS";
+        } else if (formData.course === "Bachelor of Science in Information Systems") {
+          programMatch = section.program === "Bachelor of Science in Information Systems" || 
+                        section.program === "BSIS" ||
+                        section.course === "Bachelor of Science in Information Systems" ||
+                        section.course === "BSIS";
+        } else if (formData.course === "Associate in Computer Technology") {
+          programMatch = section.program === "Associate in Computer Technology" || 
+                        section.program === "ACT" ||
+                        section.course === "Associate in Computer Technology" ||
+                        section.course === "ACT";
+        } else {
+          // Fallback to exact match
+          programMatch = section.program === formData.course || section.course === formData.course;
+        }
+        
+        // Handle year level matching (convert both to strings for comparison)
+        const yearMatch = String(section.year_level) === String(formData.year_level) || 
+                         String(section.year) === String(formData.year_level);
+        
+        console.log(`Section: ${section.section_name}, Program: ${section.program}, Year: ${section.year_level}, Match: ${programMatch && yearMatch}`);
+        
+        return programMatch && yearMatch;
+      });
+      
+      console.log('Filtered sections:', filtered.length);
+      setFilteredSections(filtered);
+    } else {
+      setFilteredSections([]);
+    }
+  }, [formData.course, formData.year_level, sections]);
+
+  // Use fetched profile or fallback to auth context user
+  const currentUser = userProfile || user;
+
+  // Debug profile picture data
+  console.log('🖼️ Profile Picture Debug:');
+  console.log('Current user:', currentUser);
+  console.log('profile_image_url:', currentUser?.profile_image_url);
+  console.log('profile_pic:', currentUser?.profile_pic);
+  console.log('imageUrl:', currentUser?.imageUrl);
+  console.log('profileImageUrl:', currentUser?.profileImageUrl);
+
+  // Get profile picture URL and fallback data
+  const profilePictureUrl = getProfilePictureUrl(currentUser);
+  const userInitials = getUserInitials(currentUser);
+  const avatarColor = getAvatarColor(currentUser);
+  
+  console.log('Computed profilePictureUrl:', profilePictureUrl);
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await ApiService.updateProfile(formData);
+      
+      if (response && response.status) {
+        setSuccess("Profile updated successfully!");
+        setUserProfile(response.data || formData);
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(response?.message || "Failed to update profile");
+      }
+    } catch (error) {
+      setError(error.message || "Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Render Student-specific form fields
+  const renderStudentFields = () => (
+    <>
+      <h6 className="heading-small text-muted mb-4">
+        Student Information
+      </h6>
+      <div className="pl-lg-4">
+        <Row>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="student_number">
+                Student Number *
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="student_number"
+                name="student_number"
+                placeholder="Enter student number (min. 8 characters)"
+                type="text"
+                value={formData.student_number || ""}
+                onChange={handleInputChange}
+                required
+              />
+            </FormGroup>
+          </Col>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="contact_number">
+                Contact Number *
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="contact_number"
+                name="contact_number"
+                placeholder="Enter contact number"
+                type="text"
+                value={formData.contact_number || ""}
+                onChange={handleInputChange}
+                required
+              />
+            </FormGroup>
+          </Col>
+        </Row>
+        <Row>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="course">
+                Program *
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="course"
+                name="course"
+                type="select"
+                value={formData.course || ""}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select Program</option>
+                <option value="Associate in Computer Technology">Associate in Computer Technology</option>
+                <option value="Bachelor of Science in Computer Science">Bachelor of Science in Computer Science</option>
+                <option value="Bachelor of Science in Information Systems">Bachelor of Science in Information Systems</option>
+                <option value="Bachelor of Science in Information Technology">Bachelor of Science in Information Technology</option>
+              </Input>
+            </FormGroup>
+          </Col>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="year_level">
+                Year Level
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="year_level"
+                name="year_level"
+                type="select"
+                value={formData.year_level || ""}
+                onChange={handleInputChange}
+              >
+                <option value="">Select Year Level</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                {formData.course !== "Associate in Computer Technology" && (
+                  <>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                  </>
+                )}
+              </Input>
+            </FormGroup>
+          </Col>
+        </Row>
+        <Row>
+          <Col lg="12">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="section">
+                Section
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="section"
+                name="section"
+                type="select"
+                value={formData.section || ""}
+                onChange={handleInputChange}
+                disabled={!formData.course || !formData.year_level}
+              >
+                <option value="">
+                  {!formData.course || !formData.year_level ? 
+                    "Select program and year level first" : 
+                    "Select Section"
+                  }
+                </option>
+                {filteredSections.map(section => (
+                  <option key={section.id} value={section.section_name}>
+                    {section.section_name}
+                    {section.adviser_details && section.adviser_details.name && 
+                      ` - ${section.adviser_details.name}`
+                    }
+                  </option>
+                ))}
+                {filteredSections.length === 0 && formData.course && formData.year_level && (
+                  <option value="" disabled>No sections available for this program/year</option>
+                )}
+              </Input>
+            </FormGroup>
+          </Col>
+        </Row>
+      </div>
+    </>
+  );
+
+  // Render Teacher-specific form fields
+  const renderTeacherFields = () => (
+    <>
+      <h6 className="heading-small text-muted mb-4">
+        Teacher Information
+      </h6>
+      <div className="pl-lg-4">
+        <Row>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="contact_number">
+                Contact Number *
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="contact_number"
+                name="contact_number"
+                placeholder="Enter contact number"
+                type="text"
+                value={formData.contact_number || ""}
+                onChange={handleInputChange}
+                required
+              />
+            </FormGroup>
+          </Col>
+          <Col lg="6">
+            <FormGroup>
+              <label className="form-control-label" htmlFor="department">
+                Department *
+              </label>
+              <Input
+                className="form-control-alternative"
+                id="department"
+                name="department"
+                placeholder="Enter department"
+                type="text"
+                value={formData.department || ""}
+                onChange={handleInputChange}
+                required
+              />
+            </FormGroup>
+          </Col>
+        </Row>
+      </div>
+    </>
+  );
+
   return (
     <>
-      <UserHeader />
+      {/* Header */}
+      <div
+        className="header pb-6 pt-4 pt-lg-6 d-flex align-items-center"
+        style={{
+          minHeight: "280px",
+          background: "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #74a9d8 100%)",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Wavy Background SVG */}
+        <div 
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' version='1.1' xmlns:xlink='http://www.w3.org/1999/xlink' xmlns:svgjs='http://svgjs.dev/svgjs' width='1440' height='280' preserveAspectRatio='none' viewBox='0 0 1440 280'%3e%3cg mask='url(%23SvgjsMask1000)' fill='none'%3e%3cpath d='M 0%2c60 C 96%2c70 288%2c100 480%2c95 C 672%2c90 768%2c45 960%2c44 C 1152%2c43 1344%2c80 1440%2c90L1440 280L0 280z' fill='rgba(255%2c 255%2c 255%2c 0.3)'%3e%3c/path%3e%3cpath d='M 0%2c160 C 120%2c150 360%2c120 600%2c118 C 840%2c116 960%2c140 1200%2c140 C 1320%2c140 1380%2c135 1440%2c133L1440 280L0 280z' fill='rgba(255%2c 255%2c 255%2c 0.4)'%3e%3c/path%3e%3cpath d='M 0%2c210 C 144%2c205 432%2c190 720%2c186 C 1008%2c182 1296%2c200 1440%2c202L1440 280L0 280z' fill='rgba(255%2c 255%2c 255%2c 0.5)'%3e%3c/path%3e%3c/g%3e%3cdefs%3e%3cmask id='SvgjsMask1000'%3e%3crect width='1440' height='280' fill='white'%3e%3c/rect%3e%3c/mask%3e%3c/defs%3e%3c/svg%3e")`,
+            backgroundSize: "cover",
+            backgroundPosition: "bottom",
+            backgroundRepeat: "no-repeat"
+          }}
+        />
+        
+        <Container className="d-flex align-items-center" fluid style={{ position: "relative", zIndex: 1 }}>
+          <Row>
+            <Col lg="7" md="10">
+              <h1 className="display-2" style={{ color: "#495057" }}>
+                Hello {currentUser?.first_name || currentUser?.full_name?.split(' ')[0] || 'User'}
+              </h1>
+              <p style={{ color: "#6c757d" }} className="mt-0 mb-5">
+                This is your profile page. You can view and edit your personal information.
+              </p>
+            </Col>
+          </Row>
+        </Container>
+      </div>
+
       {/* Page content */}
       <Container className="mt--7" fluid>
         <Row>
+          {/* Profile Card */}
           <Col className="order-xl-2 mb-5 mb-xl-0" xl="4">
             <Card className="card-profile shadow">
               <Row className="justify-content-center">
@@ -46,275 +399,199 @@ const Profile = () => {
                   <div className="card-profile-image">
                     <a href="#pablo" onClick={(e) => e.preventDefault()}>
                       <img
-                        alt="..."
+                        alt="Profile"
                         className="rounded-circle"
-                        src={require("../../assets/img/theme/team-4-800x800.jpg")}
+                        src={
+                          currentUser?.profile_image_url || 
+                          currentUser?.profile_pic || 
+                          currentUser?.profileImageUrl ||
+                          currentUser?.imageUrl ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.full_name || 'User')}&size=120&background=5e72e4&color=ffffff&bold=true`
+                        }
+                        style={{ 
+                          width: '120px', 
+                          height: '120px', 
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => {
+                          console.log('❌ Profile image failed to load:', e.target.src);
+                          // Fallback to avatar service
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.full_name || 'User')}&size=120&background=5e72e4&color=ffffff&bold=true`;
+                        }}
+                        onLoad={(e) => {
+                          console.log('✅ Profile image loaded successfully:', e.target.src);
+                        }}
                       />
                     </a>
                   </div>
                 </Col>
               </Row>
-              <CardHeader className="text-center border-0 pt-8 pt-md-4 pb-0 pb-md-4">
-                <div className="d-flex justify-content-between">
-                  <Button
-                    className="mr-4"
-                    color="info"
-                    href="#pablo"
-                    onClick={(e) => e.preventDefault()}
-                    size="sm"
-                  >
-                    Connect
-                  </Button>
-                  <Button
-                    className="float-right"
-                    color="default"
-                    href="#pablo"
-                    onClick={(e) => e.preventDefault()}
-                    size="sm"
-                  >
-                    Message
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardBody className="pt-0 pt-md-4">
-                <Row>
-                  <div className="col">
-                    <div className="card-profile-stats d-flex justify-content-center mt-md-5">
-                      <div>
-                        <span className="heading">22</span>
-                        <span className="description">Friends</span>
-                      </div>
-                      <div>
-                        <span className="heading">10</span>
-                        <span className="description">Photos</span>
-                      </div>
-                      <div>
-                        <span className="heading">89</span>
-                        <span className="description">Comments</span>
-                      </div>
-                    </div>
-                  </div>
-                </Row>
+              <CardBody className="pt-5 pt-md-7">
                 <div className="text-center">
                   <h3>
-                    Jessica Jones
-                    <span className="font-weight-light">, 27</span>
+                    {currentUser?.full_name || 'User Name'}
                   </h3>
                   <div className="h5 font-weight-300">
-                    <i className="ni location_pin mr-2" />
-                    Bucharest, Romania
+                    <Badge color={currentUser?.role === 'student' ? 'success' : 'info'}>
+                      {currentUser?.role?.toUpperCase() || 'USER'}
+                    </Badge>
                   </div>
-                  <div className="h5 mt-4">
-                    <i className="ni business_briefcase-24 mr-2" />
-                    Solution Manager - Creative Tim Officer
+                  <div className="h6 mt-2">
+                    <i className="ni ni-email-83 mr-2" />
+                    {currentUser?.email || 'No email'}
                   </div>
-                  <div>
-                    <i className="ni education_hat mr-2" />
-                    University of Computer Science
+                  {currentUser?.auth_provider === 'google' && (
+                    <div className="h6 mt-2">
+                      <i className="fab fa-google mr-2" />
+                      <Badge color="warning" pill>Google Account</Badge>
                   </div>
-                  <hr className="my-4" />
-                  <p>
-                    Ryan — the name taken by Melbourne-raised, Brooklyn-based
-                    Nick Murphy — writes, performs and records all of his own
-                    music.
-                  </p>
-                  <a href="#pablo" onClick={(e) => e.preventDefault()}>
-                    Show more
-                  </a>
+                  )}
                 </div>
               </CardBody>
             </Card>
           </Col>
+
+          {/* Edit Form */}
           <Col className="order-xl-1" xl="8">
             <Card className="bg-secondary shadow">
               <CardHeader className="bg-white border-0">
                 <Row className="align-items-center">
                   <Col xs="8">
-                    <h3 className="mb-0">My account</h3>
+                    <h3 className="mb-0">My Profile</h3>
                   </Col>
                   <Col className="text-right" xs="4">
                     <Button
                       color="primary"
-                      href="#pablo"
-                      onClick={(e) => e.preventDefault()}
+                      onClick={handleSubmit}
+                      disabled={loading}
                       size="sm"
                     >
-                      Settings
+                      {loading ? 'Updating...' : 'Update Profile'}
                     </Button>
                   </Col>
                 </Row>
               </CardHeader>
               <CardBody>
-                <Form>
+                {success && <Alert color="success">{success}</Alert>}
+                {error && <Alert color="danger">{error}</Alert>}
+
+                <Form onSubmit={handleSubmit}>
+                  {/* User Information */}
                   <h6 className="heading-small text-muted mb-4">
-                    User information
+                    User Information
                   </h6>
                   <div className="pl-lg-4">
                     <Row>
                       <Col lg="6">
                         <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-username"
-                          >
-                            Username
+                          <label className="form-control-label" htmlFor="full_name">
+                            Full Name *
                           </label>
                           <Input
                             className="form-control-alternative"
-                            defaultValue="lucky.jesse"
-                            id="input-username"
-                            placeholder="Username"
+                            id="full_name"
+                            name="full_name"
+                            placeholder="Enter full name"
                             type="text"
+                            value={formData.full_name || ""}
+                            onChange={handleInputChange}
+                            required
                           />
                         </FormGroup>
                       </Col>
                       <Col lg="6">
                         <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-email"
-                          >
-                            Email address
+                          <label className="form-control-label" htmlFor="email">
+                            Email Address
                           </label>
                           <Input
                             className="form-control-alternative"
-                            id="input-email"
-                            placeholder="jesse@example.com"
+                            id="email"
+                            name="email"
                             type="email"
+                            value={formData.email || ""}
+                            disabled={currentUser?.auth_provider === 'google'}
+                            onChange={handleInputChange}
                           />
+                          {currentUser?.auth_provider === 'google' && (
+                            <small className="text-muted">Google OAuth email cannot be changed</small>
+                          )}
                         </FormGroup>
                       </Col>
                     </Row>
                     <Row>
                       <Col lg="6">
                         <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-first-name"
-                          >
-                            First name
+                          <label className="form-control-label" htmlFor="role">
+                            Role
                           </label>
                           <Input
                             className="form-control-alternative"
-                            defaultValue="Lucky"
-                            id="input-first-name"
-                            placeholder="First name"
-                            type="text"
-                          />
+                            id="role"
+                            name="role"
+                            type="select"
+                            value={formData.role || ""}
+                            onChange={handleInputChange}
+                          >
+                            <option value="">Select Role</option>
+                            <option value="student">Student</option>
+                            <option value="teacher">Teacher</option>
+                          </Input>
                         </FormGroup>
                       </Col>
                       <Col lg="6">
                         <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-last-name"
-                          >
-                            Last name
+                          <label className="form-control-label" htmlFor="status">
+                            Status
                           </label>
                           <Input
                             className="form-control-alternative"
-                            defaultValue="Jesse"
-                            id="input-last-name"
-                            placeholder="Last name"
-                            type="text"
-                          />
+                            id="status"
+                            name="status"
+                            type="select"
+                            value={formData.status || ""}
+                            onChange={handleInputChange}
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </Input>
                         </FormGroup>
                       </Col>
                     </Row>
                   </div>
+
                   <hr className="my-4" />
-                  {/* Address */}
+
+                  {/* Role-specific fields */}
+                  {formData.role === 'student' && renderStudentFields()}
+                  {formData.role === 'teacher' && renderTeacherFields()}
+
+                  <hr className="my-4" />
+
+                  {/* Address Information */}
                   <h6 className="heading-small text-muted mb-4">
-                    Contact information
+                    Contact Information
                   </h6>
                   <div className="pl-lg-4">
                     <Row>
                       <Col md="12">
                         <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-address"
-                          >
-                            Address
+                          <label className="form-control-label" htmlFor="address">
+                            Address *
                           </label>
                           <Input
                             className="form-control-alternative"
-                            defaultValue="Bld Mihail Kogalniceanu, nr. 8 Bl 1, Sc 1, Ap 09"
-                            id="input-address"
-                            placeholder="Home Address"
+                            id="address"
+                            name="address"
+                            placeholder="Enter your address"
                             type="text"
+                            value={formData.address || ""}
+                            onChange={handleInputChange}
+                            required
                           />
                         </FormGroup>
                       </Col>
                     </Row>
-                    <Row>
-                      <Col lg="4">
-                        <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-city"
-                          >
-                            City
-                          </label>
-                          <Input
-                            className="form-control-alternative"
-                            defaultValue="New York"
-                            id="input-city"
-                            placeholder="City"
-                            type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                      <Col lg="4">
-                        <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-country"
-                          >
-                            Country
-                          </label>
-                          <Input
-                            className="form-control-alternative"
-                            defaultValue="United States"
-                            id="input-country"
-                            placeholder="Country"
-                            type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                      <Col lg="4">
-                        <FormGroup>
-                          <label
-                            className="form-control-label"
-                            htmlFor="input-country"
-                          >
-                            Postal code
-                          </label>
-                          <Input
-                            className="form-control-alternative"
-                            id="input-postal-code"
-                            placeholder="Postal code"
-                            type="number"
-                          />
-                        </FormGroup>
-                      </Col>
-                    </Row>
-                  </div>
-                  <hr className="my-4" />
-                  {/* Description */}
-                  <h6 className="heading-small text-muted mb-4">About me</h6>
-                  <div className="pl-lg-4">
-                    <FormGroup>
-                      <label>About Me</label>
-                      <Input
-                        className="form-control-alternative"
-                        placeholder="A few words about you ..."
-                        rows="4"
-                        defaultValue="A beautiful Dashboard for Bootstrap 4. It is Free and
-                        Open Source."
-                        type="textarea"
-                      />
-                    </FormGroup>
                   </div>
                 </Form>
               </CardBody>

@@ -50,6 +50,7 @@ const EditUser = () => {
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState("");
   const [studentNumber, setStudentNumber] = useState("");
+  const [originalStudentNumber, setOriginalStudentNumber] = useState(""); // Track original value
   const [section, setSection] = useState("");
   const [year, setYear] = useState("");
   const [qrData, setQrData] = useState("");
@@ -130,6 +131,22 @@ const EditUser = () => {
         setPassword(""); // Don't prefill password for security
         setDepartment(user.program || user.department || "");
         setStudentNumber(user.student_num || user.studentNumber || "");
+        setOriginalStudentNumber(user.student_num || user.studentNumber || ""); // Set original value
+        
+        // Debug logging for Google account users
+        console.log('User data fetched for editing:', {
+          userId: id,
+          userRole: role,
+          formRole: user.role || role,
+          fullName: user.full_name || user.name || "",
+          email: user.email || "",
+          program: user.program || user.department || "",
+          studentNumber: user.student_num || user.studentNumber || "",
+          hasGoogleId: !!user.google_id,
+          hasProfileImageUrl: !!user.profile_image_url,
+          profileImageUrl: user.profile_image_url,
+          fullUserObject: user
+        });
         
         // Handle section data properly
         if (user.section_name) {
@@ -187,8 +204,9 @@ const EditUser = () => {
         setStatus(user.status || "active");
         
         // Set profile image URL (construct full URL if it's a path)
-        if (user.profile_pic || user.profileImageUrl) {
-          const profileUrl = user.profile_pic || user.profileImageUrl;
+        // Check for Google OAuth profile image first, then fallback to local profile images
+        if (user.profile_image_url || user.profile_pic || user.profileImageUrl) {
+          const profileUrl = user.profile_image_url || user.profile_pic || user.profileImageUrl;
           if (profileUrl.startsWith('http')) {
             // Add cache busting parameter to existing URLs
             const cacheBuster = `?t=${Date.now()}`;
@@ -428,10 +446,34 @@ const EditUser = () => {
 
   // Auto-generate QR code for students
   useEffect(() => {
+    console.log('QR code generation useEffect triggered:', {
+      formRole,
+      studentNumber,
+      fullName,
+      department,
+      currentQrData: qrData
+    });
+    
     if (formRole === 'student' && studentNumber && fullName && department) {
-      setQrData(`IDNo: ${studentNumber}\nFull Name: ${fullName}\nProgram: ${department}`);
+      const generatedQrData = `IDNo: ${studentNumber}\nFull Name: ${fullName}\nProgram: ${department}`;
+      setQrData(generatedQrData);
+      console.log('QR code auto-generated for student:', {
+        studentNumber,
+        fullName,
+        department,
+        generatedQrData
+      });
     } else if (formRole === 'student') {
       setQrData("");
+      console.log('QR code not generated - missing required fields:', {
+        formRole,
+        studentNumber,
+        fullName,
+        department,
+        hasStudentNumber: !!studentNumber,
+        hasFullName: !!fullName,
+        hasDepartment: !!department
+      });
     }
   }, [formRole, studentNumber, fullName, department]);
 
@@ -681,6 +723,29 @@ const EditUser = () => {
         setStudentNumberError("Student number must be at least 8 characters long.");
         return;
       }
+      
+      // Check if student number has changed and validate uniqueness
+      if (studentNumber !== originalStudentNumber) {
+        try {
+          // Check if another user already has this student number
+          const existingUsersResponse = await ApiService.getUsersByRole('student');
+          const existingUsers = existingUsersResponse?.data || existingUsersResponse || [];
+          
+          const duplicateUser = existingUsers.find(user => 
+            user.student_num === studentNumber && 
+            user.user_id !== id && 
+            user.role === 'student'
+          );
+          
+          if (duplicateUser) {
+            setStudentNumberError(`Student number ${studentNumber} is already taken by ${duplicateUser.full_name || duplicateUser.name}. Please use a different student number.`);
+            return;
+          }
+        } catch (checkError) {
+          console.warn('Could not validate student number uniqueness:', checkError);
+          // Continue with update if we can't validate uniqueness
+        }
+      }
     }
     
     // Start loading modal
@@ -764,35 +829,129 @@ const EditUser = () => {
       // Create FormData to send images with user data
       const formData = new FormData();
       
-      // Add user data fields
-      formData.append('user_id', id);
-      formData.append('role', formRole);
-      formData.append('full_name', fullName);
-      formData.append('email', email);
-      if (password) formData.append('password', password);
-      formData.append('contact_num', contactNumber);
-      formData.append('address', address);
-      formData.append('status', status);
-      
-      // Add role-specific fields
-      if (formRole === 'admin') {
-        formData.append('program', 'administration');
-      } else if (formRole === 'teacher') {
-        formData.append('program', department || 'Information Technology');
-      } else if (formRole === 'student') {
-        formData.append('program', department);
-        formData.append('student_num', studentNumber);
-        // Use the resolvedSectionId if available (existing or newly created)
-        formData.append('section_id', resolvedSectionId || '');
-        formData.append('qr_code', qrData || `IDNo: ${studentNumber}\nFull Name: ${fullName}\nProgram: ${department}`);
-      }
-      
-      // Add images if they exist
-      if (profileImageFile) {
-        formData.append('profile_pic', profileImageFile);
-      }
-      if (coverPhotoFile) {
-        formData.append('cover_pic', coverPhotoFile);
+      try {
+        // Add user data fields
+        formData.append('user_id', id);
+        formData.append('role', formRole);
+        formData.append('full_name', fullName);
+        formData.append('email', email);
+        
+        // Check if this is a Google account user by checking if they have a profile_image_url
+        // Google OAuth users typically have a profile_image_url field
+        const isGoogleUser = profileImageUrl && profileImageUrl.startsWith('http') && 
+                            !profileImageUrl.includes('localhost') && 
+                            !profileImageUrl.includes('scms_new_backup');
+        
+        // Only append password if it's not empty and user is not a Google account user
+        if (password && password.trim() !== '' && !isGoogleUser) {
+          formData.append('password', password);
+          console.log('Password field added for non-Google user');
+        } else if (isGoogleUser) {
+          console.log('Skipping password field for Google account user');
+          // For Google account users, we might need to preserve the google_id
+          // This will be handled by the backend if the user already exists
+        }
+        
+        formData.append('contact_num', contactNumber);
+        formData.append('address', address);
+        formData.append('status', status);
+        
+        // Add role-specific fields
+        if (formRole === 'admin') {
+          formData.append('program', 'administration');
+        } else if (formRole === 'teacher') {
+          formData.append('program', department || 'Information Technology');
+        } else if (formRole === 'student') {
+          formData.append('program', department);
+          formData.append('student_num', studentNumber);
+          // Use the resolvedSectionId if available (existing or newly created)
+          formData.append('section_id', resolvedSectionId || '');
+          
+          // Ensure QR code is generated for Google account users
+          let finalQrData = qrData;
+          if (!finalQrData || finalQrData.trim() === '') {
+            finalQrData = `IDNo: ${studentNumber}\nFull Name: ${fullName}\nProgram: ${department}`;
+            console.log('QR code was empty, generating new one:', finalQrData);
+          }
+          formData.append('qr_code', finalQrData);
+          
+          // Debug logging for Google account users
+          console.log('Student update data for Google account user:', {
+            studentNumber,
+            fullName,
+            department,
+            qrData,
+            finalQrData,
+            resolvedSectionId,
+            formDataEntries: Array.from(formData.entries())
+          });
+        }
+        
+        // Add images if they exist
+        if (profileImageFile) {
+          formData.append('profile_pic', profileImageFile);
+        }
+        if (coverPhotoFile) {
+          formData.append('cover_pic', coverPhotoFile);
+        }
+        
+        // Debug logging for all users
+        console.log('FormData contents before sending:', {
+          role: formRole,
+          hasPassword: !!password,
+          hasProfileImage: !!profileImageFile,
+          hasCoverPhoto: !!coverPhotoFile,
+          isGoogleUser,
+          allEntries: Array.from(formData.entries())
+        });
+        
+        // Additional debugging for student updates
+        if (formRole === 'student') {
+          console.log('Student-specific data being sent:', {
+            studentNumber,
+            fullName,
+            department,
+            section: resolvedSectionId,
+            qrCode: formData.get('qr_code'),
+            program: formData.get('program')
+          });
+          
+          // Validate required fields for students
+          const requiredFields = {
+            studentNumber: studentNumber && studentNumber.trim() !== '',
+            fullName: fullName && fullName.trim() !== '',
+            department: department && department.trim() !== '',
+            qrCode: formData.get('qr_code') && formData.get('qr_code').trim() !== ''
+          };
+          
+          console.log('Required fields validation:', requiredFields);
+          
+          const missingFields = Object.entries(requiredFields)
+            .filter(([field, isValid]) => !isValid)
+            .map(([field]) => field);
+          
+          if (missingFields.length > 0) {
+            console.warn('Missing required fields for student update:', missingFields);
+          }
+        }
+        
+        // Final FormData validation and logging
+        console.log('Final FormData validation:', {
+          totalEntries: Array.from(formData.entries()).length,
+          allKeys: Array.from(formData.keys()),
+          hasUserId: formData.has('user_id'),
+          hasRole: formData.has('role'),
+          hasFullName: formData.has('full_name'),
+          hasEmail: formData.has('email'),
+          hasPassword: formData.has('password'),
+          hasContactNum: formData.has('contact_num'),
+          hasAddress: formData.has('address'),
+          hasStatus: formData.has('status')
+        });
+        
+      } catch (formDataError) {
+        console.error('Error constructing FormData:', formDataError);
+        throw new Error(`Failed to prepare form data: ${formDataError.message}`);
       }
       
       // Use role-specific update methods (now supports both files and text)
@@ -817,8 +976,9 @@ const EditUser = () => {
         
         if (refreshedUser) {
           // Update profile image URL with cache busting
-          if (refreshedUser.profile_pic || refreshedUser.profileImageUrl) {
-            const profileUrl = refreshedUser.profile_pic || refreshedUser.profileImageUrl;
+          // Check for Google OAuth profile image first, then fallback to local profile images
+          if (refreshedUser.profile_image_url || refreshedUser.profile_pic || refreshedUser.profileImageUrl) {
+            const profileUrl = refreshedUser.profile_image_url || refreshedUser.profile_pic || refreshedUser.profileImageUrl;
             if (profileUrl.startsWith('http')) {
               setProfileImageUrl(profileUrl + (profileUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
             } else {
@@ -852,6 +1012,48 @@ const EditUser = () => {
       setShowLoadingModal(false);
       setSubmitting(false);
       console.error("Full error details:", error);
+      
+      // Enhanced error logging for debugging
+      if (error.response) {
+        console.error('Error response details:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        // Check if this is a Google account user specific error
+        if (error.response.status === 500) {
+          console.error('500 Server Error - This might be related to Google account user handling');
+          console.error('Check if all required fields are properly set for Google OAuth users');
+          
+          // Check for specific database constraint violations
+          if (error.response.data && typeof error.response.data === 'string') {
+            if (error.response.data.includes('Duplicate entry') && error.response.data.includes('student_num')) {
+              const errorMessage = 'This student number is already taken by another user. Please use a different student number.';
+              setApiError(errorMessage);
+              setStudentNumberError(errorMessage);
+              console.error('Database constraint violation: Duplicate student number');
+              return;
+            }
+            
+            if (error.response.data.includes('Database Error')) {
+              console.error('Database error detected. Check the response data for specific details.');
+              // Try to extract more specific error information
+              if (error.response.data.includes('Error Number: 1062')) {
+                setApiError('Database constraint violation: This student number is already taken by another user.');
+                setStudentNumberError('This student number is already taken by another user.');
+                return;
+              }
+            }
+          }
+        }
+      } else if (error.request) {
+        console.error('Error request details:', error.request);
+      } else {
+        console.error('Error message:', error.message);
+      }
+      
       setApiError(error.message || "Failed to update user. Please try again.");
       console.error("Error updating user:", error);
     }
@@ -1425,6 +1627,11 @@ const EditUser = () => {
                           <small className="text-muted">
                             This will be generated automatically from Student Number, Full Name, and Course.
                           </small>
+                          {!qrData && (
+                            <small className="text-warning d-block mt-1">
+                              ⚠️ QR code not generated. Please ensure Student Number, Full Name, and Course are filled in.
+                            </small>
+                          )}
                         </FormGroup>
                       </div>
                     </>

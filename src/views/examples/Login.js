@@ -35,6 +35,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import ApiService from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import GoogleOAuthButton from "../../components/GoogleOAuthButton";
 
 const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
@@ -76,6 +77,25 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = (userData, variant) => {
+    console.log('Google authentication successful:', userData);
+    // Navigate based on user role
+    const role = userData.role || (userData.user && userData.user.role);
+    if (role === "student") {
+      navigate("/student/index");
+    } else if (role === "admin") {
+      navigate("/admin/index");
+    } else if (role === "teacher") {
+      navigate("/teacher/index");
+    } else {
+      navigate("/");
+    }
+  };
+
+  const handleGoogleError = (errorMessage) => {
+    setError(errorMessage);
   };
 
 
@@ -150,25 +170,14 @@ const Login = () => {
                 <small style={{ fontSize: '0.75rem' }}>Or sign in with</small>
               </div>
               <div className="btn-wrapper text-center">
-                <Button
-                  className="btn-neutral btn-icon"
-                  color="default"
-                  href="#pablo"
-                  onClick={(e) => e.preventDefault()}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  <span className="btn-inner--icon">
-                    <img
-                      alt="..."
-                      src={
-                        require("../../assets/img/icons/common/google.svg")
-                          .default
-                      }
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                  </span>
-                  <span className="btn-inner--text">Google</span>
-                </Button>
+                <GoogleOAuthButton
+                  text="Sign in with Google"
+                  variant="sign-in"
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  disabled={loading}
+                  className="w-100"
+                />
               </div>
             </Form>
           </CardBody>

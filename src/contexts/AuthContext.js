@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import ApiService from '../services/api';
+import googleAuthService from '../services/googleAuth';
 
 const AuthContext = createContext();
 
@@ -117,11 +118,83 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      // Sign in with Google (this uses demo mode currently)
+      const googleUser = await googleAuthService.signIn();
+      
+      // Always call your backend API for real authentication
+      console.log('🚀 Calling backend API for Google OAuth authentication');
+      console.log('📤 Sending user data:', {
+        email: googleUser.email,
+        name: googleUser.name,
+        provider: googleUser.provider
+      });
+
+      const response = await ApiService.googleAuth({
+        idToken: googleUser.idToken,
+        email: googleUser.email,
+        name: googleUser.name,
+        firstName: googleUser.firstName,
+        lastName: googleUser.lastName,
+        imageUrl: googleUser.imageUrl,
+        id: googleUser.id // Add Google user ID for backend
+      });
+
+      if (response && response.status) {
+        // Handle your backend response format
+        const { data } = response;
+        const token = data.token;
+        const user = {
+          user_id: data.user_id,
+          email: data.email,
+          full_name: data.full_name,
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          role: data.role,
+          profile_image_url: data.profile_image_url,
+          auth_provider: data.auth_provider,
+          status: data.status,
+          last_login: data.last_login
+        };
+
+        // Store token and user data
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('scms_logged_in_user', JSON.stringify(user));
+        
+        // Update state
+        setUser(user);
+        setToken(token);
+        
+        console.log('✅ Backend authentication successful');
+        console.log('👤 User role:', user.role);
+        console.log('🎫 Token received');
+        
+        return { success: true, data: user };
+      } else {
+        console.log('❌ Backend authentication failed:', response?.message);
+        return { success: false, message: response?.message || 'Google authentication failed' };
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      // Sign out from Google if backend authentication fails
+      try {
+        await googleAuthService.signOut();
+      } catch (signOutError) {
+        console.error('Failed to sign out from Google:', signOutError);
+      }
+      return { success: false, message: error.message || 'Google authentication failed. Please try again.' };
+    }
+  };
+
   const logout = async () => {
     try {
       if (token) {
         await ApiService.logout();
       }
+      // Also sign out from Google
+      await googleAuthService.signOut();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -173,6 +246,7 @@ export const AuthProvider = ({ children }) => {
     token,
     loading,
     login,
+    loginWithGoogle,
     logout,
     updateProfile,
     refreshUserData,

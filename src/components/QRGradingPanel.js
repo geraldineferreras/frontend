@@ -353,7 +353,7 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
                 Student Found ✓
               </div>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <img src={matchedStudent?.avatar || student?.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg'} alt={scannedInfo["Full Name"] || scannedInfo.name || ''} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #e9ecef', marginRight: 8 }} />
+                <img src={matchedStudent?.profile_image_url || matchedStudent?.avatar || student?.profile_image_url || student?.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg'} alt={scannedInfo["Full Name"] || scannedInfo.name || ''} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #e9ecef', marginRight: 8 }} />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: '#232b3b' }}>{scannedInfo["Full Name"] || scannedInfo.name || ''}</div>
                   <div style={{ color: '#888', fontWeight: 500, fontSize: 11 }}>ID: {scannedInfo.IDNo || scannedInfo.id || ''}</div>

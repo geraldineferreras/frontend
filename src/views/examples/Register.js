@@ -26,6 +26,7 @@ import {
 } from "reactstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import GoogleOAuthButton from "../../components/GoogleOAuthButton";
 import apiService from "../../services/api";
 
 const Register = () => {
@@ -46,6 +47,28 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const handleGoogleSuccess = (userData, variant) => {
+    console.log('Google registration successful:', userData);
+    setSuccess("Registration successful! Redirecting...");
+    setTimeout(() => {
+      // Navigate based on user role
+      const role = userData.role || (userData.user && userData.user.role);
+      if (role === "student") {
+        navigate("/student/index");
+      } else if (role === "admin") {
+        navigate("/admin/index");
+      } else if (role === "teacher") {
+        navigate("/teacher/index");
+      } else {
+        navigate("/");
+      }
+    }, 1500);
+  };
+
+  const handleGoogleError = (errorMessage) => {
+    setError(errorMessage);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -228,23 +251,14 @@ const Register = () => {
               <small>Sign up with</small>
             </div>
             <div className="btn-wrapper text-center">
-              <Button
-                className="btn-neutral btn-icon"
-                color="default"
-                href="#pablo"
-                onClick={(e) => e.preventDefault()}
-              >
-                <span className="btn-inner--icon">
-                  <img
-                    alt="..."
-                    src={
-                      require("../../assets/img/icons/common/google.svg")
-                        .default
-                    }
-                  />
-                </span>
-                <span className="btn-inner--text">Google</span>
-              </Button>
+              <GoogleOAuthButton
+                text="Sign up with Google"
+                variant="sign-up"
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                disabled={loading}
+                className="w-100"
+              />
             </div>
           </CardHeader>
           <CardBody className="px-lg-5 py-lg-4">

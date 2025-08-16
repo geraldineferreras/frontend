@@ -1,22 +1,21 @@
 // Utility function to get profile picture URL with proper fallbacks
 export const getProfilePictureUrl = (user) => {
-  console.log('=== PROFILE PICTURE UTILITY ===');
-  console.log('Input user:', user);
-  
   if (!user) {
-    console.log('❌ No user provided');
     return null;
   }
 
-  // Check for profile picture in various possible fields
-  const profilePic = user.profile_pic || user.profile_picture || user.avatar || user.user_avatar || user.profileImageUrl;
-  
-  console.log('Profile picture field found:', profilePic);
-  console.log('Profile pic type:', typeof profilePic);
+  // Priority order for profile picture sources (Google OAuth gets highest priority)
+  const profilePic = user.profile_image_url ||  // Google OAuth profile image
+                    user.profileImageUrl ||     // Alternative Google OAuth field
+                    user.imageUrl ||            // Another Google OAuth field  
+                    user.profile_pic ||         // Local profile picture
+                    user.profile_picture ||     // Alternative local field
+                    user.avatar ||              // Avatar field
+                    user.user_avatar;          // User avatar field
   
   if (!profilePic) {
-    console.log('❌ No profile picture found in user data');
-    return null;
+    // Return generated avatar as fallback
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || user.name || 'User')}&size=150&background=5e72e4&color=ffffff&bold=true`;
   }
 
   let imageUrl = '';

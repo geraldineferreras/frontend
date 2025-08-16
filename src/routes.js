@@ -69,6 +69,7 @@ import TestUserData from "views/examples/TestUserData.js";
 import TestProfilePics from "views/examples/TestProfilePics.js";
 import ProfilePictureDebug from "components/ProfilePictureDebug.js";
 import SimpleProfileTest from "components/SimpleProfileTest.js";
+import GoogleOAuthCallback from "components/GoogleOAuthCallback.jsx";
 
 var routes = [
   {
@@ -155,6 +156,13 @@ var routes = [
     icon: "ni ni-camera-compact text-info",
     component: <QRRegister />,
     layout: "/auth",
+  },
+  {
+    path: "/google/callback",
+    name: "Google OAuth Callback",
+    component: <GoogleOAuthCallback />,
+    layout: "/auth",
+    hideInSidebar: true,
   },
   {
     path: "/create-user",

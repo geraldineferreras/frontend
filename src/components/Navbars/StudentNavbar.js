@@ -61,10 +61,17 @@ const StudentNavbar = (props) => {
   // Use fetched profile data if available, otherwise fall back to auth context user
   const currentUser = userProfile || user;
   
-  // Get profile picture URL and fallback data
+  // Get profile picture URL and fallback data - Always use the utility for consistency
   const profilePictureUrl = getProfilePictureUrl(currentUser);
   const userInitials = getUserInitials(currentUser);
   const avatarColor = getAvatarColor(currentUser);
+  
+  // Console log for debugging
+  console.log('🖼️ StudentNavbar Profile Picture:', {
+    user: currentUser?.email,
+    profile_image_url: currentUser?.profile_image_url,
+    profilePictureUrl: profilePictureUrl
+  });
 
   // Responsive fix for dropdown menu on mobile
   if (typeof window !== 'undefined') {
@@ -157,10 +164,9 @@ const StudentNavbar = (props) => {
                           objectFit: 'cover'
                         }}
                         onError={(e) => {
-                          console.log('❌ Profile image failed to load, falling back to initials');
-                          // Fallback to initials if image fails to load
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
+                          console.log('❌ Profile image failed to load, using generated avatar');
+                          // Fallback to generated avatar instead of hiding
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.full_name || 'User')}&size=40&background=5e72e4&color=ffffff&bold=true`;
                         }}
                         onLoad={(e) => {
                           console.log('✅ Profile image loaded successfully');

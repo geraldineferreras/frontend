@@ -117,6 +117,15 @@ class ApiService {
     });
   }
 
+  // Google OAuth authentication
+  async googleAuth(googleUserData) {
+    return this.makeRequest('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify(googleUserData),
+      requireAuth: false // Google auth doesn't require existing auth
+    });
+  }
+
   // Current user profile
   async getCurrentUser() {
     return this.makeRequest('/user/me', {
@@ -174,6 +183,14 @@ class ApiService {
     return this.makeRequest('/user', {
       method: 'PUT',
       body: JSON.stringify(userData),
+      requireAuth: true,
+    });
+  }
+
+  // Get all sections for profile form
+  async getAllSections() {
+    return this.makeRequest('/admin/sections', {
+      method: 'GET',
       requireAuth: true,
     });
   }

@@ -152,7 +152,7 @@ const UserList = () => {
         <td>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <img
-              src={user.avatar || '/default-avatar.png'}
+              src={user.profile_image_url || user.avatar || '/default-avatar.png'}
               alt={user.name}
               style={{ width: 40, height: 40, borderRadius: '50%', marginRight: 8 }}
             />

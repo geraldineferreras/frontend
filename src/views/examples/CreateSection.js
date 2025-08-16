@@ -487,14 +487,14 @@ const CreateSection = () => {
   const AdviserOption = (props) => (
     <div {...props.innerProps} style={{ display: 'flex', alignItems: 'center', padding: 8, background: props.isFocused ? '#f6f9fc' : 'white' }}>
       <img 
-        src={props.data.avatar} 
+        src={props.data.profile_image_url || props.data.avatar} 
         alt={props.data.label} 
         style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover' }}
         onLoad={() => {
-          console.log('Image loaded successfully:', props.data.avatar);
+          console.log('Image loaded successfully:', props.data.profile_image_url || props.data.avatar);
         }}
         onError={(e) => {
-          console.log('Image failed to load:', props.data.avatar);
+          console.log('Image failed to load:', props.data.profile_image_url || props.data.avatar);
           e.target.src = require("../../assets/img/theme/team-1-800x800.jpg");
         }}
       />
@@ -513,14 +513,14 @@ const CreateSection = () => {
       margin: '2px 0',
     }}>
       <img 
-        src={props.data.avatar} 
+        src={props.data.profile_image_url || props.data.avatar} 
         alt={props.data.label} 
         style={{ width: 24, height: 24, borderRadius: '50%', marginRight: 8, objectFit: 'cover' }}
         onLoad={() => {
-          console.log('Image loaded successfully (single value):', props.data.avatar);
+          console.log('Image loaded successfully (single value):', props.data.profile_image_url || props.data.avatar);
         }}
         onError={(e) => {
-          console.log('Image failed to load (single value):', props.data.avatar);
+          console.log('Image failed to load (single value):', props.data.profile_image_url || props.data.avatar);
           e.target.src = require("../../assets/img/theme/team-1-800x800.jpg");
         }}
       />

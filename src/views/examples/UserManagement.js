@@ -633,6 +633,26 @@ const UserManagement = () => {
   };
 
   const getAvatarForUser = (user) => {
+    // Priority order: Google OAuth profile image -> local profile pic -> generated avatar
+    
+    // 1. Check for Google OAuth profile image first (highest priority)
+    if (user.profile_image_url && user.profile_image_url.startsWith('http')) {
+      console.log(`Using Google profile image for ${user.full_name}: ${user.profile_image_url}`);
+      return user.profile_image_url;
+    }
+    
+    // 2. Check for other Google OAuth fields
+    if (user.profileImageUrl && user.profileImageUrl.startsWith('http')) {
+      console.log(`Using Google profileImageUrl for ${user.full_name}: ${user.profileImageUrl}`);
+      return user.profileImageUrl;
+    }
+    
+    if (user.imageUrl && user.imageUrl.startsWith('http')) {
+      console.log(`Using Google imageUrl for ${user.full_name}: ${user.imageUrl}`);
+      return user.imageUrl;
+    }
+    
+    // 3. Check for local profile pic
     if (user.profile_pic) {
       let imageUrl;
       
@@ -655,11 +675,14 @@ const UserManagement = () => {
       
       // Add cache busting to prevent browser caching
       imageUrl = addCacheBuster(imageUrl);
-      console.log(`Avatar URL for ${user.full_name}: ${imageUrl}`);
+      console.log(`Using local profile pic for ${user.full_name}: ${imageUrl}`);
       return imageUrl;
     }
-    // Use initials avatar when no profile picture is available
-    return getInitialsAvatar(user.full_name || 'User');
+    
+    // 4. Use generated avatar as fallback
+    const fallbackUrl = getInitialsAvatar(user.full_name || 'User');
+    console.log(`Using generated avatar for ${user.full_name}: ${fallbackUrl}`);
+    return fallbackUrl;
   };
 
   const getCoverPhotoForUser = (user) => {

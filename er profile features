@@ -1,8 +1,3 @@
-[33m8cae357b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix API endpoint duplication in audit logs - remove duplicate /api/ prefix
-[33m401ba6b3[m Update SCMS project - UserManagement improvements
-[33m925d1c4e[m Update AuditLog component with real profile pictures and improved loading states
-[33mafb8fd1c[m Fix student count display to show real enrolled students instead of hardcoded values
-[33m7eb5b118[m feat: support file upload and correct attachment_url for stream posts
 
                    SSUUMMMMAARRYY OOFF LLEESSSS CCOOMMMMAANNDDSS
 
