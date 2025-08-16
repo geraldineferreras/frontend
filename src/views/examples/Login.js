@@ -151,26 +151,7 @@ const Login = () => {
               </div>
               <div className="btn-wrapper text-center">
                 <Button
-                  className="btn-neutral btn-icon mr-1"
-                  color="default"
-                  href="#pablo"
-                  onClick={(e) => e.preventDefault()}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  <span className="btn-inner--icon">
-                    <img
-                      alt="..."
-                      src={
-                        require("../../assets/img/icons/common/github.svg")
-                          .default
-                      }
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                  </span>
-                  <span className="btn-inner--text">Github</span>
-                </Button>
-                <Button
-                  className="btn-neutral btn-icon ml-1"
+                  className="btn-neutral btn-icon"
                   color="default"
                   href="#pablo"
                   onClick={(e) => e.preventDefault()}

@@ -141,7 +141,7 @@ const Register = () => {
       return (
         <>
           <FormGroup>
-            <InputGroup className="input-group-alternative mb-3">
+            <InputGroup className="input-group-alternative mb-2">
               <InputGroupAddon addonType="prepend">
                 <InputGroupText>
                   <i className="ni ni-badge" />
@@ -158,7 +158,7 @@ const Register = () => {
             </InputGroup>
           </FormGroup>
           <FormGroup>
-            <InputGroup className="input-group-alternative mb-3">
+            <InputGroup className="input-group-alternative mb-2">
               <InputGroupAddon addonType="prepend">
                 <InputGroupText>
                   <i className="ni ni-books" />
@@ -175,7 +175,7 @@ const Register = () => {
             </InputGroup>
           </FormGroup>
           <FormGroup>
-            <InputGroup className="input-group-alternative mb-3">
+            <InputGroup className="input-group-alternative mb-2">
               <InputGroupAddon addonType="prepend">
                 <InputGroupText>
                   <i className="ni ni-building" />
@@ -220,24 +220,14 @@ const Register = () => {
     <>
       <Col lg="6" md="8">
         <Card className="bg-secondary shadow border-0">
-          <CardHeader className="bg-transparent pb-5">
-            <div className="text-center mt-2 mb-3">
+          <CardHeader className="bg-transparent pb-3">
+            <div className="text-center mt-2 mb-2">
               <h2>Register</h2>
             </div>
-            <div className="text-muted text-center mb-3">
+            <div className="text-muted text-center mb-2">
               <small>Sign up with</small>
             </div>
             <div className="btn-wrapper text-center">
-              <Button
-                className="btn-neutral btn-icon"
-                color="default"
-                onClick={() => navigate("/auth/qr-register")}
-              >
-                <span className="btn-inner--icon">
-                  <i className="ni ni-camera-compact" />
-                </span>
-                <span className="btn-inner--text">QR Code</span>
-              </Button>
               <Button
                 className="btn-neutral btn-icon"
                 color="default"
@@ -257,8 +247,8 @@ const Register = () => {
               </Button>
             </div>
           </CardHeader>
-          <CardBody className="px-lg-5 py-lg-5">
-            <div className="text-center text-muted mb-4">
+          <CardBody className="px-lg-5 py-lg-4">
+            <div className="text-center text-muted mb-3">
               <small>Or sign up with credentials</small>
             </div>
             
@@ -268,7 +258,7 @@ const Register = () => {
             <Form role="form" onSubmit={handleSubmit}>
               {/* Role Selection Dropdown */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-circle-08" />
@@ -291,7 +281,7 @@ const Register = () => {
 
               {/* Full Name */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-hat-3" />
@@ -310,7 +300,7 @@ const Register = () => {
 
               {/* Email */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-email-83" />
@@ -333,7 +323,7 @@ const Register = () => {
 
               {/* Contact Number */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-mobile-button" />
@@ -351,7 +341,7 @@ const Register = () => {
 
               {/* Address */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-pin-3" />
@@ -369,7 +359,7 @@ const Register = () => {
 
               {/* Password */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-lock-circle-open" />
@@ -389,7 +379,7 @@ const Register = () => {
 
               {/* Confirm Password */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-3">
+                <InputGroup className="input-group-alternative mb-2">
                   <InputGroupAddon addonType="prepend">
                     <InputGroupText>
                       <i className="ni ni-lock-circle-open" />
