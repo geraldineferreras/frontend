@@ -109,7 +109,11 @@ const TaskDetail = () => {
           };
 
           const enriched = await enrichWithOriginalNames(response.data);
-          setTask(enriched);
+          
+          // Apply the same attachment normalization logic as ClassroomDetail.js
+          const normalizedTask = await normalizeTaskAttachments(enriched);
+          console.log('TaskDetail: Normalized task with attachments:', normalizedTask);
+          setTask(normalizedTask);
         }
         
         // Load submissions separately
@@ -187,6 +191,117 @@ const TaskDetail = () => {
 
     loadTaskDetails();
   }, [taskId]);
+
+  // Normalize task attachments to ensure proper display
+  const normalizeTaskAttachments = async (taskData) => {
+    if (!taskData) return taskData;
+    
+    let attachments = Array.isArray(taskData.attachments) ? [...taskData.attachments] : [];
+
+    // Handle different attachment formats from the backend
+    if (!attachments || attachments.length === 0) {
+      // Check for single attachment fields
+      if (taskData.attachment_url) {
+        const att = {
+          attachment_url: taskData.attachment_url,
+          attachment_type: taskData.attachment_type || 'file',
+          name: taskData.original_name || (typeof taskData.attachment_url === 'string' ? taskData.attachment_url.split('/').pop() : 'Attachment'),
+          file_name: taskData.file_name,
+          original_name: taskData.original_name,
+          type: taskData.attachment_type || 'file'
+        };
+        attachments = [att];
+      }
+      
+      // Check for link attachments (YouTube, Google Drive, external links)
+      // Check various possible field names for YouTube links
+      if (taskData.youtube_url || taskData.youtube_link || taskData.youtube) {
+        const youtubeUrl = taskData.youtube_url || taskData.youtube_link || taskData.youtube;
+        attachments.push({
+          type: 'YouTube',
+          url: youtubeUrl,
+          name: taskData.youtube_title || taskData.youtube_name || 'YouTube Video',
+          attachment_type: 'youtube'
+        });
+      }
+      
+      // Check various possible field names for Google Drive links
+      if (taskData.gdrive_url || taskData.gdrive_link || taskData.gdrive || taskData.google_drive_url || taskData.google_drive) {
+        const gdriveUrl = taskData.gdrive_url || taskData.gdrive_link || taskData.gdrive || taskData.google_drive_url || taskData.google_drive;
+        attachments.push({
+          type: 'Google Drive',
+          url: gdriveUrl,
+          name: taskData.gdrive_title || taskData.gdrive_name || taskData.google_drive_title || 'Google Drive Document',
+          attachment_type: 'google_drive'
+        });
+      }
+      
+      // Check various possible field names for external links
+      if (taskData.link_url || taskData.link || taskData.external_link || taskData.external_url) {
+        const linkUrl = taskData.link_url || taskData.link || taskData.external_link || taskData.external_url;
+        attachments.push({
+          type: 'Link',
+          url: linkUrl,
+          name: taskData.link_title || taskData.link_name || taskData.external_title || 'External Link',
+          attachment_type: 'link'
+        });
+      }
+      
+      // Check for external_links JSON field
+      if (taskData.external_links) {
+        try {
+          const externalLinks = typeof taskData.external_links === 'string' ? JSON.parse(taskData.external_links) : taskData.external_links;
+          if (Array.isArray(externalLinks)) {
+            externalLinks.forEach(link => {
+              if (link.url && link.type) {
+                attachments.push({
+                  type: link.type === 'youtube' ? 'YouTube' : 
+                         link.type === 'google_drive' ? 'Google Drive' : 
+                         link.type === 'link' ? 'Link' : 'Link',
+                  url: link.url,
+                  name: link.title || link.name || 'External Link',
+                  attachment_type: link.type
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to parse external_links:', e);
+        }
+      }
+    }
+
+    // Ensure all attachments have proper type and url fields
+    attachments = attachments.map(att => {
+      // Normalize attachment type for consistent display
+      if (!att.type && att.attachment_type) {
+        att.type = att.attachment_type === 'youtube' ? 'YouTube' :
+                   att.attachment_type === 'google_drive' ? 'Google Drive' :
+                   att.attachment_type === 'link' ? 'Link' : 'File';
+      }
+      
+      // Ensure attachment_type is set for proper styling
+      if (!att.attachment_type && att.type) {
+        att.attachment_type = att.type === 'YouTube' ? 'youtube' :
+                             att.type === 'Google Drive' ? 'google_drive' :
+                             att.type === 'Link' ? 'link' : 'file';
+      }
+      
+      // Ensure URL is set
+      if (!att.url && att.attachment_url) {
+        att.url = att.attachment_url;
+      }
+      
+      // Ensure name is set
+      if (!att.name && att.original_name) {
+        att.name = att.original_name;
+      }
+      
+      return att;
+    });
+
+    return { ...taskData, attachments };
+  };
 
   // Resolve top-level task attachment original_name quickly for UI label
   useEffect(() => {
@@ -334,6 +449,23 @@ const TaskDetail = () => {
         fontSize: 14,
         boxShadow: '0 4px 12px rgba(255, 0, 0, 0.3)'
       }}>YT</div>;
+    }
+
+    // Handle Google Drive attachments
+    if (att.type === "Google Drive" && att.url) {
+      return <div style={{ 
+        width: 60, 
+        height: 80, 
+        background: 'linear-gradient(135deg, #4285F4 0%, #3367D6 100%)', 
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+        boxShadow: '0 4px 12px rgba(66, 133, 244, 0.3)'
+      }}>DRIVE</div>;
     }
 
     // Handle file attachments
@@ -523,13 +655,8 @@ const TaskDetail = () => {
   const getFileUrl = (filePath) => {
     if (!filePath) return null;
     
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      return filePath;
-    } else if (filePath.startsWith('uploads/')) {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${filePath}`;
-    } else {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/submissions/${filePath}`;
-    }
+    // Use the API service's getFilePreviewUrl function for consistency
+    return apiService.getFilePreviewUrl(filePath, true); // true for submissions
   };
 
   // Open modal with file and student info

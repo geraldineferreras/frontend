@@ -25,6 +25,9 @@ const ProfilePicture = ({
     user: user?.email || user?.full_name,
     profile_image_url: user?.profile_image_url,
     profilePictureUrl: profilePictureUrl,
+    userInitials: userInitials,
+    avatarColor: avatarColor,
+    hasRealProfilePic: profilePictureUrl && profilePictureUrl !== '',
     size: size
   });
 
@@ -38,15 +41,45 @@ const ProfilePicture = ({
     ...style
   };
 
-  // Always try to load an image first (either real profile pic or generated avatar)
-  const imageUrl = profilePictureUrl || 
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name || user?.name || 'User')}&size=${size}&background=5e72e4&color=ffffff&bold=true`;
+  // Check if we have a real profile picture
+  const hasRealProfilePic = profilePictureUrl && profilePictureUrl !== '';
 
+  // If no real profile picture, show initials directly
+  if (!hasRealProfilePic && showFallback) {
+    console.log('🔄 No real profile picture, showing initials directly:', {
+      profilePictureUrl,
+      userInitials,
+      avatarColor
+    });
+    return (
+      <div className={`profile-picture ${className}`} style={containerStyle}>
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: avatarColor,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: `${Math.max(12, size / 3)}px`,
+            fontWeight: 'bold',
+            color: 'white',
+            borderRadius: '50%'
+          }}
+        >
+          {userInitials}
+        </div>
+      </div>
+    );
+  }
+
+  // If we have a real profile picture, try to load it with fallback
+  console.log('🔄 Has real profile picture, trying to load:', profilePictureUrl);
   return (
     <div className={`profile-picture ${className}`} style={containerStyle}>
       <img
         alt={`${user?.full_name || user?.name || 'User'}'s profile`}
-        src={imageUrl}
+        src={profilePictureUrl}
         style={{
           width: '100%',
           height: '100%',
@@ -54,16 +87,11 @@ const ProfilePicture = ({
           display: 'block'
         }}
         onError={(e) => {
-          console.log('❌ Profile image failed, using generated avatar');
-          // If the main image fails, try generated avatar as fallback
-          if (!e.target.src.includes('ui-avatars.com')) {
-            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name || user?.name || 'User')}&size=${size}&background=5e72e4&color=ffffff&bold=true`;
-          } else if (showFallback) {
-            // If even generated avatar fails, show initials
-            e.target.style.display = 'none';
-            if (e.target.nextSibling) {
-              e.target.nextSibling.style.display = 'flex';
-            }
+          console.log('❌ Profile image failed, showing initials fallback');
+          // Hide the failed image and show initials
+          e.target.style.display = 'none';
+          if (e.target.nextSibling) {
+            e.target.nextSibling.style.display = 'flex';
           }
         }}
         onLoad={() => {
@@ -71,7 +99,7 @@ const ProfilePicture = ({
         }}
       />
       
-      {/* Fallback initials (only shown if image fails and showFallback is true) */}
+      {/* Fallback initials (hidden by default, shown on image error) */}
       {showFallback && (
         <div
           style={{

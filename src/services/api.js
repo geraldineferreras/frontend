@@ -1149,6 +1149,121 @@ class ApiService {
     }
   }
 
+  // Teacher Create Classroom Stream Post with multiple link attachments (links, YouTube, Google Drive)
+  async createTeacherStreamPostWithLinks(classCode, baseData = {}, links = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+
+    const formData = new FormData();
+
+    // Append text fields
+    Object.keys(baseData || {}).forEach((key) => {
+      const value = baseData[key];
+      if (value === undefined || value === null) {
+        formData.append(key, '');
+      } else if (typeof value === 'boolean') {
+        formData.append(key, value ? '1' : '0');
+      } else if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    // Process link attachments
+    links.forEach((link, index) => {
+      if (link.type === 'Link' || link.type === 'link') {
+        formData.append(`link_${index}`, link.url);
+        formData.append(`link_title_${index}`, link.name || '');
+        formData.append(`link_description_${index}`, link.description || '');
+      } else if (link.type === 'YouTube' || link.type === 'youtube') {
+        formData.append(`youtube_${index}`, link.url);
+        formData.append(`youtube_title_${index}`, link.name || '');
+        formData.append(`youtube_description_${index}`, link.description || '');
+      } else if (link.type === 'Google Drive' || link.type === 'google_drive') {
+        formData.append(`gdrive_${index}`, link.url);
+        formData.append(`gdrive_title_${index}`, link.name || '');
+        formData.append(`gdrive_description_${index}`, link.description || '');
+      }
+    });
+
+    try {
+      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // No explicit Content-Type so browser sets multipart boundary
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to create stream post';
+      console.error('createTeacherStreamPostWithLinks error:', message);
+      throw new Error(message);
+    }
+  }
+
+  // Teacher Create Classroom Stream Post with mixed attachments (files + links)
+  async createTeacherStreamPostWithMixedAttachments(classCode, baseData = {}, files = [], links = []) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please log in again.');
+    }
+
+    const formData = new FormData();
+
+    // Append text fields
+    Object.keys(baseData || {}).forEach((key) => {
+      const value = baseData[key];
+      if (value === undefined || value === null) {
+        formData.append(key, '');
+      } else if (typeof value === 'boolean') {
+        formData.append(key, value ? '1' : '0');
+      } else if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    // Add files
+    files.forEach((file, index) => {
+      formData.append(`attachment_${index}`, file);
+    });
+
+    // Add links
+    links.forEach((link, index) => {
+      if (link.type === 'Link' || link.type === 'link') {
+        formData.append(`link_${index}`, link.url);
+        formData.append(`link_title_${index}`, link.title || link.name || '');
+        formData.append(`link_description_${index}`, link.description || '');
+      } else if (link.type === 'YouTube' || link.type === 'youtube') {
+        formData.append(`youtube_${index}`, link.url);
+        formData.append(`youtube_title_${index}`, link.title || link.name || '');
+        formData.append(`youtube_description_${index}`, link.description || '');
+      } else if (link.type === 'Google Drive' || link.type === 'google_drive') {
+        formData.append(`gdrive_${index}`, link.url);
+        formData.append(`gdrive_title_${index}`, link.title || link.name || '');
+        formData.append(`gdrive_description_${index}`, link.description || '');
+      }
+    });
+
+    try {
+      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // No explicit Content-Type so browser sets multipart boundary
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to create stream post';
+      console.error('createTeacherStreamPostWithMixedAttachments error:', message);
+      throw new Error(message);
+    }
+  }
+
   // Teacher add comment to a stream post
   async addTeacherStreamComment(classCode, postId, commentText) {
     return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment`, {

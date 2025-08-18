@@ -140,6 +140,95 @@ const gradeFilters = ["All", "Assigned", "Returned", "Missing"];
 // Add mock announcements for student stream tab (similar to teacher)
 // const mockAnnouncements = [ ... ];
 
+// Helper to get file type, icon, and preview
+const getFileTypeIconOrPreview = (att) => {
+  // Debug: Log what we're receiving
+  console.log('getFileTypeIconOrPreview called with:', att);
+  
+  // Handle different attachment types
+  if (!att) {
+    console.log('No attachment data, returning FILE');
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: 'FILE', color: '#90A4AE' };
+  }
+
+  // Handle link attachments
+  if (att.type === "Link" && att.url) {
+    console.log('Detected Link type');
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">LINK</text></svg>, type: 'LINK', color: '#1976D2' };
+  }
+
+  // Handle YouTube attachments
+  if (att.type === "YouTube" && att.url) {
+    console.log('Detected YouTube type');
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>, type: 'YOUTUBE', color: '#FF0000' };
+  }
+
+  // Handle Google Drive attachments
+  if (att.type === "Google Drive" && att.url) {
+    console.log('Detected Google Drive type');
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>, type: 'GOOGLE DRIVE', color: '#4285F4' };
+  }
+
+  // Handle alternative type values (case-insensitive and with underscores)
+  if (att.type && att.url) {
+    const typeLower = att.type.toLowerCase().replace(/_/g, ' ');
+    console.log('Checking alternative type:', typeLower);
+    
+    if (typeLower === "link") {
+      console.log('Detected Link type (alternative)');
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">LINK</text></svg>, type: 'LINK', color: '#1976D2' };
+    }
+    
+    if (typeLower === "youtube") {
+      console.log('Detected YouTube type (alternative)');
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>, type: 'YOUTUBE', color: '#FF0000' };
+    }
+    
+    if (typeLower === "google drive" || typeLower === "googledrive") {
+      console.log('Detected Google Drive type (alternative)');
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>, type: 'GOOGLE DRIVE', color: '#4285F4' };
+    }
+  }
+
+  // Handle file attachments
+  const fileName = att.name;
+  if (!fileName || typeof fileName !== 'string') {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: 'FILE', color: '#90A4AE' };
+  }
+
+  const ext = fileName.split('.').pop().toLowerCase();
+  const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+
+  // Microsoft Word
+  const wordExts = ['doc', 'docx', 'dot', 'dotx', 'docm', 'dotm'];
+  if (wordExts.includes(ext)) {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text></svg>, type: 'WORD', color: '#1976D2' };
+  }
+  // Microsoft Excel (including CSV)
+  const excelExts = ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'csv'];
+  if (excelExts.includes(ext)) {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#388E3C" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#388E3C" fontWeight="bold">EXCEL</text></svg>, type: 'EXCEL', color: '#388E3C' };
+  }
+  // Microsoft PowerPoint
+  const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'pptm', 'potx', 'potm', 'ppsm'];
+  if (pptExts.includes(ext)) {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF9800" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF9800" fontWeight="bold">PPT</text></svg>, type: 'PPT', color: '#FF9800' };
+  }
+  // TXT
+  if (ext === 'txt') {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#607d8b" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#607d8b" fontWeight="bold">TXT</text></svg>, type: 'TXT', color: '#607d8b' };
+  }
+
+  if (imageTypes.includes(ext) && att.file) {
+    const url = URL.createObjectURL(att.file);
+    return { preview: <img src={url} alt={fileName} style={{ width: 32, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #e9ecef' }} />, type: ext.toUpperCase(), color: '#90A4AE' };
+  }
+  if (ext === 'mp4') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#8e24aa" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#8e24aa" fontWeight="bold">MP4</text></svg>, type: 'MP4', color: '#8e24aa' };
+  if (ext === 'mp3') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/><circle cx="16" cy="20" r="7" fill="#43a047"/><rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text></svg>, type: 'MP3', color: '#43a047' };
+  if (ext === 'pdf') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text></svg>, type: 'PDF', color: '#F44336' };
+  return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: ext.toUpperCase(), color: '#90A4AE' };
+};
+
 // Helper to format relative time
 function formatRelativeTime(dateString) {
   if (!dateString) return '';
@@ -1000,8 +1089,8 @@ const ClassroomDetailStudent = () => {
     if (att.type === 'youtube') {
       return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>;
     }
-    if (att.type === 'drive') {
-      return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">DRIVE</text></svg>;
+    if (att.type === 'drive' || att.type === 'Google Drive') {
+      return <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>;
     }
     if (att.type === 'file' && att.file && att.file.type && att.file.type.startsWith('image')) {
       return <img src={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)} alt={att.name} style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', marginRight: 14 }} />;
@@ -1519,84 +1608,89 @@ const ClassroomDetailStudent = () => {
                       <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Scheduled for: {new Date(announcement.date).toLocaleString()}</div>
                       {announcement.attachments && announcement.attachments.length > 0 && (
                         <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          {announcement.attachments.map((att, idx) => {
-                            const isMp3 = att.type === 'file' && att.file && (att.file.type === 'audio/mp3' || att.file.type === 'audio/mpeg' || (att.name && att.name.toLowerCase().endsWith('.mp3')));
-                            const isPdf = att.type === 'file' && att.file && (att.file.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf')));
-                            const isMp4 = att.type === 'file' && att.file && (att.file.type === 'video/mp4' || (att.name && att.name.toLowerCase().endsWith('.mp4')));
-                            const isWord = att.type === 'file' && att.file && (att.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || (att.name && /\.docx?$/i.test(att.name)));
-                            const fileType = isMp3 ? 'MP3' : isPdf ? 'PDF' : isMp4 ? 'MP4' : isWord ? 'WORD' : (att.file && att.file.type ? att.file.type.split('/')[1]?.toUpperCase() : att.type.charAt(0).toUpperCase() + att.type.slice(1));
-                            const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
-                            const linkColor = typeColor;
-                            // Compute preview availability per attachment scope
-                            const isFile = att.type === 'file' && att.file;
-                            const canPreview = isFile || !!att.url;
-                            // Truncate file name and type string
-                            const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
-                            let typeString = '';
-                            if (isFile && att.file && att.file.type && !isMp3 && !isPdf && !isMp4 && !isWord) {
-                              typeString = att.file.type.toUpperCase();
-                              if (typeString.length > 28) typeString = typeString.slice(0, 25) + '...';
-                            } else {
-                              typeString = fileType;
+                          {announcement.attachments.map((att, idx2) => {
+                            // Debug: Log the attachment data to see its structure
+                            console.log('Student attachment data:', att);
+                            
+                            const { preview, type, color } = getFileTypeIconOrPreview(att);
+                            console.log('getFileTypeIconOrPreview result:', { preview, type, color });
+                            
+                            let url = undefined;
+                            if (att.file && (att.file instanceof File || att.file instanceof Blob)) {
+                              url = URL.createObjectURL(att.file);
+                            } else if (att.url) {
+                              url = att.url;
                             }
+                            const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
+                                         att.type === "link" || att.type === "youtube" || att.type === "google_drive" ||
+                                         att.type === "googledrive";
+                            console.log('isLink detection:', isLink, 'att.type:', att.type);
+                            // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                            let linkUrl = att.url;
+                            
+                            if (isLink && linkUrl) {
+                              // Remove localhost prefixes if they exist
+                              if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                console.log('Removed localhost prefix, new URL:', linkUrl);
+                              } else if (linkUrl.includes('localhost/')) {
+                                // Handle other localhost variations
+                                linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                console.log('Removed localhost prefix, new URL:', linkUrl);
+                              }
+                              
+                              // Ensure it's a valid external URL
+                              if (!linkUrl.startsWith('http')) {
+                                // If it's a relative URL, try to construct the full URL
+                                if (linkUrl.startsWith('/')) {
+                                  linkUrl = window.location.origin + linkUrl;
+                                } else {
+                                  // If it's just a path, assume it should be an external link
+                                  console.warn('Link attachment has relative URL:', linkUrl);
+                                  linkUrl = null; // Don't open invalid URLs
+                                }
+                              }
+                            }
+                            const displayName = isLink ? (linkUrl || att.url) : att.name;
                             return (
                               <div
-                                key={idx}
-                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: canPreview ? 'pointer' : 'default' }}
-                                onClick={canPreview ? () => handlePreviewAttachment(att) : undefined}
+                                key={idx2}
+                                style={{ 
+                                  background: isLink ? `${color}08` : '#fff', 
+                                  border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                  borderRadius: 12, 
+                                  boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
+                                  padding: '10px 18px', 
+                                  minWidth: 220, 
+                                  maxWidth: 340, 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 12, 
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onClick={() => {
+                                  if (isLink && linkUrl) {
+                                    window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                  } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                    // For YouTube, Google Drive, and Link types, always open in new tab
+                                    if (linkUrl) {
+                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                    } else {
+                                      console.warn('Cannot open link: invalid URL');
+                                    }
+                                  } else {
+                                    handlePreviewAttachment(att);
+                                  }
+                                }}
                               >
-                                {/* File icon */}
-                                {isMp3 ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/>
-                                    <circle cx="16" cy="20" r="7" fill="#43a047"/>
-                                    <rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/>
-                                    <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text>
-                                  </svg>
-                                ) : isPdf ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/>
-                                    <path d="M8 8h16v24H8z" fill="#fff"/>
-                                    <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text>
-                                  </svg>
-                                ) : isMp4 ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#7B1FA2" strokeWidth="2"/>
-                                    <polygon points="13,14 25,20 13,26" fill="#7B1FA2"/>
-                                    <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#7B1FA2" fontWeight="bold">MP4</text>
-                                  </svg>
-                                ) : isWord ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/>
-                                    <path d="M8 8h16v24H8z" fill="#fff"/>
-                                    <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text>
-                                  </svg>
-                                ) : getFileTypeIcon(att)}
-                                {/* File info */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 600, fontSize: 15, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName}</div>
-                                  <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
-                                    <span style={{ color: typeColor }}>{typeString}</span>
-                                    {canPreview && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
-                                    {isFile ? (
-                                      <a
-                                        href={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)}
-                                        download={att.name}
-                                        style={{ fontSize: 13, color: linkColor, fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => { e.stopPropagation(); }}
-                                      >
-                                        Download
-                                      </a>
-                                    ) : null}
-                                    {canPreview ? (
-                                      <a
-                                        href="#"
-                                        style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
-                                      >
-                                        Open
-                                      </a>
-                                    ) : null}
+                                  <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
+                                  <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
+                                    {type}
+                                    {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                    {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                   </div>
                                 </div>
                               </div>
@@ -1630,92 +1724,92 @@ const ClassroomDetailStudent = () => {
                       <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{announcement.title}</div>
                       <div style={{ color: '#444', fontSize: 13, marginBottom: 10 }}>{announcement.content}</div>
                       <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Saved as draft: {new Date(announcement.date).toLocaleString()}</div>
-                      {announcement.attachments && announcement.attachments.length > 0 && (
-                        <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          {announcement.attachments.map((att, idx) => {
-                            const isMp3 = att.type === 'file' && att.file && (att.file.type === 'audio/mp3' || att.file.type === 'audio/mpeg' || (att.name && att.name.toLowerCase().endsWith('.mp3')));
-                            const isPdf = att.type === 'file' && att.file && (att.file.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf')));
-                            const isMp4 = att.type === 'file' && att.file && (att.file.type === 'video/mp4' || (att.name && att.name.toLowerCase().endsWith('.mp4')));
-                            const isWord = att.type === 'file' && att.file && (att.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || (att.name && /\.docx?$/i.test(att.name)));
-                            const fileType = isMp3 ? 'MP3' : isPdf ? 'PDF' : isMp4 ? 'MP4' : isWord ? 'WORD' : (att.file && att.file.type ? att.file.type.split('/')[1]?.toUpperCase() : att.type.charAt(0).toUpperCase() + att.type.slice(1));
-                            const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
-                            const linkColor = typeColor;
-                            const isFile = att.type === 'file' && att.file;
-                            const canPreview = isFile || !!att.url;
-                            // Truncate file name and type string
-                            const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
-                            let typeString = '';
-                            if (isFile && att.file && att.file.type && !isMp3 && !isPdf && !isMp4 && !isWord) {
-                              typeString = att.file.type.toUpperCase();
-                              if (typeString.length > 28) typeString = typeString.slice(0, 25) + '...';
-                            } else {
-                              typeString = fileType;
-                            }
-                            return (
-                              <div
-                                key={idx}
-                                style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: canPreview ? 'pointer' : 'default' }}
-                                onClick={canPreview ? () => handlePreviewAttachment(att) : undefined}
-                              >
-                                {/* File icon */}
-                                {isMp3 ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/>
-                                    <circle cx="16" cy="20" r="7" fill="#43a047"/>
-                                    <rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/>
-                                    <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text>
-                                  </svg>
-                                ) : isPdf ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/>
-                                    <path d="M8 8h16v24H8z" fill="#fff"/>
-                                    <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text>
-                                  </svg>
-                                ) : isMp4 ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#7B1FA2" strokeWidth="2"/>
-                                    <polygon points="13,14 25,20 13,26" fill="#7B1FA2"/>
-                                    <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#7B1FA2" fontWeight="bold">MP4</text>
-                                  </svg>
-                                ) : isWord ? (
-                                  <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                    <rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/>
-                                    <path d="M8 8h16v24H8z" fill="#fff"/>
-                                    <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text>
-                                  </svg>
-                                ) : getFileTypeIcon(att)}
-                                {/* File info */}
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 600, fontSize: 15, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName}</div>
-                                  <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
-                                    <span style={{ color: typeColor }}>{typeString}</span>
-                                    {canPreview && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
-                                    {isFile ? (
-                                      <a
-                                        href={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)}
-                                        download={att.name}
-                                        style={{ fontSize: 13, color: linkColor, fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => { e.stopPropagation(); }}
-                                      >
-                                        Download
-                                      </a>
-                                    ) : null}
-                                    {canPreview ? (
-                                      <a
-                                        href="#"
-                                        style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                        onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
-                                      >
-                                        Open
-                                      </a>
-                                    ) : null}
+                                              {announcement.attachments && announcement.attachments.length > 0 && (
+                          <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {announcement.attachments.map((att, idx2) => {
+                              const { preview, type, color } = getFileTypeIconOrPreview(att);
+                              let url = undefined;
+                              if (att.file && (att.file instanceof File || att.file instanceof Blob)) {
+                                url = URL.createObjectURL(att.file);
+                              } else if (att.url) {
+                                url = att.url;
+                              }
+                              const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
+                                           att.type === "link" || att.type === "youtube" || att.type === "google_drive" ||
+                                           att.type === "googledrive";
+                              // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                              let linkUrl = att.url;
+                              
+                              if (isLink && linkUrl) {
+                                // Remove localhost prefixes if they exist
+                                if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                  linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                  console.log('Removed localhost prefix, new URL:', linkUrl);
+                                } else if (linkUrl.includes('localhost/')) {
+                                  // Handle other localhost variations
+                                  linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                  console.log('Removed localhost prefix, new URL:', linkUrl);
+                                }
+                                
+                                // Ensure it's a valid external URL
+                                if (!linkUrl.startsWith('http')) {
+                                  // If it's a relative URL, try to construct the full URL
+                                  if (linkUrl.startsWith('/')) {
+                                    linkUrl = window.location.origin + linkUrl;
+                                  } else {
+                                    // If it's just a path, assume it should be an external link
+                                    console.warn('Link attachment has relative URL:', linkUrl);
+                                    linkUrl = null; // Don't open invalid URLs
+                                  }
+                                }
+                              }
+                              const displayName = isLink ? (linkUrl || att.url) : att.name;
+                              return (
+                                <div
+                                  key={idx2}
+                                  style={{ 
+                                    background: isLink ? `${color}08` : '#fff', 
+                                    border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                    borderRadius: 12, 
+                                    boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
+                                    padding: '10px 18px', 
+                                    minWidth: 220, 
+                                    maxWidth: 340, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 12, 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onClick={() => {
+                                    if (isLink && linkUrl) {
+                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                    } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                      // For YouTube, Google Drive, and Link types, always open in new tab
+                                      if (linkUrl) {
+                                        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                      } else {
+                                        console.warn('Cannot open link: invalid URL');
+                                      }
+                                    } else {
+                                      handlePreviewAttachment(att);
+                                    }
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
+                                    <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
+                                      {type}
+                                      {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                      {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              );
+                            })}
+                          </div>
+                        )}
                     </div>
                   ))
                 )}
@@ -1839,8 +1933,29 @@ const ClassroomDetailStudent = () => {
                       return (
                         <div
                           key={idx}
-                          style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isLink ? 'pointer' : (isFile ? 'pointer' : 'default') }}
-                          onClick={() => { if (isLink && url) { window.open(url, '_blank', 'noopener,noreferrer'); } else if (isFile) { handlePreviewAttachment(att); } }}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            background: isLink ? `${typeColor}08` : '#fff', 
+                            border: `1px solid ${isLink ? `${typeColor}20` : '#e9ecef'}`,
+                            borderRadius: 12, 
+                            boxShadow: isLink ? `0 2px 12px ${typeColor}15` : '0 1px 4px #e9ecef', 
+                            padding: '10px 18px', 
+                            minWidth: 220, 
+                            maxWidth: 340, 
+                            cursor: isLink ? 'pointer' : (isFile ? 'pointer' : 'default'),
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={() => { 
+                            if (isLink && url) { 
+                              window.open(url, '_blank', 'noopener,noreferrer'); 
+                            } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                              // For YouTube, Google Drive, and Link types, always open in new tab
+                              window.open(url, '_blank', 'noopener,noreferrer');
+                            } else if (isFile) { 
+                              handlePreviewAttachment(att); 
+                            } 
+                          }}
                         >
                           {/* File icon */}
                           {isMp3 ? (
@@ -2087,86 +2202,87 @@ const ClassroomDetailStudent = () => {
                         </div>
                         <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{announcement.title}</div>
                         <div style={{ color: '#444', fontSize: 15, marginBottom: 12 }}>{announcement.content}</div>
-                        {announcement.attachments && announcement.attachments.length > 0 && (
+                                                {announcement.attachments && announcement.attachments.length > 0 && (
                           <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {announcement.attachments.map((att, idx) => {
-                              const isMp3 = att.type === 'file' && att.file && (att.file.type === 'audio/mp3' || att.file.type === 'audio/mpeg' || (att.name && att.name.toLowerCase().endsWith('.mp3')));
-                              const isPdf = att.type === 'file' && att.file && (att.file.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf')));
-                              const isMp4 = att.type === 'file' && att.file && (att.file.type === 'video/mp4' || (att.name && att.name.toLowerCase().endsWith('.mp4')));
-                              const isWord = att.type === 'file' && att.file && (att.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || (att.name && /\.docx?$/i.test(att.name)));
-                              const fileType = isMp3 ? 'MP3' : isPdf ? 'PDF' : isMp4 ? 'MP4' : isWord ? 'WORD' : (att.file && att.file.type ? att.file.type.split('/')[1]?.toUpperCase() : att.type.charAt(0).toUpperCase() + att.type.slice(1));
-                              const typeColor = isMp3 ? '#43a047' : isPdf ? '#F44336' : isMp4 ? '#7B1FA2' : isWord ? '#1976D2' : '#888';
-                              const linkColor = typeColor;
-                              const isFile = att.type === 'file' && att.file;
-                              // Truncate file name and type string
-                              const displayName = (att.name || att.url || 'Attachment').length > 22 ? (att.name || att.url || 'Attachment').slice(0, 19) + '...' : (att.name || att.url || 'Attachment');
-                              let typeString = '';
-                              if (isFile && att.file && att.file.type && !isMp3 && !isPdf && !isMp4 && !isWord) {
-                                typeString = att.file.type.toUpperCase();
-                                if (typeString.length > 28) typeString = typeString.slice(0, 25) + '...';
-                              } else {
-                                typeString = fileType;
+                            {announcement.attachments.map((att, idx2) => {
+                              const { preview, type, color } = getFileTypeIconOrPreview(att);
+                              let url = undefined;
+                              if (att.file && (att.file instanceof File || att.file instanceof Blob)) {
+                                url = URL.createObjectURL(att.file);
+                              } else if (att.url) {
+                                url = att.url;
                               }
+                              const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
+                                           att.type === "link" || att.type === "youtube" || att.type === "google_drive" ||
+                                           att.type === "googledrive";
+                              // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                              let linkUrl = att.url;
+                              
+                              if (isLink && linkUrl) {
+                                // Remove localhost prefixes if they exist
+                                if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                  linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                  console.log('Removed localhost prefix, new URL:', linkUrl);
+                                } else if (linkUrl.includes('localhost/')) {
+                                  // Handle other localhost variations
+                                  linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                  console.log('Removed localhost prefix, new URL:', linkUrl);
+                                }
+                                
+                                // Ensure it's a valid external URL
+                                if (!linkUrl.startsWith('http')) {
+                                  // If it's a relative URL, try to construct the full URL
+                                  if (linkUrl.startsWith('/')) {
+                                    linkUrl = window.location.origin + linkUrl;
+                                  } else {
+                                    // If it's just a path, assume it should be an external link
+                                    console.warn('Link attachment has relative URL:', linkUrl);
+                                    linkUrl = null; // Don't open invalid URLs
+                                  }
+                                }
+                              }
+                              const displayName = isLink ? (linkUrl || att.url) : att.name;
                               return (
                                 <div
-                                  key={idx}
-                                  style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, cursor: isFile ? 'pointer' : 'default' }}
-                                  onClick={isFile ? () => handlePreviewAttachment(att) : undefined}
+                                  key={idx2}
+                                  style={{ 
+                                    background: isLink ? `${color}08` : '#fff', 
+                                    border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                    borderRadius: 12, 
+                                    boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
+                                    padding: '10px 18px', 
+                                    minWidth: 220, 
+                                    maxWidth: 340, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 12, 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onClick={() => {
+                                    if (isLink && linkUrl) {
+                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                    } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                      // For YouTube, Google Drive, and Link types, always open in new tab
+                                      if (linkUrl) {
+                                        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                      } else {
+                                        console.warn('Cannot open link: invalid URL');
+                                      }
+                                    } else {
+                                      handlePreviewAttachment(att);
+                                    }
+                                  }}
                                 >
-                                  {/* File icon */}
-                                  {isMp3 ? (
-                                    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                      <rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/>
-                                      <circle cx="16" cy="20" r="7" fill="#43a047"/>
-                                      <rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/>
-                                      <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text>
-                                    </svg>
-                                  ) : isPdf ? (
-                                    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                      <rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/>
-                                      <path d="M8 8h16v24H8z" fill="#fff"/>
-                                      <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text>
-                                    </svg>
-                                  ) : isMp4 ? (
-                                    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                      <rect width="32" height="40" rx="6" fill="#fff" stroke="#7B1FA2" strokeWidth="2"/>
-                                      <polygon points="13,14 25,20 13,26" fill="#7B1FA2"/>
-                                      <text x="16" y="36" textAnchor="middle" fontSize="10" fill="#7B1FA2" fontWeight="bold">MP4</text>
-                                    </svg>
-                                  ) : isWord ? (
-                                    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 14 }}>
-                                      <rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/>
-                                      <path d="M8 8h16v24H8z" fill="#fff"/>
-                                      <text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text>
-                                    </svg>
-                                  ) : getFileTypeIcon(att)}
-                                  {/* File info */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontWeight: 600, fontSize: 15, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{displayName}</div>
-                                    <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
-                                      <span style={{ color: typeColor }}>{typeString}</span>
-                                      {isFile && <span style={{ color: '#b0b0b0', fontWeight: 700, fontSize: 15, margin: '0 2px' }}>•</span>}
-                                      {isFile ? (
-                                        <a
-                                          href={typeof att.file === 'string' ? att.file : URL.createObjectURL(att.file)}
-                                          download={att.name}
-                                          style={{ fontSize: 13, color: linkColor, fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                          onClick={e => { e.stopPropagation(); }}
-                                        >
-                                          Download
-                                        </a>
-                                      ) : (
-                                        <a
-                                          href="#"
-                                          style={{ fontSize: 13, color: '#1976d2', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                                          onClick={e => { e.preventDefault(); e.stopPropagation(); handlePreviewAttachment(att); }}
-                                        >
-                                          Open
-                                        </a>
-                                      )}
+                                    <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
+                                    <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
+                                      {type}
+                                      {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                      {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                     </div>
                                   </div>
-                                  {/* Remove control hidden for student API attachments */}
                                 </div>
                               );
                             })}

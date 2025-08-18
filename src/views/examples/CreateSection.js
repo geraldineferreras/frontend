@@ -24,6 +24,7 @@ import { FaCheck, FaTimes, FaUser } from "react-icons/fa";
 import Select from 'react-select';
 import { components } from 'react-select';
 import ApiService from "../../services/api";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 
 const courseOptions = [
   { value: "bsit", label: "BSIT" },
@@ -157,15 +158,36 @@ const userManagementUsers = [
 // Use only students for the popup
 const userManagementStudents = userManagementUsers.filter(u => u.role === "student");
 
-// Helper to get student avatar URL
+// Helper to get student avatar URL or initials fallback
 const getStudentAvatar = (student) => {
+  if (!student) return null;
+  
+  // Check for profile picture in various formats
   if (student.profile_pic) {
+    let imageUrl;
+    
+    // If it's a relative path, construct the full URL
     if (student.profile_pic.startsWith('uploads/')) {
-      return `http://localhost/scms_new/${student.profile_pic}`;
+      imageUrl = `http://localhost/scms_new/${student.profile_pic}`;
     }
-    return student.profile_pic;
+    // If it's already a full URL, use as is
+    else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
+      imageUrl = student.profile_pic;
+    }
+    // If it's a base64 data URL, return as is
+    else if (student.profile_pic.startsWith('data:')) {
+      return student.profile_pic;
+    }
+    // For other cases, try to construct the full URL
+    else {
+      imageUrl = `http://localhost/scms_new/uploads/profile/${student.profile_pic}`;
+    }
+    
+    return imageUrl;
   }
-  return student.avatar || require('../../assets/img/theme/team-1-800x800.jpg');
+  
+  // No profile picture available
+  return null;
 };
 
 const CreateSection = () => {
@@ -874,7 +896,27 @@ const CreateSection = () => {
                               const s = students.find(stu => stu.id === id);
                               return s ? (
                                 <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                  <img src={getStudentAvatar(s)} alt={s.full_name} style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }} />
+                                  {(() => {
+                                    const avatarUrl = getStudentAvatar(s);
+                                    const bgColor = getAvatarColor(s);
+                                    const initials = getUserInitials(s);
+                                    return (
+                                      <div style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 6, border: '1px solid #fff' }}>
+                                        {avatarUrl ? (
+                                          <img
+                                            src={avatarUrl}
+                                            alt={s.full_name}
+                                            style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null}
+                                        <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                      </div>
+                                    );
+                                  })()}
                                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                     <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                     <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>
@@ -927,11 +969,67 @@ const CreateSection = () => {
                           <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>
                             Students ({selectedStudents.length})
                           </span>
-                          {selectedStudents.length > 0 && (
-                            <button className="unselect-all-btn" type="button" onClick={() => setSelectedStudents([])}>
-                              Unselect All
-                            </button>
-                          )}
+                          {(() => {
+                            const filtered = filteredStudents;
+                            const allSelected = filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id));
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (allSelected) {
+                                    setSelectedStudents([]);
+                                  } else {
+                                    const allStudentIds = filtered.map(s => s.id);
+                                    setSelectedStudents(allStudentIds);
+                                  }
+                                }}
+                                style={{
+                                  background: allSelected ? '#f8f9fa' : '#5e72e4',
+                                  color: allSelected ? '#6c757d' : 'white',
+                                  border: allSelected ? '1px solid #dee2e6' : 'none',
+                                  borderRadius: 6,
+                                  padding: '6px 12px',
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (allSelected) {
+                                    e.target.style.background = '#e9ecef';
+                                    e.target.style.borderColor = '#adb5bd';
+                                  } else {
+                                    e.target.style.background = '#4a5fd1';
+                                    e.target.style.transform = 'translateY(-1px)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (allSelected) {
+                                    e.target.style.background = '#f8f9fa';
+                                    e.target.style.borderColor = '#dee2e6';
+                                  } else {
+                                    e.target.style.background = '#5e72e4';
+                                    e.target.style.transform = 'translateY(0)';
+                                  }
+                                }}
+                              >
+                                {allSelected ? (
+                                  <>
+                                    <FaTimes size={10} />
+                                    Unselect All
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaCheck size={10} />
+                                    Select All
+                                  </>
+                                )}
+                              </button>
+                            );
+                          })()}
                         </div>
                         <div style={{ maxHeight: 320, overflowY: 'auto', border: 'none', borderRadius: 12, background: '#f9fafd', padding: '0 16px 0 0', marginBottom: 8 }}>
                           {filteredStudents.length === 0 ? (
@@ -944,11 +1042,27 @@ const CreateSection = () => {
                                 onClick={() => handleStudentCheck(s.id)}
                                 style={{ display: 'flex', alignItems: 'center', padding: '6px 10px' }}
                               >
-                                <img
-                                  src={getStudentAvatar(s)}
-                                  alt={s.full_name}
-                                  style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover', border: '1px solid #e9ecef' }}
-                                />
+                                {(() => {
+                                  const avatarUrl = getStudentAvatar(s);
+                                  const bgColor = getAvatarColor(s);
+                                  const initials = getUserInitials(s);
+                                  return (
+                                    <div style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 12, border: '1px solid #e9ecef' }}>
+                                      {avatarUrl ? (
+                                        <img
+                                          src={avatarUrl}
+                                          alt={s.full_name}
+                                          style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                    </div>
+                                  );
+                                })()}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontWeight: 500, fontSize: '0.97rem', color: '#425466' }}>{s.full_name}</div>
                                   <div style={{ fontSize: '0.85rem', color: '#7b8a9b' }}>{s.email}</div>
@@ -974,7 +1088,27 @@ const CreateSection = () => {
                               const s = students.find(stu => stu.id === id);
                               return s ? (
                                 <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                  <img src={getStudentAvatar(s)} alt={s.full_name} style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }} />
+                                  {(() => {
+                                    const avatarUrl = getStudentAvatar(s);
+                                    const bgColor = getAvatarColor(s);
+                                    const initials = getUserInitials(s);
+                                    return (
+                                      <div style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 6, border: '1px solid #fff' }}>
+                                        {avatarUrl ? (
+                                          <img
+                                            src={avatarUrl}
+                                            alt={s.full_name}
+                                            style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null}
+                                        <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                      </div>
+                                    );
+                                  })()}
                                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                     <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                     <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>

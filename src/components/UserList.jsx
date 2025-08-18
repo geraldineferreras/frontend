@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ApiService from '../services/api';
+import ProfilePicture from './ProfilePicture';
 
 const ROLE_LABELS = {
   admin: 'Admins',
@@ -151,10 +152,11 @@ const UserList = () => {
       <tr key={user.id}>
         <td>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <img
-              src={user.profile_image_url || user.avatar || '/default-avatar.png'}
-              alt={user.name}
-              style={{ width: 40, height: 40, borderRadius: '50%', marginRight: 8 }}
+            <ProfilePicture 
+              user={user}
+              size={40}
+              style={{ marginRight: 8 }}
+              showFallback={true}
             />
             <div>
               <div style={{ fontWeight: 600 }}>{user.name}</div>

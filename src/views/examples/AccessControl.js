@@ -4,6 +4,7 @@ import {
 } from "reactstrap";
 import { FaSearch, FaLock, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import Header from "components/Headers/Header.js";
+import ProfilePicture from "../../components/ProfilePicture";
 
 // Mock users
 const mockUsers = [
@@ -301,7 +302,12 @@ export default function AccessControl() {
                   ) : filteredUsers.map(user => (
                     <tr key={user.id}>
                       <td className="d-flex align-items-center">
-                        <img src={user.profile_image_url || user.avatar} alt={user.name} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", marginRight: 12 }} />
+                        <ProfilePicture 
+                          user={user}
+                          size={38}
+                          style={{ marginRight: 12 }}
+                          showFallback={true}
+                        />
                         <span style={{ fontWeight: 600 }}>{user.name}</span>
                       </td>
                       <td>{user.email}</td>
@@ -335,7 +341,12 @@ export default function AccessControl() {
             <>
               <div className="mb-3">
                 <div className="d-flex align-items-center mb-2">
-                  <img src={selectedUser.profile_image_url || selectedUser.avatar} alt={selectedUser.name} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", marginRight: 16 }} />
+                  <ProfilePicture 
+                    user={selectedUser}
+                    size={48}
+                    style={{ marginRight: 16 }}
+                    showFallback={true}
+                  />
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 18 }}>{selectedUser.name}</div>
                     <div className="text-muted" style={{ fontSize: 15 }}>{selectedUser.email}</div>

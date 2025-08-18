@@ -14,8 +14,8 @@ export const getProfilePictureUrl = (user) => {
                     user.user_avatar;          // User avatar field
   
   if (!profilePic) {
-    // Return generated avatar as fallback
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || user.name || 'User')}&size=150&background=5e72e4&color=ffffff&bold=true`;
+    // Return null when no profile picture is available
+    return null;
   }
 
   let imageUrl = '';

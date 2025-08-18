@@ -277,6 +277,11 @@ const getFileTypeIconOrPreview = (att) => {
     return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>, type: 'YOUTUBE', color: '#FF0000' };
   }
 
+  // Handle Google Drive attachments
+  if (att.type === "Google Drive" && att.url) {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>, type: 'GOOGLE DRIVE', color: '#4285F4' };
+  }
+
   // Handle file attachments
   const fileName = att.name;
   if (!fileName || typeof fileName !== 'string') {
@@ -1177,6 +1182,7 @@ const ClassroomDetail = () => {
       if (response.status) {
         console.log('API Response:', response);
         console.log('Tasks data:', response.data);
+        console.log('Raw task data from backend:', response.data);
 
         // Normalize tasks to always include an attachments array
         const normalizeTasks = async (rawTasks = []) => {
@@ -1184,32 +1190,107 @@ const ClassroomDetail = () => {
           const enriched = await Promise.all(tasks.map(async (t) => {
             let attachments = Array.isArray(t.attachments) ? [...t.attachments] : [];
 
-            // If the API provided only a single top-level attachment, convert it to array form
-            if ((!attachments || attachments.length === 0) && t.attachment_url) {
-              const att = {
-                attachment_url: t.attachment_url,
-                attachment_type: t.attachment_type || 'file',
-                name: t.original_name || (typeof t.attachment_url === 'string' ? t.attachment_url.split('/').pop() : 'Attachment'),
-                file_name: t.file_name,
-                original_name: t.original_name,
-              };
-
-              // Try to resolve original_name if missing using the file-info endpoint
-              try {
-                const p = att.attachment_url;
-                if (typeof p === 'string' && !(p.startsWith('http://') || p.startsWith('https://'))) {
-                  const filename = p.includes('/') ? p.split('/').pop() : p;
-                  if (filename && !att.original_name) {
-                    const info = await apiService.getTaskFileInfo(filename);
-                    if (info && info.status && info.data) {
-                      att.original_name = info.data.original_name || info.data.filename || att.original_name;
-                    }
+            // Handle different attachment formats from the backend
+            if (!attachments || attachments.length === 0) {
+              // Check for single attachment fields
+              if (t.attachment_url) {
+                const att = {
+                  attachment_url: t.attachment_url,
+                  attachment_type: t.attachment_type || 'file',
+                  name: t.original_name || (typeof t.attachment_url === 'string' ? t.attachment_url.split('/').pop() : 'Attachment'),
+                  file_name: t.file_name,
+                  original_name: t.original_name,
+                  type: t.attachment_type || 'file'
+                };
+                attachments = [att];
+              }
+              
+              // Check for link attachments (YouTube, Google Drive, external links)
+              // Check various possible field names for YouTube links
+              if (t.youtube_url || t.youtube_link || t.youtube) {
+                const youtubeUrl = t.youtube_url || t.youtube_link || t.youtube;
+                attachments.push({
+                  type: 'YouTube',
+                  url: youtubeUrl,
+                  name: t.youtube_title || t.youtube_name || 'YouTube Video',
+                  attachment_type: 'youtube'
+                });
+              }
+              
+              // Check various possible field names for Google Drive links
+              if (t.gdrive_url || t.gdrive_link || t.gdrive || t.google_drive_url || t.google_drive) {
+                const gdriveUrl = t.gdrive_url || t.gdrive_link || t.gdrive || t.google_drive_url || t.google_drive;
+                attachments.push({
+                  type: 'Google Drive',
+                  url: gdriveUrl,
+                  name: t.gdrive_title || t.gdrive_name || t.google_drive_title || 'Google Drive Document',
+                  attachment_type: 'google_drive'
+                });
+              }
+              
+              // Check various possible field names for external links
+              if (t.link_url || t.link || t.external_link || t.external_url) {
+                const linkUrl = t.link_url || t.link || t.external_link || t.external_url;
+                attachments.push({
+                  type: 'Link',
+                  url: linkUrl,
+                  name: t.link_title || t.link_name || t.external_title || 'External Link',
+                  attachment_type: 'link'
+                });
+              }
+              
+              // Check for external_links JSON field
+              if (t.external_links) {
+                try {
+                  const externalLinks = typeof t.external_links === 'string' ? JSON.parse(t.external_links) : t.external_links;
+                  if (Array.isArray(externalLinks)) {
+                    externalLinks.forEach(link => {
+                      if (link.url && link.type) {
+                        attachments.push({
+                          type: link.type === 'youtube' ? 'YouTube' : 
+                                 link.type === 'google_drive' ? 'Google Drive' : 
+                                 link.type === 'link' ? 'Link' : 'Link',
+                          url: link.url,
+                          name: link.title || link.name || 'External Link',
+                          attachment_type: link.type
+                        });
+                      }
+                    });
                   }
+                } catch (e) {
+                  console.warn('Failed to parse external_links:', e);
                 }
-              } catch (_) {}
-
-              attachments = [att];
+              }
             }
+
+            // Ensure all attachments have proper type and url fields
+            attachments = attachments.map(att => {
+              // Normalize attachment type for consistent display
+              if (!att.type && att.attachment_type) {
+                att.type = att.attachment_type === 'youtube' ? 'YouTube' :
+                           att.attachment_type === 'google_drive' ? 'Google Drive' :
+                           att.attachment_type === 'link' ? 'Link' : 'File';
+              }
+              
+              // Ensure attachment_type is set for proper styling
+              if (!att.attachment_type && att.type) {
+                att.attachment_type = att.type === 'YouTube' ? 'youtube' :
+                                     att.type === 'Google Drive' ? 'google_drive' :
+                                     att.type === 'Link' ? 'link' : 'file';
+              }
+              
+              // Ensure URL is set
+              if (!att.url && att.attachment_url) {
+                att.url = att.attachment_url;
+              }
+              
+              // Ensure name is set
+              if (!att.name && att.original_name) {
+                att.name = att.original_name;
+              }
+              
+              return att;
+            });
 
             return { ...t, attachments };
           }));
@@ -1217,6 +1298,16 @@ const ClassroomDetail = () => {
         };
 
         const normalized = await normalizeTasks(response.data || []);
+        console.log('Normalized tasks with attachments:', normalized);
+        console.log('Task attachments after normalization:', normalized.map(t => ({ 
+          id: t.task_id || t.id, 
+          title: t.title, 
+          attachments: t.attachments,
+          attachment_url: t.attachment_url,
+          youtube_url: t.youtube_url,
+          gdrive_url: t.gdrive_url,
+          link_url: t.link_url
+        })));
         setTasks(normalized);
       } else {
         setTaskError(response.message || 'Failed to load tasks');
@@ -1316,11 +1407,12 @@ const ClassroomDetail = () => {
   const [showTaskLinkModal, setShowTaskLinkModal] = useState(false);
   const [showTaskYouTubeModal, setShowTaskYouTubeModal] = useState(false);
   const [showTaskDriveModal, setShowTaskDriveModal] = useState(false);
-  const [showTaskScheduleModal, setShowTaskScheduleModal] = useState(false);
-  const [showTaskOptionsModal, setShowTaskOptionsModal] = useState(false);
   const [taskLinkInput, setTaskLinkInput] = useState('');
   const [taskYouTubeInput, setTaskYouTubeInput] = useState('');
   const [taskDriveInput, setTaskDriveInput] = useState('');
+  const [taskLinkError, setTaskLinkError] = useState('');
+  const [showTaskScheduleModal, setShowTaskScheduleModal] = useState(false);
+  const [showTaskOptionsModal, setShowTaskOptionsModal] = useState(false);
   const [taskScheduleDate, setTaskScheduleDate] = useState('');
   const [taskScheduleTime, setTaskScheduleTime] = useState('');
   const [taskCommentsOpen, setTaskCommentsOpen] = useState({});
@@ -1932,20 +2024,19 @@ useEffect(() => {
 
       // Collect any file attachments and link attachments
       const fileAttachments = (attachments || []).filter(att => att && att.file);
-      const firstLinkAttachment = (attachments || []).find(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+      const linkAttachments = (attachments || []).filter(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
 
-      if (fileAttachments.length > 0) {
-        // Backend expects keys: attachment_0, attachment_1, ...
+      if (fileAttachments.length > 0 && linkAttachments.length > 0) {
+        // Mixed attachments: files + links
+        const files = fileAttachments.map(att => att.file);
+        response = await apiService.createTeacherStreamPostWithMixedAttachments(code, postData, files, linkAttachments);
+      } else if (fileAttachments.length > 0) {
+        // Files only: backend expects keys: attachment_0, attachment_1, ...
         const files = fileAttachments.map(att => att.file);
         response = await apiService.createTeacherStreamPostWithFiles(code, postData, files);
-      } else if (firstLinkAttachment) {
-        // Send JSON payload including link details
-        const payload = {
-          ...postData,
-          attachment_type: 'link',
-          attachment_url: firstLinkAttachment.url,
-        };
-        response = await apiService.createClassroomStreamPost(code, payload);
+      } else if (linkAttachments.length > 0) {
+        // Links only: use new API method for multiple link attachments
+        response = await apiService.createTeacherStreamPostWithLinks(code, postData, linkAttachments);
       } else {
         // No attachments
         response = await apiService.createClassroomStreamPost(code, postData);
@@ -2082,14 +2173,26 @@ useEffect(() => {
           let normalizedAttachments = [];
 
           if (Array.isArray(post.attachments) && post.attachments.length > 0) {
-            normalizedAttachments = post.attachments.map(att => ({
-              name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
-              // Prefer direct uploaded path to avoid redirect links
-              url: att.file_path
-                ? `${base}/${att.file_path}`
-                : (att.serving_url || ''),
-              type: att.attachment_type || att.file_type || 'file',
-            })).filter(a => a.url);
+            normalizedAttachments = post.attachments.map(att => {
+              let attachmentType = att.attachment_type || att.file_type || 'file';
+              let attachmentUrl = att.file_path ? `${base}/${att.file_path}` : (att.serving_url || '');
+              
+              // Detect YouTube and Google Drive links to set proper type
+              if (attachmentUrl.includes('youtube.com') || attachmentUrl.includes('youtu.be')) {
+                attachmentType = 'YouTube';
+              } else if (attachmentUrl.includes('drive.google.com')) {
+                attachmentType = 'Google Drive';
+              } else if (attachmentUrl.startsWith('http') && attachmentType === 'link') {
+                attachmentType = 'Link';
+              }
+              
+              return {
+                name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+                // Prefer direct uploaded path to avoid redirect links
+                url: attachmentUrl,
+                type: attachmentType,
+              };
+            }).filter(a => a.url);
           } else if (
             (post.attachment_type === 'multiple' || (typeof post.attachment_url === 'string' && post.attachment_url.trim().startsWith('['))) &&
             typeof post.attachment_url === 'string'
@@ -2097,13 +2200,25 @@ useEffect(() => {
             try {
               const parsed = JSON.parse(post.attachment_url);
               const arr = Array.isArray(parsed) ? parsed : [parsed];
-              normalizedAttachments = arr.map(att => ({
-                name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
-                url: att.file_path
-                  ? `${base}/${att.file_path}`
-                  : (att.serving_url || ''),
-                type: att.attachment_type || att.file_type || 'file',
-              })).filter(a => a.url);
+              normalizedAttachments = arr.map(att => {
+                let attachmentType = att.attachment_type || att.file_type || 'file';
+                let attachmentUrl = att.file_path ? `${base}/${att.file_path}` : (att.serving_url || '');
+                
+                // Detect YouTube and Google Drive links to set proper type
+                if (attachmentUrl.includes('youtube.com') || attachmentUrl.includes('youtu.be')) {
+                  attachmentType = 'YouTube';
+                } else if (attachmentUrl.includes('drive.google.com')) {
+                  attachmentType = 'Google Drive';
+                } else if (attachmentUrl.startsWith('http') && attachmentType === 'link') {
+                  attachmentType = 'Link';
+                }
+                
+                return {
+                  name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+                  url: attachmentUrl,
+                  type: attachmentType,
+                };
+              }).filter(a => a.url);
             } catch (e) {
               // Fall back to single attachment logic below
             }
@@ -2111,13 +2226,25 @@ useEffect(() => {
 
           // If still empty, check single file fields
           if (normalizedAttachments.length === 0 && (post.attachment_url || post.attachment_serving_url)) {
+            const attachmentUrl = post.attachment_url || post.attachment_serving_url || '';
+            let attachmentType = post.attachment_type || post.attachment_file_type || 'file';
+            
+            // Detect YouTube and Google Drive links to set proper type
+            if (attachmentUrl.includes('youtube.com') || attachmentUrl.includes('youtu.be')) {
+              attachmentType = 'YouTube';
+            } else if (attachmentUrl.includes('drive.google.com')) {
+              attachmentType = 'Google Drive';
+            } else if (attachmentUrl.startsWith('http') && attachmentType === 'link') {
+              attachmentType = 'Link';
+            }
+            
             normalizedAttachments = [{
-              name: (post.original_name || (post.attachment_url || post.attachment_serving_url || '').split('/').pop()),
+              name: (post.original_name || attachmentUrl.split('/').pop()),
               // Prefer direct uploads path if provided
-              url: (post.attachment_url && !post.attachment_url.startsWith('http'))
-                ? `${base}/${post.attachment_url}`
-                : (post.attachment_url || post.attachment_serving_url || ''),
-              type: post.attachment_type || post.attachment_file_type || 'file',
+              url: (attachmentUrl && !attachmentUrl.startsWith('http'))
+                ? `${base}/${attachmentUrl}`
+                : attachmentUrl,
+              type: attachmentType,
             }].filter(a => a.url);
           }
 
@@ -4249,11 +4376,93 @@ useEffect(() => {
       console.log('🐛 DEBUG - Original taskForm.type:', taskForm.type);
       console.log('🐛 DEBUG - Mapped type:', mapTaskTypeToBackend(taskForm.type));
       
-      // Enhanced task creation with multiple files and external links
+      // Enhanced task creation with multiple files, link attachments, and external links
       let response;
-      if (taskAttachments.length > 0 || taskExternalLinks.length > 0) {
-        if (taskAttachments.length > 0 && taskExternalLinks.length > 0) {
-          // Both files and external links - use FormData with external links as JSON
+      
+      // Separate file attachments from link attachments
+      const fileAttachments = taskAttachments.filter(att => att.file);
+      const linkAttachments = taskAttachments.filter(att => att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+      
+      if (fileAttachments.length > 0 || linkAttachments.length > 0 || taskExternalLinks.length > 0) {
+        if (fileAttachments.length > 0 && linkAttachments.length > 0 && taskExternalLinks.length > 0) {
+          // All three types - use FormData with mixed attachments
+          const formData = new FormData();
+          
+          // Add all task data fields
+          Object.keys(taskData).forEach(key => {
+            if (key === 'class_codes' || key === 'assigned_students') {
+              formData.append(key, JSON.stringify(taskData[key]));
+            } else if (typeof taskData[key] === 'boolean') {
+              formData.append(key, taskData[key] ? '1' : '0');
+            } else {
+              formData.append(key, taskData[key] || '');
+            }
+          });
+          
+          // Add external links as JSON string
+          formData.append('external_links', JSON.stringify(taskExternalLinks));
+          
+          // Add link attachments
+          linkAttachments.forEach((attachment, index) => {
+            if (attachment.type === 'Link') {
+              formData.append(`link_${index}`, attachment.url);
+              formData.append(`link_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'YouTube') {
+              formData.append(`youtube_${index}`, attachment.url);
+              formData.append(`youtube_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'Google Drive') {
+              formData.append(`gdrive_${index}`, attachment.url);
+              formData.append(`gdrive_title_${index}`, attachment.name || '');
+            }
+          });
+          
+          // Add all file attachments using backend-compatible keys
+          fileAttachments.forEach((attachment, index) => {
+            const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
+            formData.append(key, attachment.file);
+          });
+          
+          console.log('Sending FormData with files, links, and external links:', { fileAttachments, linkAttachments, taskExternalLinks });
+          response = await apiService.createTask(formData);
+        } else if (fileAttachments.length > 0 && linkAttachments.length > 0) {
+          // Files and links only
+          const formData = new FormData();
+          
+          // Add all task data fields
+          Object.keys(taskData).forEach(key => {
+            if (key === 'class_codes' || key === 'assigned_students') {
+              formData.append(key, JSON.stringify(taskData[key]));
+            } else if (typeof taskData[key] === 'boolean') {
+              formData.append(key, taskData[key] ? '1' : '0');
+            } else {
+              formData.append(key, taskData[key] || '');
+            }
+          });
+          
+          // Add link attachments
+          linkAttachments.forEach((attachment, index) => {
+            if (attachment.type === 'Link') {
+              formData.append(`link_${index}`, attachment.url);
+              formData.append(`link_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'YouTube') {
+              formData.append(`youtube_${index}`, attachment.url);
+              formData.append(`youtube_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'Google Drive') {
+              formData.append(`gdrive_${index}`, attachment.url);
+              formData.append(`gdrive_title_${index}`, attachment.name || '');
+            }
+          });
+          
+          // Add all file attachments
+          fileAttachments.forEach((attachment, index) => {
+            const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
+            formData.append(key, attachment.file);
+          });
+          
+          console.log('Sending FormData with files and links:', { fileAttachments, linkAttachments });
+          response = await apiService.createTask(formData);
+        } else if (fileAttachments.length > 0 && taskExternalLinks.length > 0) {
+          // Files and external links only
           const formData = new FormData();
           
           // Add all task data fields
@@ -4271,19 +4480,82 @@ useEffect(() => {
           formData.append('external_links', JSON.stringify(taskExternalLinks));
           
           // Add all file attachments using backend-compatible keys
-          taskAttachments.forEach((attachment, index) => {
-            if (attachment.file) {
-              const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
-              formData.append(key, attachment.file);
+          fileAttachments.forEach((attachment, index) => {
+            const key = index === 0 ? 'attachment' : `attachment${index + 1}`;
+            formData.append(key, attachment.file);
+          });
+          
+          console.log('Sending FormData with files and external links:', { fileAttachments, taskExternalLinks });
+          response = await apiService.createTask(formData);
+        } else if (linkAttachments.length > 0 && taskExternalLinks.length > 0) {
+          // Links and external links only
+          const formData = new FormData();
+          
+          // Add all task data fields
+          Object.keys(taskData).forEach(key => {
+            if (key === 'class_codes' || key === 'assigned_students') {
+              formData.append(key, JSON.stringify(taskData[key]));
+            } else if (typeof taskData[key] === 'boolean') {
+              formData.append(key, taskData[key] ? '1' : '0');
+            } else {
+              formData.append(key, taskData[key] || '');
             }
           });
           
-          console.log('Sending FormData with files and external links:', { taskAttachments, taskExternalLinks });
+          // Add external links as JSON string
+          formData.append('external_links', JSON.stringify(taskExternalLinks));
+          
+          // Add link attachments
+          linkAttachments.forEach((attachment, index) => {
+            if (attachment.type === 'Link') {
+              formData.append(`link_${index}`, attachment.url);
+              formData.append(`link_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'YouTube') {
+              formData.append(`youtube_${index}`, attachment.url);
+              formData.append(`youtube_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'Google Drive') {
+              formData.append(`gdrive_${index}`, attachment.url);
+              formData.append(`gdrive_title_${index}`, attachment.name || '');
+            }
+          });
+          
+          console.log('Sending FormData with links and external links:', { linkAttachments, taskExternalLinks });
           response = await apiService.createTask(formData);
-        } else if (taskAttachments.length > 0) {
+        } else if (fileAttachments.length > 0) {
           // Files only - use multiple files method
-          const files = taskAttachments.map(att => att.file).filter(Boolean);
+          const files = fileAttachments.map(att => att.file).filter(Boolean);
           response = await apiService.createTaskWithMultipleFiles(taskData, files);
+        } else if (linkAttachments.length > 0) {
+          // Links only - use FormData with link attachments
+          const formData = new FormData();
+          
+          // Add all task data fields
+          Object.keys(taskData).forEach(key => {
+            if (key === 'class_codes' || key === 'assigned_students') {
+              formData.append(key, JSON.stringify(taskData[key]));
+            } else if (typeof taskData[key] === 'boolean') {
+              formData.append(key, taskData[key] ? '1' : '0');
+            } else {
+              formData.append(key, taskData[key] || '');
+            }
+          });
+          
+          // Add link attachments
+          linkAttachments.forEach((attachment, index) => {
+            if (attachment.type === 'Link') {
+              formData.append(`link_${index}`, attachment.url);
+              formData.append(`link_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'YouTube') {
+              formData.append(`youtube_${index}`, attachment.url);
+              formData.append(`youtube_title_${index}`, attachment.name || '');
+            } else if (attachment.type === 'Google Drive') {
+              formData.append(`gdrive_${index}`, attachment.url);
+              formData.append(`gdrive_title_${index}`, attachment.name || '');
+            }
+          });
+          
+          console.log('Sending FormData with links only:', { linkAttachments });
+          response = await apiService.createTask(formData);
         } else {
           // External links only - use external links method
           response = await apiService.createTaskWithExternalLinks(taskData, taskExternalLinks);
@@ -4296,6 +4568,33 @@ useEffect(() => {
       
       if (response.status) {
         // Add the new task to the state
+        // Combine all attachments for the new task
+        const allAttachments = [
+          ...fileAttachments.map(att => ({
+            type: 'File',
+            name: att.name,
+            file: att.file,
+            attachment_type: 'file',
+            attachment_url: att.file ? URL.createObjectURL(att.file) : null
+          })),
+          ...linkAttachments.map(att => ({
+            type: att.type,
+            name: att.name,
+            url: att.url,
+            attachment_type: att.type === 'Link' ? 'link' : 
+                             att.type === 'YouTube' ? 'youtube' : 
+                             att.type === 'Google Drive' ? 'google_drive' : 'link'
+          })),
+          ...taskExternalLinks.map(link => ({
+            type: link.type === 'youtube' ? 'YouTube' : 
+                  link.type === 'google_drive' ? 'Google Drive' : 
+                  link.type === 'link' ? 'Link' : 'Link',
+            name: link.title || link.name || 'External Link',
+            url: link.url,
+            attachment_type: link.type
+          }))
+        ];
+
         const newTask = {
           ...response.data,
           id: response.data.task_id,
@@ -4305,7 +4604,7 @@ useEffect(() => {
           isLiked: false,
           isPinned: false,
           comments: [],
-          attachments: [...taskAttachments],
+          attachments: allAttachments,
           assignedStudents: taskAssignedStudents
         };
         
@@ -4683,6 +4982,62 @@ useEffect(() => {
     setEditTaskAttachments(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // Task attachment handlers
+  const handleAddTaskLink = () => {
+    let url = taskLinkInput.trim();
+    setTaskLinkError("");
+    if (!url) {
+      setTaskLinkError("Please enter a link URL");
+      return;
+    }
+    let formatted = url;
+    let valid = false;
+    try {
+      const urlObj = new URL(formatted);
+      if (urlObj.protocol && urlObj.hostname) valid = true;
+    } catch {}
+    if (!valid) {
+      if (/[^a-zA-Z0-9.-]/.test(url)) {
+        setTaskLinkError("Please enter a valid URL or word (no spaces or special characters)");
+        return;
+      }
+      formatted = `https://${url}.com`;
+      try {
+        const urlObj = new URL(formatted);
+        if (urlObj.protocol && urlObj.hostname) valid = true;
+      } catch {}
+    }
+    if (!valid) {
+      setTaskLinkError("Could not autoformat to a valid link. Please check your input.");
+      return;
+    }
+    setTaskAttachments(prev => [...prev, { type: "Link", url: formatted, name: formatted }]);
+    setTaskLinkInput("");
+    setTaskLinkError("");
+    setShowTaskLinkModal(false);
+  };
+
+  const handleAddTaskYouTube = () => {
+    if (taskYouTubeInput.trim()) {
+      setTaskAttachments(prev => [...prev, { type: "YouTube", url: taskYouTubeInput, name: taskYouTubeInput }]);
+      setTaskYouTubeInput("");
+      setShowTaskYouTubeModal(false);
+    }
+  };
+
+  const handleAddTaskDrive = () => {
+    const url = (taskDriveInput || '').trim();
+    if (!url) return;
+    // Basic formatting: ensure it looks like a URL
+    let formatted = url;
+    if (!/^https?:\/\//i.test(formatted)) {
+      formatted = `https://${formatted}`;
+    }
+    setTaskAttachments(prev => [...prev, { type: 'Google Drive', url: formatted, name: formatted }]);
+    setTaskDriveInput('');
+    setShowTaskDriveModal(false);
+  };
+
   // External link handlers for task creation
   const handleAddTaskExternalLink = () => {
     if (newTaskLink.name && newTaskLink.url) {
@@ -4806,12 +5161,24 @@ useEffect(() => {
         submitted: false
       });
       
-      // Set attachments if any
-      if (task.attachment_url) {
+      // Set attachments if any - handle both single attachment and attachments array
+      if (task.attachments && Array.isArray(task.attachments) && task.attachments.length > 0) {
+        // Handle attachments array
+        const editAttachments = task.attachments.map(att => ({
+          name: att.name || att.original_name || 'Attachment',
+          type: att.type || att.attachment_type || 'file',
+          url: att.url || att.attachment_url,
+          file: att.file,
+          attachment_type: att.attachment_type || 'file'
+        }));
+        setEditTaskAttachments(editAttachments);
+      } else if (task.attachment_url) {
+        // Handle single attachment (legacy format)
         setEditTaskAttachments([{
           name: task.attachment_url,
           type: task.attachment_type || 'file',
-          url: task.attachment_url
+          url: task.attachment_url,
+          attachment_type: task.attachment_type || 'file'
         }]);
       } else {
         setEditTaskAttachments([]);
@@ -4871,6 +5238,10 @@ useEffect(() => {
         attachment_type: editTaskAttachments.length > 0 ? 'file' : null,
         attachment_url: editTaskAttachments.length > 0 ? editTaskAttachments[0].name : null
       };
+
+      // Separate attachments by type
+      const fileAttachments = editTaskAttachments.filter(att => att.file);
+      const linkAttachments = editTaskAttachments.filter(att => !att.file && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
       
       console.log('Sending update data:', taskData);
       
@@ -4905,6 +5276,25 @@ useEffect(() => {
         console.log('Task updated successfully:', response);
         
         // Update the task in state using the prioritized ID field
+        // Combine all attachments for the updated task
+        const allAttachments = [
+          ...fileAttachments.map(att => ({
+            type: 'File',
+            name: att.name,
+            file: att.file,
+            attachment_type: 'file',
+            attachment_url: att.file ? URL.createObjectURL(att.file) : null
+          })),
+          ...linkAttachments.map(att => ({
+            type: att.type,
+            name: att.name,
+            url: att.url,
+            attachment_type: att.type === 'Link' ? 'link' : 
+                             att.type === 'YouTube' ? 'youtube' : 
+                             att.type === 'Google Drive' ? 'google_drive' : 'link'
+          }))
+        ];
+
         setTasks(prev => prev.map(task => 
           (task.task_id || task.id || task._id || task.taskId) === editingTaskId 
             ? { 
@@ -4912,6 +5302,7 @@ useEffect(() => {
                 title: response.data.title,
                 type: response.data.type,
                 points: response.data.points,
+                attachments: allAttachments,
                 instructions: response.data.instructions,
                 allow_comments: response.data.allow_comments,
                 due_date: response.data.due_date,
@@ -5622,14 +6013,60 @@ useEffect(() => {
                                     url = att.url;
                                   }
                                   const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
-                                  const displayName = isLink ? att.url : att.name;
+                                  // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                                  let linkUrl = att.url;
+                                  
+                                  if (isLink && linkUrl) {
+                                    // Remove localhost prefixes if they exist
+                                    if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                      linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                      console.log('Removed localhost prefix, new URL:', linkUrl);
+                                    } else if (linkUrl.includes('localhost/')) {
+                                      // Handle other localhost variations
+                                      linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                      console.log('Removed localhost prefix, new URL:', linkUrl);
+                                    }
+                                    
+                                    // Ensure it's a valid external URL
+                                    if (!linkUrl.startsWith('http')) {
+                                      // If it's a relative URL, try to construct the full URL
+                                      if (linkUrl.startsWith('/')) {
+                                        linkUrl = window.location.origin + linkUrl;
+                                      } else {
+                                        // If it's just a path, assume it should be an external link
+                                        console.warn('Link attachment has relative URL:', linkUrl);
+                                        linkUrl = null; // Don't open invalid URLs
+                                      }
+                                    }
+                                  }
+                                  const displayName = isLink ? (linkUrl || att.url) : att.name;
                                   return (
                                     <div
                                       key={idx2}
-                                      style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px #e9ecef', padding: '10px 18px', minWidth: 220, maxWidth: 340, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                                      style={{ 
+                                        background: isLink ? `${color}08` : '#fff', 
+                                        border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                        borderRadius: 12, 
+                                        boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
+                                        padding: '10px 18px', 
+                                        minWidth: 220, 
+                                        maxWidth: 340, 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: 12, 
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                      }}
                                       onClick={() => {
-                                        if (isLink && att.url) {
-                                          window.open(att.url, '_blank', 'noopener,noreferrer');
+                                        if (isLink && linkUrl) {
+                                          window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                        } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                          // For YouTube, Google Drive, and Link types, always open in new tab
+                                          if (linkUrl) {
+                                            window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                          } else {
+                                            console.warn('Cannot open link: invalid URL');
+                                          }
                                         } else {
                                           handlePreviewAttachment(att);
                                         }
@@ -5641,7 +6078,7 @@ useEffect(() => {
                                         <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                           {type}
                                           {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
-                                          {isLink && <>&bull; <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                                          {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                         </div>
                                       </div>
                                     </div>
@@ -6348,16 +6785,66 @@ useEffect(() => {
                                   url = att.url;
                                 }
                                 const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
+                                // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                                let linkUrl = att.url;
+                                console.log('Processing attachment:', { type: att.type, url: att.url, isLink });
+                                
+                                if (isLink && linkUrl) {
+                                  // Remove localhost prefixes if they exist
+                                  if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                    linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                    console.log('Removed localhost prefix, new URL:', linkUrl);
+                                  } else if (linkUrl.includes('localhost/')) {
+                                    // Handle other localhost variations
+                                    linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                    console.log('Removed localhost prefix, new URL:', linkUrl);
+                                  }
+                                  
+                                  // Ensure it's a valid external URL
+                                  if (!linkUrl.startsWith('http')) {
+                                    // If it's a relative URL, try to construct the full URL
+                                    if (linkUrl.startsWith('/')) {
+                                      linkUrl = window.location.origin + linkUrl;
+                                      console.log('Converted relative URL to:', linkUrl);
+                                    } else {
+                                      // If it's just a path, assume it should be an external link
+                                      console.warn('Link attachment has relative URL:', linkUrl);
+                                      linkUrl = null; // Don't open invalid URLs
+                                    }
+                                  }
+                                }
+                                console.log('Final linkUrl:', linkUrl);
                                 // Show just the filename (e.g., assignment1.pdf) as display name, but keep full path in database
-                                const displayName = isLink ? att.url : att.name;
+                                const displayName = isLink ? (linkUrl || att.url) : att.name;
                                 return (
                                   <div
                                     key={idx}
-                                    style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12, minWidth: 180, maxWidth: 320, width: '100%', cursor: isLink ? 'pointer' : 'pointer' }}
+                                    style={{ 
+                                      background: isLink ? `${color}08` : '#fff', 
+                                      border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                      borderRadius: 8, 
+                                      boxShadow: isLink ? `0 2px 12px ${color}15` : '0 2px 8px #e9ecef', 
+                                      padding: '0.5rem 1.25rem', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 12, 
+                                      minWidth: 180, 
+                                      maxWidth: 320, 
+                                      width: '100%', 
+                                      cursor: isLink ? 'pointer' : 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (isLink && att.url) {
-                                        window.open(att.url, '_blank', 'noopener,noreferrer');
+                                      if (isLink && linkUrl) {
+                                        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                      } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                        // For YouTube, Google Drive, and Link types, always open in new tab
+                                        if (linkUrl) {
+                                          window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                        } else {
+                                          console.warn('Cannot open link: invalid URL');
+                                        }
                                       } else {
                                         handlePreviewAttachment(att);
                                       }
@@ -6366,11 +6853,11 @@ useEffect(() => {
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
-                                      <div style={{ fontSize: 13, color: color || '#90A4AE', marginTop: 2 }}>
-                                        {type}
-                                        {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
-                                        {isLink && <>&bull; <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
-                                      </div>
+                                                                              <div style={{ fontSize: 13, color: color || '#90A4AE', marginTop: 2 }}>
+                                          {type}
+                                          {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                          {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                                        </div>
                                     </div>
                                   </div>
                                 );
@@ -7568,14 +8055,61 @@ useEffect(() => {
                                     url = att.url;
                                   }
                                   const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
-                                  const displayName = isLink ? att.url : att.name;
+                                  // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                                  let linkUrl = att.url;
+                                  
+                                  if (isLink && linkUrl) {
+                                    // Remove localhost prefixes if they exist
+                                    if (linkUrl.includes('localhost/scms_new_backup/')) {
+                                      linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                      console.log('Removed localhost prefix, new URL:', linkUrl);
+                                    } else if (linkUrl.includes('localhost/')) {
+                                      // Handle other localhost variations
+                                      linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                                      console.log('Removed localhost prefix, new URL:', linkUrl);
+                                    }
+                                    
+                                    // Ensure it's a valid external URL
+                                    if (!linkUrl.startsWith('http')) {
+                                      // If it's a relative URL, try to construct the full URL
+                                      if (linkUrl.startsWith('/')) {
+                                        linkUrl = window.location.origin + linkUrl;
+                                      } else {
+                                        // If it's just a path, assume it should be an external link
+                                        console.warn('Link attachment has relative URL:', linkUrl);
+                                        linkUrl = null; // Don't open invalid URLs
+                                      }
+                                    }
+                                  }
+                                  const displayName = isLink ? (linkUrl || att.url) : att.name;
                                   return (
                                     <div
                                       key={idx}
-                                style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12, minWidth: 180, maxWidth: 320, width: '100%', cursor: 'pointer' }}
+                                style={{ 
+                                  background: isLink ? `${color}08` : '#fff', 
+                                  border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                  borderRadius: 8, 
+                                  boxShadow: isLink ? `0 2px 12px ${color}15` : '0 2px 8px #e9ecef', 
+                                  padding: '0.5rem 1.25rem', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 12, 
+                                  minWidth: 180, 
+                                  maxWidth: 320,
+                                  width: '100%', 
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
                                 onClick={() => {
-                                  if (isLink && att.url) {
-                                    window.open(att.url, '_blank', 'noopener,noreferrer');
+                                  if (isLink && linkUrl) {
+                                    window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                  } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                    // For YouTube, Google Drive, and Link types, always open in new tab
+                                    if (linkUrl) {
+                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                                    } else {
+                                      console.warn('Cannot open link: invalid URL');
+                                    }
                                   } else {
                                     handlePreviewAttachment(att);
                                   }
@@ -7587,7 +8121,7 @@ useEffect(() => {
                                         <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                           {type}
                                           {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
-                                    {isLink && <>&bull; <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                                    {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                         </div>
                                       </div>
                                 <button onClick={() => handleRemoveTaskAttachment(idx)} style={{ fontSize: 18, marginLeft: 4, background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}>×</button>
@@ -7879,6 +8413,7 @@ useEffect(() => {
                           )}
                           {(collapsedTasks[task.id || task.task_id || task._id || task.taskId] === false) && task.attachments && task.attachments.length > 0 && (
                             <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                              {console.log('Rendering task attachments:', task.attachments)}
                               {task.attachments.map((att, idx) => {
                                 const { preview, type, color } = getFileTypeIconOrPreview(att);
                                 let url = undefined;
@@ -7902,9 +8437,26 @@ useEffect(() => {
                                 return (
                                   <div
                                     key={idx}
-                                    style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12, minWidth: 180, maxWidth: 320, width: '100%', cursor: 'pointer' }}
+                                    style={{ 
+                                      background: isLink ? `${color}08` : '#fff', 
+                                      border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
+                                      borderRadius: 8, 
+                                      boxShadow: isLink ? `0 2px 12px ${color}15` : '0 2px 8px #e9ecef', 
+                                      padding: '0.5rem 1.25rem', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 12, 
+                                      minWidth: 180, 
+                                      maxWidth: 320, 
+                                      width: '100%', 
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
                                     onClick={() => {
                                       if (isLink && att.url) {
+                                        window.open(att.url, '_blank', 'noopener,noreferrer');
+                                      } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                        // For YouTube, Google Drive, and Link types, always open in new tab
                                         window.open(att.url, '_blank', 'noopener,noreferrer');
                                       } else {
                                         handlePreviewAttachment(att);
@@ -9951,6 +10503,55 @@ useEffect(() => {
         </ModalFooter>
       </Modal>
       {/* Export modal removed - export uses current grading settings directly */}
+
+      {/* Task Link Modal */}
+      <Modal isOpen={showTaskLinkModal} toggle={() => setShowTaskLinkModal(false)} centered>
+        <ModalHeader toggle={() => setShowTaskLinkModal(false)}>Attach Link to Task</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="https://example.com"
+            value={taskLinkInput}
+            onChange={(e) => setTaskLinkInput(e.target.value)}
+          />
+          {taskLinkError && <div style={{ color: '#e74c3c', marginTop: 8, fontSize: 13 }}>{taskLinkError}</div>}
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowTaskLinkModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddTaskLink}>Add</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Task YouTube Modal */}
+      <Modal isOpen={showTaskYouTubeModal} toggle={() => setShowTaskYouTubeModal(false)} centered>
+        <ModalHeader toggle={() => setShowTaskYouTubeModal(false)}>Attach YouTube to Task</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="Paste YouTube URL"
+            value={taskYouTubeInput}
+            onChange={(e) => setTaskYouTubeInput(e.target.value)}
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowTaskYouTubeModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddTaskYouTube}>Add</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Task Google Drive Modal */}
+      <Modal isOpen={showTaskDriveModal} toggle={() => setShowTaskDriveModal(false)} centered>
+        <ModalHeader toggle={() => setShowTaskDriveModal(false)}>Attach Google Drive to Task</ModalHeader>
+        <ModalBody>
+          <Input
+            placeholder="Paste Google Drive link"
+            value={taskDriveInput}
+            onChange={(e) => setTaskDriveInput(e.target.value)}
+        />
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowTaskDriveModal(false)}>Cancel</Button>
+          <Button color="primary" onClick={handleAddTaskDrive}>Add</Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Copy Toast */}
       <div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999 }}>

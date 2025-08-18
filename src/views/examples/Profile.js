@@ -14,8 +14,9 @@ import {
   Badge,
 } from "reactstrap";
 import { useAuth } from "../../contexts/AuthContext";
-import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+
 import ApiService from "../../services/api";
+
 
 const Profile = () => {
   const { user } = useAuth();
@@ -128,12 +129,7 @@ const Profile = () => {
   console.log('imageUrl:', currentUser?.imageUrl);
   console.log('profileImageUrl:', currentUser?.profileImageUrl);
 
-  // Get profile picture URL and fallback data
-  const profilePictureUrl = getProfilePictureUrl(currentUser);
-  const userInitials = getUserInitials(currentUser);
-  const avatarColor = getAvatarColor(currentUser);
-  
-  console.log('Computed profilePictureUrl:', profilePictureUrl);
+
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -394,38 +390,7 @@ const Profile = () => {
           {/* Profile Card */}
           <Col className="order-xl-2 mb-5 mb-xl-0" xl="4">
             <Card className="card-profile shadow">
-              <Row className="justify-content-center">
-                <Col className="order-lg-2" lg="3">
-                  <div className="card-profile-image">
-                    <a href="#pablo" onClick={(e) => e.preventDefault()}>
-                      <img
-                        alt="Profile"
-                        className="rounded-circle"
-                        src={
-                          currentUser?.profile_image_url || 
-                          currentUser?.profile_pic || 
-                          currentUser?.profileImageUrl ||
-                          currentUser?.imageUrl ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.full_name || 'User')}&size=120&background=5e72e4&color=ffffff&bold=true`
-                        }
-                        style={{ 
-                          width: '120px', 
-                          height: '120px', 
-                          objectFit: 'cover'
-                        }}
-                        onError={(e) => {
-                          console.log('❌ Profile image failed to load:', e.target.src);
-                          // Fallback to avatar service
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.full_name || 'User')}&size=120&background=5e72e4&color=ffffff&bold=true`;
-                        }}
-                        onLoad={(e) => {
-                          console.log('✅ Profile image loaded successfully:', e.target.src);
-                        }}
-                      />
-                    </a>
-                  </div>
-                </Col>
-              </Row>
+
               <CardBody className="pt-5 pt-md-7">
                 <div className="text-center">
                   <h3>
@@ -536,9 +501,106 @@ const Profile = () => {
                             <option value="">Select Role</option>
                             <option value="student">Student</option>
                             <option value="teacher">Teacher</option>
+                            <option value="admin">Admin</option>
                           </Input>
                         </FormGroup>
                       </Col>
+                    </Row>
+                    <Row>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="password">
+                            Password
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="password"
+                            name="password"
+                            placeholder="Leave blank to keep current password"
+                            type="password"
+                            value={formData.password || ""}
+                            onChange={handleInputChange}
+                          />
+                        </FormGroup>
+                      </Col>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="confirm_password">
+                            Confirm Password
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="confirm_password"
+                            name="confirm_password"
+                            placeholder="Leave blank to keep current password"
+                            type="password"
+                            value={formData.confirm_password || ""}
+                            onChange={handleInputChange}
+                          />
+                        </FormGroup>
+                      </Col>
+                    </Row>
+                  </div>
+
+                  <hr className="my-4" />
+
+                  {/* Role-specific fields */}
+                  {formData.role === 'student' && renderStudentFields()}
+                  {formData.role === 'teacher' && renderTeacherFields()}
+
+                  <hr className="my-4" />
+
+                  {/* Address Information */}
+                  <h6 className="heading-small text-muted mb-4">
+                    Contact Information
+                  </h6>
+                  <div className="pl-lg-4">
+                    <Row>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="address">
+                            Address *
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="address"
+                            name="address"
+                            placeholder="Enter your address"
+                            type="text"
+                            value={formData.address || ""}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </FormGroup>
+                      </Col>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="contact_number">
+                            Contact Number *
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="contact_number"
+                            name="contact_number"
+                            placeholder="Enter contact number"
+                            type="text"
+                            value={formData.contact_number || ""}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </FormGroup>
+                      </Col>
+                    </Row>
+                  </div>
+
+                  <hr className="my-4" />
+
+                  {/* Account Status Section */}
+                  <h6 className="heading-small text-muted mb-4">
+                    ACCOUNT STATUS
+                  </h6>
+                  <div className="pl-lg-4">
+                    <Row>
                       <Col lg="6">
                         <FormGroup>
                           <label className="form-control-label" htmlFor="status">
@@ -560,39 +622,35 @@ const Profile = () => {
                     </Row>
                   </div>
 
-                  <hr className="my-4" />
-
-                  {/* Role-specific fields */}
-                  {formData.role === 'student' && renderStudentFields()}
-                  {formData.role === 'teacher' && renderTeacherFields()}
-
-                  <hr className="my-4" />
-
-                  {/* Address Information */}
-                  <h6 className="heading-small text-muted mb-4">
-                    Contact Information
-                  </h6>
-                  <div className="pl-lg-4">
-                    <Row>
-                      <Col md="12">
-                        <FormGroup>
-                          <label className="form-control-label" htmlFor="address">
-                            Address *
-                          </label>
-                          <Input
-                            className="form-control-alternative"
-                            id="address"
-                            name="address"
-                            placeholder="Enter your address"
-                            type="text"
-                            value={formData.address || ""}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </FormGroup>
-                      </Col>
-                    </Row>
-                  </div>
+                  {/* Admin Information Section */}
+                  {formData.role === 'admin' && (
+                    <>
+                      <hr className="my-4" />
+                      <h6 className="heading-small text-muted mb-4">
+                        ADMIN INFORMATION
+                      </h6>
+                      <div className="pl-lg-4">
+                        <Row>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="department">
+                                Department
+                              </label>
+                              <Input
+                                className="form-control-alternative"
+                                id="department"
+                                name="department"
+                                type="text"
+                                value={formData.department || "Administration"}
+                                onChange={handleInputChange}
+                                readOnly
+                              />
+                            </FormGroup>
+                          </Col>
+                        </Row>
+                      </div>
+                    </>
+                  )}
                 </Form>
               </CardBody>
             </Card>

@@ -23,6 +23,7 @@ import Header from "components/Headers/Header.js";
 import ApiService from "../../services/api.js";
 import userDefault from "../../assets/img/theme/user-default.svg";
 import { FaUser, FaTimes } from "react-icons/fa";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 
 // Course options for dropdown
 const courseOptions = [
@@ -112,9 +113,9 @@ const getInitialsAvatar = (fullName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${color}&color=fff&size=128&bold=true`;
 };
 
-// Helper function to get student avatar URL or initials
+// Helper function to get student avatar URL or initials fallback
 const getStudentAvatar = (student) => {
-  if (!student) return getInitialsAvatar('User');
+  if (!student) return null;
   
   // Check for profile picture in various formats
   if (student.profile_pic) {
@@ -140,8 +141,8 @@ const getStudentAvatar = (student) => {
     return imageUrl;
   }
   
-  // Fallback to initials avatar
-  return getInitialsAvatar(student.full_name || student.name || 'User');
+  // No profile picture available
+  return null;
 };
 
 const EditSection = () => {
@@ -774,15 +775,27 @@ const EditSection = () => {
                                     const s = students.find(stu => stu.id === id);
                                     return s ? (
                                       <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                        <img 
-                                          src={getStudentAvatar(s)} 
-                                          alt={s.full_name} 
-                                          style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }}
-                                          onError={(e) => {
-                                            // Fallback to initials avatar if image fails to load
-                                            e.target.src = getInitialsAvatar(s.full_name || s.name || 'User');
-                                          }}
-                                        />
+                                        {(() => {
+                                          const avatarUrl = getStudentAvatar(s);
+                                          const bgColor = getAvatarColor(s);
+                                          const initials = getUserInitials(s);
+                                          return (
+                                            <div style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 6, border: '1px solid #fff' }}>
+                                              {avatarUrl ? (
+                                                <img
+                                                  src={avatarUrl}
+                                                  alt={s.full_name}
+                                                  style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                                  onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                  }}
+                                                />
+                                              ) : null}
+                                              <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                            </div>
+                                          );
+                                        })()}
                                         <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                           <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                           <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>
@@ -825,13 +838,70 @@ const EditSection = () => {
                                 student.full_name.toLowerCase().includes(studentSearch.toLowerCase()) ||
                                 student.email.toLowerCase().includes(studentSearch.toLowerCase())
                               ).length})</h6>
-                              <Button
-                                color="link"
-                                size="sm"
-                                onClick={() => setSelectedStudents([])}
-                              >
-                                Unselect All
-                              </Button>
+                              {(() => {
+                                const filtered = students.filter(student => 
+                                  student.full_name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                                  student.email.toLowerCase().includes(studentSearch.toLowerCase())
+                                );
+                                const allSelected = filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id));
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (allSelected) {
+                                        setSelectedStudents([]);
+                                      } else {
+                                        const allStudentIds = filtered.map(s => s.id);
+                                        setSelectedStudents(allStudentIds);
+                                      }
+                                    }}
+                                    style={{
+                                      background: allSelected ? '#f8f9fa' : '#5e72e4',
+                                      color: allSelected ? '#6c757d' : 'white',
+                                      border: allSelected ? '1px solid #dee2e6' : 'none',
+                                      borderRadius: 6,
+                                      padding: '6px 12px',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 4
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (allSelected) {
+                                        e.target.style.background = '#e9ecef';
+                                        e.target.style.borderColor = '#adb5bd';
+                                      } else {
+                                        e.target.style.background = '#4a5fd1';
+                                        e.target.style.transform = 'translateY(-1px)';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (allSelected) {
+                                        e.target.style.background = '#f8f9fa';
+                                        e.target.style.borderColor = '#dee2e6';
+                                      } else {
+                                        e.target.style.background = '#5e72e4';
+                                        e.target.style.transform = 'translateY(0)';
+                                      }
+                                    }}
+                                  >
+                                    {allSelected ? (
+                                      <>
+                                        <i className="ni ni-fat-remove" style={{ fontSize: '10px' }}></i>
+                                        Unselect All
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="ni ni-check-bold" style={{ fontSize: '10px' }}></i>
+                                        Select All
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
 
@@ -848,16 +918,28 @@ const EditSection = () => {
                                   style={{ cursor: 'pointer' }}
                                   onClick={() => handleStudentCheck(student.id)}
                                 >
-                                  <img
-                                    src={getStudentAvatar(student)}
-                                    alt="Profile"
-                                    className="rounded-circle mr-3"
-                                    style={{ width: '35px', height: '35px', objectFit: 'cover' }}
-                                    onError={(e) => {
-                                      // Fallback to initials avatar if image fails to load
-                                      e.target.src = getInitialsAvatar(student.full_name || student.name || 'User');
-                                    }}
-                                  />
+                                  {(() => {
+                                    const avatarUrl = getStudentAvatar(student);
+                                    const bgColor = getAvatarColor(student);
+                                    const initials = getUserInitials(student);
+                                    return (
+                                      <div style={{ width: 35, height: 35, borderRadius: '50%', marginRight: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                                        {avatarUrl ? (
+                                          <img
+                                            src={avatarUrl}
+                                            alt="Profile"
+                                            className="rounded-circle"
+                                            style={{ width: 35, height: 35, objectFit: 'cover', display: 'block' }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null}
+                                        <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="flex-grow-1">
                                     <div className="font-weight-bold">{student.full_name}</div>
                                     <small className="text-muted">{student.email}</small>
@@ -883,15 +965,27 @@ const EditSection = () => {
                                   const s = students.find(stu => stu.id === id);
                                   return s ? (
                                     <span key={id} className="student-pill" style={{ display: 'flex', alignItems: 'center', background: '#e0e3ea', borderRadius: 10, padding: '0 4px 0 1px', fontSize: 9, fontWeight: 500 }}>
-                                      <img 
-                                        src={getStudentAvatar(s)} 
-                                        alt={s.full_name} 
-                                        style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, objectFit: 'cover', border: '1px solid #fff' }}
-                                        onError={(e) => {
-                                          // Fallback to initials avatar if image fails to load
-                                          e.target.src = getInitialsAvatar(s.full_name || s.name || 'User');
-                                        }}
-                                      />
+                                      {(() => {
+                                        const avatarUrl = getStudentAvatar(s);
+                                        const bgColor = getAvatarColor(s);
+                                        const initials = getUserInitials(s);
+                                        return (
+                                          <div style={{ width: 13, height: 13, borderRadius: '50%', marginRight: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 6, border: '1px solid #fff' }}>
+                                            {avatarUrl ? (
+                                              <img
+                                                src={avatarUrl}
+                                                alt={s.full_name}
+                                                style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                              />
+                                            ) : null}
+                                            <span style={{ display: avatarUrl ? 'none' : 'flex', width: '100%', height: '100%', fontSize: 6, alignItems: 'center', justifyContent: 'center' }}>{initials}</span>
+                                          </div>
+                                        );
+                                      })()}
                                       <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
                                         <span style={{ fontWeight: 700, fontSize: 9 }}>{s.full_name}</span>
                                         <span style={{ color: '#888', fontWeight: 400, fontSize: 8 }}>{s.email}</span>

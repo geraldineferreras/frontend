@@ -375,14 +375,86 @@ const AssignmentDetailStudent = () => {
   const getFileUrl = (filePath) => {
     if (!filePath) return null;
     
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      return filePath;
-    } else if (filePath.startsWith('uploads/')) {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${filePath}`;
-    } else {
-      // Bare filenames are considered assignment (task) attachments by default
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/tasks/${filePath}`;
+    // Use the API service's getFilePreviewUrl function for consistency
+    return apiService.getFilePreviewUrl(filePath, false);
+  };
+
+  // Helper to get file type, icon, and preview (same as teacher side)
+  const getFileTypeIconOrPreview = (att) => {
+    // Handle different attachment types
+    if (!att) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: 'FILE', color: '#90A4AE' };
     }
+
+    // Handle link attachments
+    if (att.type === "Link" && att.url) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">LINK</text></svg>, type: 'LINK', color: '#1976D2' };
+    }
+
+    // Handle YouTube attachments
+    if (att.type === "YouTube" && att.url) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>, type: 'YOUTUBE', color: '#FF0000' };
+    }
+
+    // Handle Google Drive attachments
+    if (att.type === "Google Drive" && att.url) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>, type: 'GOOGLE DRIVE', color: '#4285F4' };
+    }
+
+    // Handle alternative type values (case-insensitive and with underscores)
+    if (att.type && att.url) {
+      const typeLower = att.type.toLowerCase().replace(/_/g, ' ');
+      
+      if (typeLower === "link") {
+        return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">LINK</text></svg>, type: 'LINK', color: '#1976D2' };
+      }
+      
+      if (typeLower === "youtube") {
+        return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF0000" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF0000" fontWeight="bold">YT</text></svg>, type: 'YOUTUBE', color: '#FF0000' };
+      }
+      
+      if (typeLower === "google drive" || typeLower === "googledrive") {
+        return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#4285F4" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#4285F4" fontWeight="bold">DRIVE</text></svg>, type: 'GOOGLE DRIVE', color: '#4285F4' };
+      }
+    }
+
+    // Handle file attachments
+    const fileName = att.name || att.original_name || att.file_name || (att.attachment_url ? att.attachment_url.split('/').pop() : '');
+    if (!fileName || typeof fileName !== 'string') {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: 'FILE', color: '#90A4AE' };
+    }
+
+    const ext = fileName.split('.').pop().toLowerCase();
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+
+    // Microsoft Word
+    const wordExts = ['doc', 'docx', 'dot', 'dotx', 'docm', 'dotm'];
+    if (wordExts.includes(ext)) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text></svg>, type: 'WORD', color: '#1976D2' };
+    }
+    // Microsoft Excel (including CSV)
+    const excelExts = ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'csv'];
+    if (excelExts.includes(ext)) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#388E3C" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#388E3C" fontWeight="bold">EXCEL</text></svg>, type: 'EXCEL', color: '#388E3C' };
+    }
+    // Microsoft PowerPoint
+    const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'pptm', 'potx', 'potm', 'ppsm'];
+    if (pptExts.includes(ext)) {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF9800" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF9800" fontWeight="bold">PPT</text></svg>, type: 'PPT', color: '#FF9800' };
+    }
+    // TXT
+    if (ext === 'txt') {
+      return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#607d8b" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#607d8b" fontWeight="bold">TXT</text></svg>, type: 'TXT', color: '#607d8b' };
+    }
+
+    if (imageTypes.includes(ext) && att.file) {
+      const url = URL.createObjectURL(att.file);
+      return { preview: <img src={url} alt={fileName} style={{ width: 32, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #e9ecef' }} />, type: ext.toUpperCase(), color: '#90A4AE' };
+    }
+    if (ext === 'mp4') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#8e24aa" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#8e24aa" fontWeight="bold">MP4</text></svg>, type: 'MP4', color: '#8e24aa' };
+    if (ext === 'mp3') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text></svg>, type: 'MP3', color: '#43a047' };
+    if (ext === 'pdf') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text></svg>, type: 'PDF', color: '#F44336' };
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: ext.toUpperCase(), color: '#90A4AE' };
   };
 
   // Determine simple mime from name when backend mime is absent
@@ -911,126 +983,189 @@ const AssignmentDetailStudent = () => {
                    
                      {assignment.attachments && assignment.attachments.length > 0 ? (
                      // Multiple attachments
-                     assignment.attachments.map((attachment, index) => (
-                       <div key={index} style={{
-                         display: 'flex',
-                         alignItems: 'center',
-                         background: '#ffffff',
-                         borderRadius: '12px',
-                         padding: '16px',
-                         marginBottom: '12px',
-                         border: '2px solid #e2e8f0',
-                          cursor: 'pointer',
-                         transition: 'all 0.3s ease',
-                         boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                          }} onClick={() => openPreview(attachment)}>
-                         <div style={{
-                           width: '50px',
-                           height: '60px',
-                           background: 'linear-gradient(135deg, #e53e3e 0%, #c53030 100%)',
-                           borderRadius: '8px',
+                     assignment.attachments.map((attachment, index) => {
+                       const { preview, type, color } = getFileTypeIconOrPreview(attachment);
+                       let url = undefined;
+                       if (attachment.file && (attachment.file instanceof File || attachment.file instanceof Blob)) {
+                         url = URL.createObjectURL(attachment.file);
+                       } else if (attachment.url) {
+                         url = attachment.url;
+                       } else if (attachment.attachment_url) {
+                         // Use the getFileUrl function for consistent URL construction
+                         url = getFileUrl(attachment.attachment_url);
+                       }
+                       const isLink = attachment.type === "Link" || attachment.type === "YouTube" || attachment.type === "Google Drive" || 
+                                    attachment.type === "link" || attachment.type === "youtube" || attachment.type === "google_drive" ||
+                                    attachment.type === "googledrive" || (attachment.attachment_type && String(attachment.attachment_type).toLowerCase() !== 'file');
+                       
+                       // Ensure link URLs are absolute external URLs and remove localhost prefixes
+                       let linkUrl = attachment.url;
+                       if (isLink && linkUrl) {
+                         // Remove localhost prefixes if they exist
+                         if (linkUrl.includes('localhost/scms_new_backup/')) {
+                           linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                         } else if (linkUrl.includes('localhost/')) {
+                           // Handle other localhost variations
+                           linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
+                         }
+                         
+                         // Ensure it's a valid external URL
+                         if (!linkUrl.startsWith('http')) {
+                           // If it's a relative URL, try to construct the full URL
+                           if (linkUrl.startsWith('/')) {
+                             linkUrl = window.location.origin + linkUrl;
+                           } else {
+                             // If it's just a path, assume it should be an external link
+                             linkUrl = null; // Don't open invalid URLs
+                           }
+                         }
+                       }
+                       
+                       const displayName = isLink ? (linkUrl || attachment.url) : (attachment.original_name || attachment.file_name || (attachment.attachment_url ? attachment.attachment_url.split('/').pop() : 'Assignment File'));
+                       
+                       return (
+                         <div key={index} style={{
                            display: 'flex',
                            alignItems: 'center',
-                           justifyContent: 'center',
-                           color: '#fff',
-                           fontWeight: 'bold',
-                           fontSize: '12px',
-                           marginRight: '16px',
-                           boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
+                           background: isLink ? `${color}08` : '#ffffff',
+                           borderRadius: '12px',
+                           padding: '16px',
+                           marginBottom: '12px',
+                           border: `2px solid ${isLink ? `${color}20` : '#e2e8f0'}`,
+                           cursor: 'pointer',
+                           transition: 'all 0.3s ease',
+                           boxShadow: isLink ? `0 2px 12px ${color}15` : '0 2px 8px rgba(0,0,0,0.05)'
+                         }} onClick={() => {
+                           if (isLink && linkUrl) {
+                             window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                           } else if (attachment.type === "YouTube" || attachment.type === "Google Drive" || attachment.type === "Link") {
+                             // For YouTube, Google Drive, and Link types, always open in new tab
+                             if (linkUrl) {
+                               window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                             }
+                           } else {
+                             openPreview(attachment);
+                           }
                          }}>
-                            {(attachment.attachment_url || '').toLowerCase().endsWith('.pdf') ? 'PDF' : 'FILE'}
-                         </div>
-                         <div style={{ flex: 1 }}>
                            <div style={{
-                             fontWeight: 600,
-                             fontSize: '16px',
-                             color: '#2d3748',
-                             marginBottom: '4px'
+                             width: '50px',
+                             height: '60px',
+                             borderRadius: '8px',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             marginRight: '16px'
                            }}>
-                              {attachment.original_name || attachment.file_name || (attachment.attachment_url ? attachment.attachment_url.split('/').pop() : 'Assignment File')}
+                             {preview}
+                           </div>
+                           <div style={{ flex: 1 }}>
+                             <div style={{
+                               fontWeight: 600,
+                               fontSize: '16px',
+                               color: '#2d3748',
+                               marginBottom: '4px'
+                             }}>
+                                {displayName}
+                             </div>
+                             <div style={{
+                               color: '#718096',
+                               fontSize: '14px'
+                             }}>
+                                 {type}
+                                 {url && <>&bull; <a href={url} download={attachment.original_name || attachment.file_name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                 {isLink && <>&bull; <a href={linkUrl || attachment.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                             </div>
                            </div>
                            <div style={{
-                             color: '#718096',
-                             fontSize: '14px'
+                             width: '40px',
+                             height: '40px',
+                             background: '#f7fafc',
+                             borderRadius: '50%',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             color: '#4a5568'
                            }}>
-                               {(attachment.attachment_url || '').toLowerCase().endsWith('.pdf') ? 'PDF Document' : (attachment.mime_type || 'File')} • Click to preview
+                             <i className="ni ni-bold-right" style={{ fontSize: '16px' }} />
                            </div>
                          </div>
-                         <div style={{
-                           width: '40px',
-                           height: '40px',
-                           background: '#f7fafc',
-                           borderRadius: '50%',
-                           display: 'flex',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           color: '#4a5568'
-                         }}>
-                           <i className="ni ni-bold-right" style={{ fontSize: '16px' }} />
-                         </div>
-                       </div>
-                     ))
+                       );
+                     })
                      ) : assignment.attachment_url ? (
                      // Single attachment
-                     <div style={{
-                       display: 'flex',
-                       alignItems: 'center',
-                       background: '#ffffff',
-                       borderRadius: '12px',
-                       padding: '16px',
-                       border: '2px solid #e2e8f0',
-                       cursor: 'pointer',
-                       transition: 'all 0.3s ease',
-                       boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                       }} onClick={() => openPreview({ attachment_url: assignment.attachment_url, original_name: (assignment.original_name || resolvedAssignmentFileName || (assignment.attachment_url.startsWith('http') ? 'External Link' : assignment.attachment_url.split('/').pop())), mime_type: inferMimeFromName(assignment.attachment_url) })}>
-                       <div style={{
-                         width: '50px',
-                         height: '60px',
-                         background: 'linear-gradient(135deg, #e53e3e 0%, #c53030 100%)',
-                         borderRadius: '8px',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         color: '#fff',
-                         fontWeight: 'bold',
-                         fontSize: '12px',
-                         marginRight: '16px',
-                         boxShadow: '0 4px 12px rgba(229, 62, 62, 0.3)'
-                       }}>
-                         {assignment.attachment_url.startsWith('http') ? 'LINK' : 'PDF'}
-                       </div>
-                       <div style={{ flex: 1 }}>
-                          <div style={{
-                           fontWeight: 600,
-                           fontSize: '16px',
-                           color: '#2d3748',
-                           marginBottom: '4px'
-                         }}>
-                            {assignment.original_name || resolvedAssignmentFileName || (assignment.attachment_url.startsWith('http') 
-                              ? 'External Link' 
-                              : assignment.attachment_url.split('/').pop())
-                            }
-                         </div>
+                     (() => {
+                       const attachment = { 
+                         attachment_url: assignment.attachment_url, 
+                         original_name: (assignment.original_name || resolvedAssignmentFileName || (assignment.attachment_url.startsWith('http') ? 'External Link' : assignment.attachment_url.split('/').pop())), 
+                         mime_type: inferMimeFromName(assignment.attachment_url),
+                         url: assignment.attachment_url.startsWith('http') ? assignment.attachment_url : null
+                       };
+                       
+                       const { preview, type, color } = getFileTypeIconOrPreview(attachment);
+                       const isLink = attachment.url && (attachment.url.startsWith('http://') || attachment.url.startsWith('https://'));
+                       
+                       return (
                          <div style={{
-                           color: '#718096',
-                           fontSize: '14px'
+                           display: 'flex',
+                           alignItems: 'center',
+                           background: isLink ? `${color}08` : '#ffffff',
+                           borderRadius: '12px',
+                           padding: '16px',
+                           border: `2px solid ${isLink ? `${color}20` : '#e2e8f0'}`,
+                           cursor: 'pointer',
+                           transition: 'all 0.3s ease',
+                           boxShadow: isLink ? `0 2px 12px ${color}15` : '0 2px 8px rgba(0,0,0,0.05)'
+                         }} onClick={() => {
+                           if (isLink && attachment.url) {
+                             window.open(attachment.url, '_blank', 'noopener,noreferrer');
+                           } else {
+                             openPreview(attachment);
+                           }
                          }}>
-                          {assignment.attachment_url.startsWith('http') ? 'External Link' : 'PDF Document'} • Click to preview
+                           <div style={{
+                             width: '50px',
+                             height: '60px',
+                             borderRadius: '8px',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             marginRight: '16px'
+                           }}>
+                              {preview}
+                           </div>
+                           <div style={{ flex: 1 }}>
+                             <div style={{
+                               fontWeight: 600,
+                               fontSize: '16px',
+                               color: '#2d3748',
+                               marginBottom: '4px'
+                             }}>
+                                {attachment.original_name}
+                             </div>
+                             <div style={{
+                               color: '#718096',
+                               fontSize: '14px'
+                             }}>
+                                 {type}
+                                 {isLink && <>&bull; <a href={attachment.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
+                                 {!isLink && <>&bull; Click to preview</>}
+                             </div>
+                           </div>
+                           <div style={{
+                             width: '40px',
+                             height: '40px',
+                             background: '#f7fafc',
+                             borderRadius: '50%',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             color: '#4a5568'
+                           }}>
+                             <i className="ni ni-bold-right" style={{ fontSize: '16px' }} />
+                           </div>
                          </div>
-                       </div>
-                       <div style={{
-                         width: '40px',
-                         height: '40px',
-                         background: '#f7fafc',
-                         borderRadius: '50%',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         color: '#4a5568'
-                       }}>
-                         <i className="ni ni-bold-right" style={{ fontSize: '16px' }} />
-                       </div>
-                     </div>
+                       );
+                     })()
                    ) : null}
                  </div>
                )}

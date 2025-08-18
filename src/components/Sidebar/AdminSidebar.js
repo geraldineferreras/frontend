@@ -100,7 +100,6 @@ const AdminSidebar = (props) => {
     { name: "Subject Management", icon: "ni ni-books text-info", path: "/subject-management" },
     { name: "Offerings Management", icon: "ni ni-collection text-orange", path: "/offerings-management" },
     { name: "Reports & Logs", icon: "ni ni-archive-2 text-warning", path: "/reports-logs", dropdown: true },
-    { name: "Access Control", icon: "ni ni-lock-circle-open text-info", path: "/access-control" },
   ];
   const createLinks = () => {
     return adminModules.map((mod, key) => {
@@ -281,14 +280,6 @@ const AdminSidebar = (props) => {
               <DropdownItem to="/admin/user-profile" tag={Link}>
                 <i className="ni ni-settings-gear-65" />
                 <span>Settings</span>
-              </DropdownItem>
-              <DropdownItem to="/admin/user-profile" tag={Link}>
-                <i className="ni ni-calendar-grid-58" />
-                <span>Activity</span>
-              </DropdownItem>
-              <DropdownItem to="/admin/user-profile" tag={Link}>
-                <i className="ni ni-support-16" />
-                <span>Support</span>
               </DropdownItem>
               <DropdownItem divider />
               <DropdownItem href="#pablo" onClick={(e) => e.preventDefault()}>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Teacher Stream Post API Testing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .attachment-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .attachment-info {
+            flex: 1;
+        }
+        .attachment-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .response-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            background-color: #f8f9fa;
+        }
+        .tab.active {
+            background-color: white;
+            border-color: #ddd;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .url-preview {
+            background-color: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .file-input-wrapper:hover {
+            background-color: #0056b3;
+        }
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Teacher Stream Post API Testing</h1>
+    <p class="info">Test the enhanced teacher stream post API that supports multiple link attachments (regular links, YouTube, and Google Drive)</p>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('multipart')">Multipart/Form-Data</div>
+        <div class="tab" onclick="showTab('json')">JSON Body</div>
+        <div class="tab" onclick="showTab('mixed')">Mixed Attachments</div>
+        <div class="tab" onclick="showTab('validation')">Validation Tests</div>
+    </div>
+
+    <!-- Multipart/Form-Data Tab -->
+    <div id="multipart" class="tab-content active">
+        <div class="container">
+            <h2>Testing with Multipart/Form-Data</h2>
+            <p>Test the API using form data with multiple link attachments</p>
+
+            <div class="form-group">
+                <label for="multipart-class-code">Class Code:</label>
+                <input type="text" id="multipart-class-code" value="J56NHD" placeholder="Enter class code">
+            </div>
+
+            <div class="form-group">
+                <label for="multipart-title">Title:</label>
+                <input type="text" id="multipart-title" value="Test Post with Multiple Links" placeholder="Enter post title">
+            </div>
+
+            <div class="form-group">
+                <label for="multipart-content">Content:</label>
+                <textarea id="multipart-content" placeholder="Enter post content">This post contains various types of links for testing</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Link Attachments:</label>
+                <div id="multipart-links-container">
+                    <!-- Link attachments will be added here -->
+                </div>
+                <button type="button" class="btn btn-warning" onclick="addMultipartLink('link')">Add Regular Link</button>
+                <button type="button" class="btn btn-warning" onclick="addMultipartLink('youtube')">Add YouTube Link</button>
+                <button type="button" class="btn btn-warning" onclick="addMultipartLink('gdrive')">Add Google Drive Link</button>
+            </div>
+
+            <div class="form-group">
+                <label>File Attachments:</label>
+                <div id="multipart-files-container">
+                    <!-- File attachments will be added here -->
+                </div>
+                <div class="file-input-wrapper">
+                    <span>Choose Files</span>
+                    <input type="file" id="multipart-file-input" multiple onchange="handleMultipartFileSelect(event)">
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-success" onclick="testMultipartSubmission()">Test Multipart Submission</button>
+            <button type="button" class="btn btn-danger" onclick="clearMultipartForm()">Clear Form</button>
+
+            <div id="multipart-response" class="response-area" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- JSON Body Tab -->
+    <div id="json" class="tab-content">
+        <div class="container">
+            <h2>Testing with JSON Body</h2>
+            <p>Test the API using JSON payload with multiple link attachments</p>
+
+            <div class="form-group">
+                <label for="json-class-code">Class Code:</label>
+                <input type="text" id="json-class-code" value="J56NHD" placeholder="Enter class code">
+            </div>
+
+            <div class="form-group">
+                <label for="json-title">Title:</label>
+                <input type="text" id="json-title" value="Test JSON Post with Multiple Links" placeholder="Enter post title">
+            </div>
+
+            <div class="form-group">
+                <label for="json-content">Content:</label>
+                <textarea id="json-content" placeholder="Enter post content">This post contains various types of links for testing</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Link Attachments:</label>
+                <div id="json-links-container">
+                    <!-- Link attachments will be added here -->
+                </div>
+                <button type="button" class="btn btn-warning" onclick="addJsonLink('link')">Add Regular Link</button>
+                <button type="button" class="btn btn-warning" onclick="addJsonLink('youtube')">Add YouTube Link</button>
+                <button type="button" class="btn btn-warning" onclick="addJsonLink('google_drive')">Add Google Drive Link</button>
+            </div>
+
+            <button type="button" class="btn btn-success" onclick="testJsonSubmission()">Test JSON Submission</button>
+            <button type="button" class="btn btn-danger" onclick="clearJsonForm()">Clear Form</button>
+
+            <div id="json-response" class="response-area" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Mixed Attachments Tab -->
+    <div id="mixed" class="tab-content">
+        <div class="container">
+            <h2>Testing with Mixed Attachments</h2>
+            <p>Test the API with both files and link attachments</p>
+
+            <div class="form-group">
+                <label for="mixed-class-code">Class Code:</label>
+                <input type="text" id="mixed-class-code" value="J56NHD" placeholder="Enter class code">
+            </div>
+
+            <div class="form-group">
+                <label for="mixed-title">Title:</label>
+                <input type="text" id="mixed-title" value="Test Post with Files and Links" placeholder="Enter post title">
+            </div>
+
+            <div class="form-group">
+                <label for="mixed-content">Content:</label>
+                <textarea id="mixed-content" placeholder="Enter post content">This post contains both files and links</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Link Attachments:</label>
+                <div id="mixed-links-container">
+                    <!-- Link attachments will be added here -->
+                </div>
+                <button type="button" class="btn btn-warning" onclick="addMixedLink('link')">Add Regular Link</button>
+                <button type="button" class="btn btn-warning" onclick="addMixedLink('youtube')">Add YouTube Link</button>
+                <button type="button" class="btn btn-warning" onclick="addMixedLink('google_drive')">Add Google Drive Link</button>
+            </div>
+
+            <div class="form-group">
+                <label>File Attachments:</label>
+                <div id="mixed-files-container">
+                    <!-- File attachments will be added here -->
+                </div>
+                <div class="file-input-wrapper">
+                    <span>Choose Files</span>
+                    <input type="file" id="mixed-file-input" multiple onchange="handleMixedFileSelect(event)">
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-success" onclick="testMixedSubmission()">Test Mixed Submission</button>
+            <button type="button" class="btn btn-danger" onclick="clearMixedForm()">Clear Form</button>
+
+            <div id="mixed-response" class="response-area" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Validation Tests Tab -->
+    <div id="validation" class="tab-content">
+        <div class="container">
+            <h2>Validation Tests</h2>
+            <p>Test various edge cases and validation scenarios</p>
+
+            <div class="test-section">
+                <h3>Invalid URL Tests</h3>
+                <button type="button" class="btn btn-warning" onclick="testInvalidUrls()">Test Invalid URLs</button>
+                <div id="invalid-urls-response" class="response-area" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Empty Attachments Test</h3>
+                <button type="button" class="btn btn-warning" onclick="testEmptyAttachments()">Test Empty Attachments</button>
+                <div id="empty-attachments-response" class="response-area" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Single Attachment Test</h3>
+                <button type="button" class="btn btn-warning" onclick="testSingleAttachment()">Test Single Attachment</button>
+                <div id="single-attachment-response" class="response-area" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Authentication Test</h3>
+                <button type="button" class="btn btn-warning" onclick="testAuthentication()">Test Authentication</button>
+                <div id="authentication-response" class="response-area" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let multipartLinks = [];
+        let multipartFiles = [];
+        let jsonLinks = [];
+        let mixedLinks = [];
+        let mixedFiles = [];
+
+        // Tab switching
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to selected tab
+            event.target.classList.add('active');
+        }
+
+        // Multipart form functions
+        function addMultipartLink(type) {
+            const link = {
+                id: Date.now(),
+                type: type,
+                url: '',
+                name: '',
+                description: ''
+            };
+            multipartLinks.push(link);
+            renderMultipartLinks();
+        }
+
+        function removeMultipartLink(id) {
+            multipartLinks = multipartLinks.filter(link => link.id !== id);
+            renderMultipartLinks();
+        }
+
+        function updateMultipartLink(id, field, value) {
+            const link = multipartLinks.find(l => l.id === id);
+            if (link) {
+                link[field] = value;
+            }
+        }
+
+        function renderMultipartLinks() {
+            const container = document.getElementById('multipart-links-container');
+            container.innerHTML = '';
+
+            multipartLinks.forEach(link => {
+                const linkDiv = document.createElement('div');
+                linkDiv.className = 'attachment-item';
+                linkDiv.innerHTML = `
+                    <div class="attachment-info">
+                        <strong>${link.type.toUpperCase()}</strong><br>
+                        <input type="text" placeholder="URL" value="${link.url}" 
+                               onchange="updateMultipartLink(${link.id}, 'url', this.value)">
+                        <input type="text" placeholder="Title/Name" value="${link.name}" 
+                               onchange="updateMultipartLink(${link.id}, 'name', this.value)">
+                        <input type="text" placeholder="Description" value="${link.description}" 
+                               onchange="updateMultipartLink(${link.id}, 'description', this.value)">
+                    </div>
+                    <div class="attachment-actions">
+                        <button type="button" class="btn btn-danger" onclick="removeMultipartLink(${link.id})">Remove</button>
+                    </div>
+                `;
+                container.appendChild(linkDiv);
+            });
+        }
+
+        function handleMultipartFileSelect(event) {
+            const files = Array.from(event.target.files);
+            multipartFiles = files.map(file => ({
+                id: Date.now() + Math.random(),
+                file: file,
+                name: file.name,
+                size: file.size
+            }));
+            renderMultipartFiles();
+        }
+
+        function removeMultipartFile(id) {
+            multipartFiles = multipartFiles.filter(file => file.id !== id);
+            renderMultipartFiles();
+        }
+
+        function renderMultipartFiles() {
+            const container = document.getElementById('multipart-files-container');
+            container.innerHTML = '';
+
+            multipartFiles.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'attachment-item';
+                fileDiv.innerHTML = `
+                    <div class="attachment-info">
+                        <strong>File:</strong> ${file.name}<br>
+                        <small>Size: ${(file.size / 1024).toFixed(2)} KB</small>
+                    </div>
+                    <div class="attachment-actions">
+                        <button type="button" class="btn btn-danger" onclick="removeMultipartFile(${file.id})">Remove</button>
+                    </div>
+                `;
+                container.appendChild(fileDiv);
+            });
+        }
+
+        async function testMultipartSubmission() {
+            const classCode = document.getElementById('multipart-class-code').value;
+            const title = document.getElementById('multipart-title').value;
+            const content = document.getElementById('multipart-content').value;
+
+            if (!classCode || !title || !content) {
+                showResponse('multipart-response', 'error', 'Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('content', content);
+                formData.append('is_draft', '0');
+                formData.append('is_scheduled', '0');
+                formData.append('scheduled_at', '');
+                formData.append('allow_comments', '1');
+                formData.append('assignment_type', 'classroom');
+
+                // Add link attachments
+                multipartLinks.forEach((link, index) => {
+                    if (link.url.trim()) {
+                        if (link.type === 'link') {
+                            formData.append(`link_${index}`, link.url);
+                            formData.append(`link_title_${index}`, link.name);
+                            formData.append(`link_description_${index}`, link.description);
+                        } else if (link.type === 'youtube') {
+                            formData.append(`youtube_${index}`, link.url);
+                            formData.append(`youtube_title_${index}`, link.name);
+                            formData.append(`youtube_description_${index}`, link.description);
+                        } else if (link.type === 'gdrive') {
+                            formData.append(`gdrive_${index}`, link.url);
+                            formData.append(`gdrive_title_${index}`, link.name);
+                            formData.append(`gdrive_description_${index}`, link.description);
+                        }
+                    }
+                });
+
+                // Add file attachments
+                multipartFiles.forEach((file, index) => {
+                    formData.append(`attachment_${index}`, file.file);
+                });
+
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+                showResponse('multipart-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('multipart-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        // JSON form functions
+        function addJsonLink(type) {
+            const link = {
+                id: Date.now(),
+                type: type,
+                url: '',
+                title: '',
+                description: ''
+            };
+            jsonLinks.push(link);
+            renderJsonLinks();
+        }
+
+        function removeJsonLink(id) {
+            jsonLinks = jsonLinks.filter(link => link.id !== id);
+            renderJsonLinks();
+        }
+
+        function updateJsonLink(id, field, value) {
+            const link = jsonLinks.find(l => l.id === id);
+            if (link) {
+                link[field] = value;
+            }
+        }
+
+        function renderJsonLinks() {
+            const container = document.getElementById('json-links-container');
+            container.innerHTML = '';
+
+            jsonLinks.forEach(link => {
+                const linkDiv = document.createElement('div');
+                linkDiv.className = 'attachment-item';
+                linkDiv.innerHTML = `
+                    <div class="attachment-info">
+                        <strong>${link.type.toUpperCase()}</strong><br>
+                        <input type="text" placeholder="URL" value="${link.url}" 
+                               onchange="updateJsonLink(${link.id}, 'url', this.value)">
+                        <input type="text" placeholder="Title" value="${link.title}" 
+                               onchange="updateJsonLink(${link.id}, 'title', this.value)">
+                        <input type="text" placeholder="Description" value="${link.description}" 
+                               onchange="updateJsonLink(${link.id}, 'description', this.value)">
+                    </div>
+                    <div class="attachment-actions">
+                        <button type="button" class="btn btn-danger" onclick="removeJsonLink(${link.id})">Remove</button>
+                    </div>
+                `;
+                container.appendChild(linkDiv);
+            });
+        }
+
+        async function testJsonSubmission() {
+            const classCode = document.getElementById('json-class-code').value;
+            const title = document.getElementById('json-title').value;
+            const content = document.getElementById('json-content').value;
+
+            if (!classCode || !title || !content) {
+                showResponse('json-response', 'error', 'Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const payload = {
+                    title: title,
+                    content: content,
+                    is_draft: 0,
+                    is_scheduled: 0,
+                    scheduled_at: '',
+                    allow_comments: 1,
+                    assignment_type: 'classroom',
+                    attachments: jsonLinks.filter(link => link.url.trim()).map(link => ({
+                        type: link.type,
+                        url: link.url,
+                        title: link.title,
+                        description: link.description
+                    }))
+                };
+
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showResponse('json-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('json-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        // Mixed attachments functions
+        function addMixedLink(type) {
+            const link = {
+                id: Date.now(),
+                type: type,
+                url: '',
+                title: '',
+                description: ''
+            };
+            mixedLinks.push(link);
+            renderMixedLinks();
+        }
+
+        function removeMixedLink(id) {
+            mixedLinks = mixedLinks.filter(link => link.id !== id);
+            renderMixedLinks();
+        }
+
+        function updateMixedLink(id, field, value) {
+            const link = mixedLinks.find(l => l.id === id);
+            if (link) {
+                link[field] = value;
+            }
+        }
+
+        function renderMixedLinks() {
+            const container = document.getElementById('mixed-links-container');
+            container.innerHTML = '';
+
+            mixedLinks.forEach(link => {
+                const linkDiv = document.createElement('div');
+                linkDiv.className = 'attachment-item';
+                linkDiv.innerHTML = `
+                    <div class="attachment-info">
+                        <strong>${link.type.toUpperCase()}</strong><br>
+                        <input type="text" placeholder="URL" value="${link.url}" 
+                               onchange="updateMixedLink(${link.id}, 'url', this.value)">
+                        <input type="text" placeholder="Title" value="${link.title}" 
+                               onchange="updateMixedLink(${link.id}, 'title', this.value)">
+                        <input type="text" placeholder="Description" value="${link.description}" 
+                               onchange="updateMixedLink(${link.id}, 'description', this.value)">
+                    </div>
+                    <div class="attachment-actions">
+                        <button type="button" class="btn btn-danger" onclick="removeMixedLink(${link.id})">Remove</button>
+                    </div>
+                `;
+                container.appendChild(linkDiv);
+            });
+        }
+
+        function handleMixedFileSelect(event) {
+            const files = Array.from(event.target.files);
+            mixedFiles = files.map(file => ({
+                id: Date.now() + Math.random(),
+                file: file,
+                name: file.name,
+                size: file.size
+            }));
+            renderMixedFiles();
+        }
+
+        function removeMixedFile(id) {
+            mixedFiles = mixedFiles.filter(file => file.id !== id);
+            renderMixedFiles();
+        }
+
+        function renderMixedFiles() {
+            const container = document.getElementById('mixed-files-container');
+            container.innerHTML = '';
+
+            mixedFiles.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'attachment-item';
+                fileDiv.innerHTML = `
+                    <div class="attachment-info">
+                        <strong>File:</strong> ${file.name}<br>
+                        <small>Size: ${(file.size / 1024).toFixed(2)} KB</small>
+                    </div>
+                    <div class="attachment-actions">
+                        <button type="button" class="btn btn-danger" onclick="removeMixedFile(${file.id})">Remove</button>
+                    </div>
+                `;
+                container.appendChild(fileDiv);
+            });
+        }
+
+        async function testMixedSubmission() {
+            const classCode = document.getElementById('mixed-class-code').value;
+            const title = document.getElementById('mixed-title').value;
+            const content = document.getElementById('mixed-content').value;
+
+            if (!classCode || !title || !content) {
+                showResponse('mixed-response', 'error', 'Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('content', content);
+                formData.append('is_draft', '0');
+                formData.append('is_scheduled', '0');
+                formData.append('scheduled_at', '');
+                formData.append('allow_comments', '1');
+                formData.append('assignment_type', 'classroom');
+
+                // Add link attachments
+                mixedLinks.forEach((link, index) => {
+                    if (link.url.trim()) {
+                        if (link.type === 'link') {
+                            formData.append(`link_${index}`, link.url);
+                            formData.append(`link_title_${index}`, link.title);
+                            formData.append(`link_description_${index}`, link.description);
+                        } else if (link.type === 'youtube') {
+                            formData.append(`youtube_${index}`, link.url);
+                            formData.append(`youtube_title_${index}`, link.title);
+                            formData.append(`youtube_description_${index}`, link.description);
+                        } else if (link.type === 'google_drive') {
+                            formData.append(`gdrive_${index}`, link.url);
+                            formData.append(`gdrive_title_${index}`, link.title);
+                            formData.append(`gdrive_description_${index}`, link.description);
+                        }
+                    }
+                });
+
+                // Add file attachments
+                mixedFiles.forEach((file, index) => {
+                    formData.append(`attachment_${index}`, file.file);
+                });
+
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+                showResponse('mixed-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('mixed-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        // Validation test functions
+        async function testInvalidUrls() {
+            const classCode = 'J56NHD';
+            const payload = {
+                title: 'Test Invalid URLs',
+                content: 'Testing URL validation',
+                attachments: [
+                    {
+                        type: 'youtube',
+                        url: 'https://invalid-youtube.com/watch?v=123',
+                        title: 'Invalid YouTube URL'
+                    },
+                    {
+                        type: 'google_drive',
+                        url: 'https://invalid-drive.com/file/d/123',
+                        title: 'Invalid Google Drive URL'
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showResponse('invalid-urls-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('invalid-urls-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        async function testEmptyAttachments() {
+            const classCode = 'J56NHD';
+            const payload = {
+                title: 'Test Empty Attachments',
+                content: 'Testing with no attachments',
+                attachments: []
+            };
+
+            try {
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showResponse('empty-attachments-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('empty-attachments-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        async function testSingleAttachment() {
+            const classCode = 'J56NHD';
+            const payload = {
+                title: 'Test Single Attachment',
+                content: 'Testing with one attachment',
+                attachments: [
+                    {
+                        type: 'link',
+                        url: 'https://www.example.com',
+                        title: 'Single Link'
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getTestToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showResponse('single-attachment-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('single-attachment-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        async function testAuthentication() {
+            const classCode = 'J56NHD';
+            const payload = {
+                title: 'Test Authentication',
+                content: 'Testing without valid token',
+                attachments: []
+            };
+
+            try {
+                const response = await fetch(`http://localhost/scms_new_backup/index.php/api/teacher/classroom/${classCode}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                        // No Authorization header
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showResponse('authentication-response', response.ok ? 'success' : 'error', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                showResponse('authentication-response', 'error', `Error: ${error.message}`);
+            }
+        }
+
+        // Utility functions
+        function showResponse(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `response-area ${type}`;
+            element.textContent = message;
+        }
+
+        function getTestToken() {
+            // For testing purposes, return a mock token
+            // In production, this would come from localStorage or user session
+            return 'test_jwt_token_12345';
+        }
+
+        function clearMultipartForm() {
+            document.getElementById('multipart-title').value = '';
+            document.getElementById('multipart-content').value = '';
+            multipartLinks = [];
+            multipartFiles = [];
+            renderMultipartLinks();
+            renderMultipartFiles();
+            document.getElementById('multipart-response').style.display = 'none';
+        }
+
+        function clearJsonForm() {
+            document.getElementById('json-title').value = '';
+            document.getElementById('json-content').value = '';
+            jsonLinks = [];
+            renderJsonLinks();
+            document.getElementById('json-response').style.display = 'none';
+        }
+
+        function clearMixedForm() {
+            document.getElementById('mixed-title').value = '';
+            document.getElementById('mixed-content').value = '';
+            mixedLinks = [];
+            mixedFiles = [];
+            renderMixedLinks();
+            renderMixedFiles();
+            document.getElementById('mixed-response').style.display = 'none';
+        }
+
+        // Initialize forms with sample data
+        window.onload = function() {
+            // Add sample links to multipart form
+            addMultipartLink('link');
+            addMultipartLink('youtube');
+            addMultipartLink('gdrive');
+            
+            // Set sample values
+            if (multipartLinks.length >= 3) {
+                multipartLinks[0].url = 'https://www.example.com';
+                multipartLinks[0].name = 'Example Website';
+                multipartLinks[1].url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+                multipartLinks[1].name = 'Rick Roll Video';
+                multipartLinks[2].url = 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view';
+                multipartLinks[2].name = 'Google Drive Document';
+                renderMultipartLinks();
+            }
+
+            // Add sample links to JSON form
+            addJsonLink('link');
+            addJsonLink('youtube');
+            addJsonLink('google_drive');
+            
+            // Set sample values
+            if (jsonLinks.length >= 3) {
+                jsonLinks[0].url = 'https://github.com';
+                jsonLinks[0].title = 'GitHub Repository';
+                jsonLinks[1].url = 'https://youtu.be/dQw4w9WgXcQ';
+                jsonLinks[1].title = 'Never Gonna Give You Up';
+                jsonLinks[2].url = 'https://docs.google.com/document/d/1234567890/edit';
+                jsonLinks[2].title = 'Google Doc';
+                renderJsonLinks();
+            }
+
+            // Add sample links to mixed form
+            addMixedLink('link');
+            addMixedLink('youtube');
+            
+            // Set sample values
+            if (mixedLinks.length >= 2) {
+                mixedLinks[0].url = 'https://www.example.com';
+                mixedLinks[0].title = 'Example Website';
+                mixedLinks[1].url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+                mixedLinks[1].title = 'Rick Roll Video';
+                renderMixedLinks();
+            }
+        };
+    </script>
+</body>
+</html>
