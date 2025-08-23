@@ -989,7 +989,6 @@ const ClassroomDetail = () => {
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
   const [audienceDropdownOpen, setAudienceDropdownOpen] = useState(false);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
-  const [postDropdownOpen, setPostDropdownOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState('2024-2025');
   const [selectedAudience, setSelectedAudience] = useState('All students');
   const years = ['2023-2024', '2024-2025', '2025-2026'];
@@ -1042,7 +1041,11 @@ const ClassroomDetail = () => {
 
   const [attachmentDropdownOpen, setAttachmentDropdownOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [postDropdownOpen, setPostDropdownOpen] = useState(false);
+  const [scheduledActionMenu, setScheduledActionMenu] = useState(null);
+  const [draftActionMenu, setDraftActionMenu] = useState(null);
   const emojiPickerRef = useRef();
+  const postFormRef = useRef();
 
   // 1. Add state for preview modal and attachment
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -1055,8 +1058,7 @@ const ClassroomDetail = () => {
   // Add refs for visualizer
   const visualizerIntervalRef = useRef(null);
 
-  //
-  const [currentDraftId, setCurrentDraftId] = useState(null);
+
 
   // Visualizer functions
   const startVisualizer = () => {
@@ -1093,6 +1095,13 @@ const ClassroomDetail = () => {
 
   // Add at the top of ClassroomDetail component:
   const [tempSelectedStudents, setTempSelectedStudents] = useState([]);
+  
+  // Add Users Modal state
+  const [showAddUsersModal, setShowAddUsersModal] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   
   // Add classrooms state to load actual classrooms
   const [classrooms, setClassrooms] = useState([]);
@@ -1162,6 +1171,61 @@ const ClassroomDetail = () => {
       setClassrooms([]);
     }
   }, []);
+  
+  // Fetch available users when Add Users modal is opened or when students data changes
+  useEffect(() => {
+    if (showAddUsersModal) {
+      fetchAvailableUsers();
+    }
+  }, [showAddUsersModal, students]);
+  
+  // Function to fetch available users for the Add Users modal
+  const fetchAvailableUsers = async () => {
+    if (!code) return;
+    
+    setLoadingUsers(true);
+    try {
+      const users = [];
+      
+      // For teacher role: only show students, don't include the teacher themselves
+      // Add students from the existing students state
+      if (students && Array.isArray(students) && students.length > 0) {
+        students.forEach(student => {
+          users.push({
+            ...student,
+            name: student.name || student.full_name,
+            role: 'student',
+            type: 'student'
+          });
+        });
+      }
+      
+      // If no students found, add some sample data
+      if (users.length === 0) {
+        const sampleStudents = [
+          { id: 'sample_student1', name: 'John Doe', email: 'john.doe@example.com', role: 'student', type: 'student' },
+          { id: 'sample_student2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'student', type: 'student' },
+          { id: 'sample_student3', name: 'Mike Johnson', email: 'mike.johnson@example.com', role: 'student', type: 'student' }
+        ];
+        users.push(...sampleStudents);
+      }
+      
+      console.log('Available users for Add Users modal (students only):', users);
+      setAvailableUsers(users);
+      
+    } catch (error) {
+      console.error('Error setting up available users:', error);
+      // Fallback to sample student data only
+      setAvailableUsers([
+        { id: 'student1', name: 'John Doe', email: 'john.doe@example.com', role: 'student', type: 'student' },
+        { id: 'student2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'student', type: 'student' },
+        { id: 'student3', name: 'Mike Johnson', email: 'mike.johnson@example.com', role: 'student', type: 'student' },
+        { id: 'student4', name: 'Sarah Wilson', email: 'sarah.wilson@example.com', role: 'student', type: 'student' }
+      ]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
   // Load tasks from API for current classroom
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [taskError, setTaskError] = useState(null);
@@ -1985,6 +2049,9 @@ useEffect(() => {
   // Add state for edit announcement student selection
   const [showEditStudentSelectModal, setShowEditStudentSelectModal] = useState(false);
   const [editSelectedStudents, setEditSelectedStudents] = useState([]);
+  
+  // Track current draft being edited
+  const [currentDraftId, setCurrentDraftId] = useState(null);
 
   // 3. In handlePostAnnouncement, save both title and content
   const [postLoading, setPostLoading] = useState(false);
@@ -1999,14 +2066,10 @@ useEffect(() => {
       is_scheduled: 0,
       scheduled_at: '',
       allow_comments: allowComments ? 1 : 0,
-      // When teacher selects specific students, treat as individual assignment
-      assignment_type: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
-        ? 'individual'
-        : 'classroom',
-      // Only include specific students when any are selected; otherwise let backend post to whole class
-      student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
-        ? selectedAnnouncementStudents
-        : null,
+      // TODO: student_ids support will be added when new backend endpoints are ready
+      // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
+      //   ? selectedAnnouncementStudents
+      //   : null,
     };
 
     console.log("Posting announcement with data:", postData);
@@ -2038,19 +2101,358 @@ useEffect(() => {
         // Links only: use new API method for multiple link attachments
         response = await apiService.createTeacherStreamPostWithLinks(code, postData, linkAttachments);
       } else {
-        // No attachments
+        // No attachments - use the existing working endpoint
         response = await apiService.createClassroomStreamPost(code, postData);
       }
       console.log("Success response:", response?.data || response);
+      
+      // Debug: Log current draft tracking
+      console.log("Current draft ID before removal:", currentDraftId);
+      console.log("Current drafts before removal:", drafts);
+      
+      // Note: Draft removal is now handled in the backend update section below
+      
       setNewAnnouncement("");
       setNewAnnouncementTitle("");
       setAttachments([]);
       setSelectedAnnouncementStudents([]);
+      setPostDropdownOpen(false);
+      
+      // If this was posted from a draft, update the backend to mark it as posted
+      if (currentDraftId) {
+        try {
+          console.log("Updating backend draft status for ID:", currentDraftId);
+          // Update the draft status in the backend to mark it as posted
+          const updateResponse = await apiService.updateClassroomStreamDraft(code, currentDraftId, {
+            is_draft: 0,
+            is_scheduled: 0,
+            scheduled_at: ''
+          });
+          console.log("Backend draft update response:", updateResponse);
+          
+          // If backend update succeeds, also remove from frontend state immediately
+          if (updateResponse?.status) {
+            console.log("Backend draft status updated successfully, removing from frontend state");
+            setDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+          }
+        } catch (updateErr) {
+          console.error("Error updating backend draft status:", updateErr);
+          // If backend update fails, still remove from frontend state
+          // The refresh will sync the state
+          console.log("Backend update failed, removing from frontend state anyway");
+          setDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+        }
+        
+        // Clear the current draft tracking
+        setCurrentDraftId(null);
+        console.log("Draft tracking cleared");
+      }
+      
+      // Refresh both streams and drafts to ensure consistency
       fetchStreamPosts();
+      fetchStreamDraftsAndScheduled();
     } catch (err) {
       console.error("Error posting announcement:", err);
       console.error("Error response:", err.response?.data);
       alert('Failed to post announcement: ' + (err.response?.data?.message || err.message || err));
+    } finally {
+      setPostLoading(false);
+    }
+  };
+
+  // Handle creating a draft post
+  const handleCreateDraft = async (e) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
+
+    const postData = {
+      title: newAnnouncementTitle || 'Untitled Draft',
+      content: newAnnouncement,
+      is_draft: 1,
+      is_scheduled: 0,
+      scheduled_at: '',
+      allow_comments: allowComments ? 1 : 0,
+      // TODO: student_ids support will be added when new backend endpoints are ready
+      // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
+      //   ? selectedAnnouncementStudents
+      //   : null,
+    };
+
+    if (!newAnnouncement.trim()) {
+      alert('Please enter draft content');
+      return;
+    }
+
+    try {
+      setPostLoading(true);
+      let response;
+
+      // Use the new unified endpoint for creating drafts with student targeting
+      if (attachments && attachments.length > 0) {
+        // Handle attachments if any
+        const fileAttachments = attachments.filter(att => att && att.file);
+        const linkAttachments = attachments.filter(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+
+        if (fileAttachments.length > 0 && linkAttachments.length > 0) {
+          const files = fileAttachments.map(att => att.file);
+          response = await apiService.createTeacherStreamPostWithMixedAttachments(code, postData, files, linkAttachments);
+        } else if (fileAttachments.length > 0) {
+          const files = fileAttachments.map(att => att.file);
+          response = await apiService.createTeacherStreamPostWithFiles(code, postData, files);
+        } else if (linkAttachments.length > 0) {
+          response = await apiService.createTeacherStreamPostWithLinks(code, postData, linkAttachments);
+        } else {
+          response = await apiService.createClassroomStreamPost(code, postData);
+        }
+      } else {
+        // No attachments - use the existing working endpoint
+        response = await apiService.createClassroomStreamPost(code, postData);
+      }
+
+      if (response?.status) {
+        setNewAnnouncement("");
+        setNewAnnouncementTitle("");
+        setAttachments([]);
+        setSelectedAnnouncementStudents([]);
+        setPostDropdownOpen(false);
+        setFormExpanded(false);
+        fetchStreamDraftsAndScheduled();
+        alert('Draft saved successfully!');
+      }
+    } catch (err) {
+      console.error("Error saving draft:", err);
+      alert('Failed to save draft: ' + (err.response?.data?.message || err.message || err));
+    } finally {
+      setPostLoading(false);
+    }
+  };
+
+  // Handle creating a scheduled post
+  const handleCreateScheduled = async (e) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
+
+    if (!scheduleDate || !scheduleTime) {
+      alert('Please select both date and time for scheduling');
+      return;
+    }
+
+    const scheduledDateTime = `${scheduleDate} ${scheduleTime}:00`;
+
+    const postData = {
+      title: newAnnouncementTitle || 'Untitled Scheduled Post',
+      content: newAnnouncement,
+      is_draft: 0,
+      is_scheduled: 1,
+      scheduled_at: scheduledDateTime,
+      allow_comments: allowComments ? 1 : 0,
+      // TODO: student_ids support will be added when new backend endpoints are ready
+      // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
+      //   ? selectedAnnouncementStudents
+      //   : null,
+    };
+
+    if (!newAnnouncement.trim()) {
+      alert('Please enter scheduled post content');
+      return;
+    }
+
+    try {
+      setPostLoading(true);
+      let response;
+
+      // Collect any file attachments and link attachments
+      const fileAttachments = (attachments || []).filter(att => att && att.file);
+      const linkAttachments = (attachments || []).filter(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+
+      if (fileAttachments.length > 0 && linkAttachments.length > 0) {
+        const files = fileAttachments.map(att => att.file);
+        response = await apiService.createTeacherStreamPostWithMixedAttachments(code, postData, files, linkAttachments);
+      } else if (fileAttachments.length > 0) {
+        const files = fileAttachments.map(att => att.file);
+        response = await apiService.createTeacherStreamPostWithFiles(code, postData, files);
+      } else if (linkAttachments.length > 0) {
+        response = await apiService.createTeacherStreamPostWithLinks(code, postData, linkAttachments);
+      } else {
+        // No attachments - use the existing working endpoint
+        response = await apiService.createClassroomStreamPost(code, postData);
+      }
+
+      if (response?.status) {
+        setNewAnnouncement("");
+        setNewAnnouncementTitle("");
+        setAttachments([]);
+        setSelectedAnnouncementStudents([]);
+        setPostDropdownOpen(false);
+        setFormExpanded(false);
+        setScheduleDate("");
+        setScheduleTime("");
+        setShowScheduleModal(false);
+        fetchStreamDraftsAndScheduled();
+        alert('Post scheduled successfully!');
+      }
+    } catch (err) {
+      console.error("Error scheduling post:", err);
+      alert('Failed to schedule post: ' + (err.response?.data?.message || err.message || err));
+    } finally {
+      setPostLoading(false);
+    }
+  };
+
+  // Handle updating a draft post (publish, keep as draft, or schedule)
+  const handleUpdateDraft = async (draftId, action, scheduledDateTime = null) => {
+    try {
+      setPostLoading(true);
+      
+      const draft = drafts.find(d => d.id === draftId);
+      if (!draft) {
+        alert('Draft not found');
+        return;
+      }
+      
+      let postData = {
+        title: draft.title || 'Untitled Post',
+        content: draft.content || draft.text || '',
+        allow_comments: draft.allowComments ? 1 : 0,
+        // TODO: student_ids support will be added when new backend endpoints are ready
+        // student_ids: draft.studentIds || draft.visible_to_student_ids || null,
+      };
+
+      if (action === 'publish') {
+        postData.is_draft = 0;
+        postData.is_scheduled = 0;
+        postData.scheduled_at = '';
+      } else if (action === 'schedule' && scheduledDateTime) {
+        postData.is_draft = 0;
+        postData.is_scheduled = 1;
+        postData.scheduled_at = scheduledDateTime;
+      } else {
+        // Keep as draft
+        postData.is_draft = 1;
+        postData.is_scheduled = 0;
+        postData.scheduled_at = '';
+      }
+
+      // Use the existing working endpoint for updating drafts
+      const response = await apiService.updateClassroomStreamDraft(code, draftId, postData);
+      
+      if (response?.status) {
+        // Remove the draft from local state immediately
+        if (action === 'publish' || action === 'schedule') {
+          setDrafts(prev => prev.filter(d => d.id !== draftId));
+        }
+        
+        // Refresh both streams and drafts/scheduled
+        fetchStreamPosts();
+        fetchStreamDraftsAndScheduled();
+        
+        if (action === 'publish') {
+          alert('Draft published successfully!');
+        } else if (action === 'schedule') {
+          alert('Draft scheduled successfully!');
+        } else {
+          alert('Draft updated successfully!');
+        }
+      }
+    } catch (err) {
+      console.error("Error updating draft:", err);
+      alert('Failed to update draft: ' + (err.response?.data?.message || err.message || err));
+    } finally {
+      setPostLoading(false);
+    }
+  };
+
+    // Handle editing a draft post
+  const handleEditDraft = (draftId) => {
+    const draft = drafts.find(d => d.id === draftId);
+    if (draft) {
+      // Populate the form with draft data
+      setNewAnnouncementTitle(draft.title || '');
+      setNewAnnouncement(draft.content || draft.text || '');
+      setAllowComments(draft.allowComments || false);
+      setAttachments(draft.attachments || []);
+      
+      // TODO: Student targeting - will be re-enabled when backend supports student_ids
+      // Handle student targeting - support both old and new field names
+      // const studentIds = draft.studentIds || draft.visible_to_student_ids || [];
+      // setSelectedAnnouncementStudents(Array.isArray(studentIds) ? studentIds : []);
+      
+      // Track this draft as being edited (don't remove it yet)
+      console.log("Setting current draft ID:", draftId);
+      setCurrentDraftId(draftId);
+      
+      // Expand the form
+      setFormExpanded(true);
+      
+      // Scroll to the form
+      if (formExpandedRef.current) {
+        formExpandedRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
+  // Handle scheduling a draft post
+  const handleScheduleDraft = (draftId) => {
+    const draft = drafts.find(d => d.id === draftId);
+    if (draft) {
+      // Populate the form with draft data
+      setNewAnnouncementTitle(draft.title || '');
+      setNewAnnouncement(draft.content || draft.text || '');
+      setAllowComments(draft.allowComments || false);
+      setAttachments(draft.attachments || []);
+      
+      // TODO: Student targeting - will be re-enabled when backend supports student_ids
+      // Handle student targeting - support both old and new field names
+      // const studentIds = draft.studentIds || draft.visible_to_student_ids || [];
+      // setSelectedAnnouncementStudents(Array.isArray(studentIds) ? studentIds : []);
+      
+      // Remove the draft from the drafts list since it's now being scheduled
+      setDrafts(prev => prev.filter(d => d.id !== draftId));
+      
+      // Show the schedule modal
+      setShowScheduleModal(true);
+      
+      // Close the action menu
+      setDraftActionMenu(null);
+    }
+  };
+
+  // Handle publishing a scheduled post now
+  const handlePublishScheduledNow = async (scheduledId) => {
+    try {
+      setPostLoading(true);
+      
+      const scheduledPost = scheduledPosts.find(s => s.id === scheduledId);
+      if (!scheduledPost) {
+        alert('Scheduled post not found');
+        return;
+      }
+
+      const postData = {
+        title: scheduledPost.title,
+        content: scheduledPost.content,
+        is_draft: 0,
+        is_scheduled: 0,
+        scheduled_at: '',
+        allow_comments: scheduledPost.allowComments ? 1 : 0,
+        // TODO: student_ids support will be added when new backend endpoints are ready
+        // student_ids: scheduledPost.studentIds || scheduledPost.visible_to_student_ids || null,
+      };
+
+      // Use the existing working endpoint for updating scheduled posts
+      const response = await apiService.updateClassroomStreamDraft(code, scheduledId, postData);
+      
+      if (response?.status) {
+        // Refresh both streams and drafts/scheduled
+        fetchStreamPosts();
+        fetchStreamDraftsAndScheduled();
+        alert('Scheduled post published now!');
+      }
+    } catch (err) {
+      console.error("Error publishing scheduled post:", err);
+      alert('Failed to publish scheduled post: ' + (err.response?.data?.message || err.message || err));
     } finally {
       setPostLoading(false);
     }
@@ -2309,8 +2711,56 @@ useEffect(() => {
 
   useEffect(() => {
     fetchStreamPosts();
+    fetchStreamDraftsAndScheduled();
     // eslint-disable-next-line
   }, [code]);
+
+  // Fetch stream drafts and scheduled posts from API
+  const fetchStreamDraftsAndScheduled = async () => {
+    if (!code) return;
+    
+    try {
+      // Fetch drafts
+      const draftsResponse = await apiService.getClassroomStreamDrafts(code);
+      if (draftsResponse?.status && draftsResponse?.data) {
+        const transformedDrafts = draftsResponse.data.map(draft => ({
+          id: draft.id,
+          title: draft.title || 'Untitled Draft',
+          content: draft.content || draft.text || '',
+          lastEdited: draft.created_at || draft.updated_at || new Date().toISOString(),
+          attachments: draft.attachments || [],
+          allowComments: draft.allow_comments === 1,
+          studentIds: draft.student_ids ? JSON.parse(draft.student_ids) : [],
+          api_response: draft
+        }));
+        setDrafts(transformedDrafts);
+      }
+
+      // Fetch scheduled posts
+      const scheduledResponse = await apiService.getClassroomStreamScheduled(code);
+      if (scheduledResponse?.status && scheduledResponse?.data) {
+        const transformedScheduled = scheduledResponse.data.map(scheduled => ({
+          id: scheduled.id,
+          title: scheduled.title || 'Untitled Scheduled Post',
+          content: scheduled.content || scheduled.text || '',
+          scheduledFor: {
+            date: scheduled.scheduled_at ? scheduled.scheduled_at.split(' ')[0] : '',
+            time: scheduled.scheduled_at ? scheduled.scheduled_at.split(' ')[1] : '',
+            fullDateTime: scheduled.scheduled_at
+          },
+          lastEdited: scheduled.created_at || scheduled.updated_at || new Date().toISOString(),
+          attachments: scheduled.attachments || [],
+          allowComments: scheduled.allow_comments === 1,
+          studentIds: scheduled.student_ids ? JSON.parse(scheduled.student_ids) : [],
+          api_response: scheduled
+        }));
+        setScheduledPosts(transformedScheduled);
+      }
+    } catch (error) {
+      console.error('Error fetching stream drafts and scheduled posts:', error);
+      // Keep existing local state if API fails
+    }
+  };
 
   useEffect(() => {
     // Check if user is a student
@@ -2490,6 +2940,49 @@ useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [emojiPickerOpen]);
+
+  // Post dropdown click outside handler
+  useEffect(() => {
+    if (!postDropdownOpen) return;
+    function handlePostDropdownClickOutside(event) {
+      // Check if click is outside the post dropdown and form area
+      const postDropdown = event.target.closest('.post-dropdown-container');
+      const postForm = event.target.closest('.post-form-container');
+      if (!postDropdown && !postForm) {
+        setPostDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePostDropdownClickOutside);
+    return () => document.removeEventListener("mousedown", handlePostDropdownClickOutside);
+  }, [postDropdownOpen]);
+
+  // Scheduled action menu click outside handler
+  useEffect(() => {
+    if (scheduledActionMenu === null) return;
+    function handleScheduledActionMenuClickOutside(event) {
+      // Check if click is outside the scheduled action menu
+      const actionMenu = event.target.closest('.scheduled-action-menu-container');
+      if (!actionMenu) {
+        setScheduledActionMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", handleScheduledActionMenuClickOutside);
+    return () => document.removeEventListener("mousedown", handleScheduledActionMenuClickOutside);
+  }, [scheduledActionMenu]);
+
+  // Draft action menu click outside handler
+  useEffect(() => {
+    if (draftActionMenu === null) return;
+    function handleDraftActionMenuClickOutside(event) {
+      // Check if click is outside the draft action menu
+      const actionMenu = event.target.closest('.draft-action-menu-container');
+      if (!actionMenu) {
+        setDraftActionMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", handleDraftActionMenuClickOutside);
+    return () => document.removeEventListener("mousedown", handleDraftActionMenuClickOutside);
+  }, [draftActionMenu]);
 
   // Task emoji picker click outside handler
   useEffect(() => {
@@ -2845,6 +3338,229 @@ useEffect(() => {
     }
   };
 
+  const handleScheduleStreamPost = () => {
+    if (newAnnouncement.trim() || newAnnouncementTitle.trim() || attachments.length > 0) {
+      if (scheduleDate && scheduleTime) {
+        // Get current logged-in user information
+        let currentUserName = 'You';
+        let currentUserProfilePic = null;
+        try {
+          const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+          if (stored) {
+            const u = JSON.parse(stored);
+            currentUserName = u.full_name || u.name || u.user_name || 'You';
+            currentUserProfilePic = u.profile_pic || u.profile_picture || u.avatar || null;
+          }
+        } catch (_) {}
+
+        setScheduled([
+          ...scheduled,
+          {
+            id: Date.now() + Math.random(),
+            title: newAnnouncementTitle || 'Untitled Announcement',
+            content: newAnnouncement,
+            author: currentUserName,
+            authorProfilePic: currentUserProfilePic,
+            attachments: attachments || [],
+            year: selectedYear,
+            audience: selectedAudience,
+            visibleTo: selectedAnnouncementStudents,
+            allowComments: allowComments,
+            scheduledFor: {
+              date: scheduleDate,
+              time: scheduleTime
+            },
+            lastEdited: new Date().toISOString(),
+            // Store metadata for future reference
+            metadata: {
+              originalFormData: {
+                title: newAnnouncementTitle,
+                content: newAnnouncement,
+                allowComments: allowComments,
+                attachments: attachments,
+                selectedStudents: selectedAnnouncementStudents
+              }
+            }
+          }
+        ]);
+        
+        // Clear form and close modal
+        setNewAnnouncement("");
+        setNewAnnouncementTitle("");
+        setAttachments([]);
+        setSelectedAnnouncementStudents([]);
+        setScheduleDate("");
+        setScheduleTime("");
+        setShowScheduleModal(false);
+        setPostDropdownOpen(false);
+        
+        alert("Post scheduled successfully!");
+      }
+    }
+  };
+
+  const handlePublishNow = (idx) => {
+    const scheduledPost = scheduled[idx];
+    if (scheduledPost) {
+      // Get current logged-in user information
+      let currentUserName = 'You';
+      let currentUserProfilePic = null;
+      try {
+        const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          currentUserName = u.full_name || u.name || u.user_name || 'You';
+          currentUserProfilePic = u.profile_pic || u.profile_picture || u.avatar || null;
+        }
+      } catch (_) {}
+
+      // Create new announcement from scheduled post with all details
+      const newAnnouncement = {
+        id: Date.now() + Math.random(),
+        title: scheduledPost.title || scheduledPost.content || 'Scheduled Announcement',
+        content: scheduledPost.content || scheduledPost.text || '',
+        author: currentUserName,
+        authorProfilePic: currentUserProfilePic,
+        date: new Date().toISOString(),
+        isPinned: false,
+        reactions: { like: 0, likedBy: [] },
+        comments: [],
+        attachments: scheduledPost.attachments || [],
+        year: scheduledPost.year,
+        audience: scheduledPost.audience,
+        visibleTo: scheduledPost.visibleTo || [],
+        allowComments: true, // Default to allowing comments
+        // Include any additional metadata from the scheduled post
+        ...(scheduledPost.metadata && { metadata: scheduledPost.metadata })
+      };
+      
+      // Add to announcements and remove from scheduled
+      setAnnouncements(prev => [newAnnouncement, ...prev]);
+      setScheduled(prev => prev.filter((_, i) => i !== idx));
+      setScheduledActionMenu(null);
+      
+      alert("Post published now!");
+    }
+  };
+
+  const handleEditScheduled = (idx) => {
+    const scheduledPost = scheduledPosts[idx];
+    if (scheduledPost) {
+      // Load scheduled post into form for editing with all details
+      setNewAnnouncementTitle(scheduledPost.title || '');
+      setNewAnnouncement(scheduledPost.content || scheduledPost.text || '');
+      setAttachments(scheduledPost.attachments || []);
+      
+      // TODO: Student targeting - will be re-enabled when backend supports student_ids
+      // Handle student targeting - support both old and new field names
+      // const studentIds = scheduledPost.studentIds || scheduledPost.visible_to_student_ids || scheduledPost.visibleTo || [];
+      // setSelectedAnnouncementStudents(Array.isArray(studentIds) ? studentIds : []);
+      
+      // Restore allow comments setting if available
+      if (scheduledPost.allowComments !== undefined) {
+        setAllowComments(scheduledPost.allowComments);
+      }
+      
+      // Remove from scheduled posts and open form
+      setScheduledPosts(prev => prev.filter((_, i) => i !== idx));
+      setFormExpanded(true);
+      setShowScheduledCollapse(false);
+      setScheduledActionMenu(null);
+      
+      alert("Scheduled post loaded for editing. Update and schedule again.");
+    }
+  };
+
+  const handleDeleteScheduled = async (idx) => {
+    if (window.confirm("Are you sure you want to delete this scheduled post?")) {
+      const scheduledPost = scheduledPosts[idx];
+      if (scheduledPost && scheduledPost.id) {
+        try {
+          // Call the backend delete endpoint using the API service method
+          const response = await apiService.deleteClassroomStreamPost(code, scheduledPost.id);
+          
+          if (response?.status) {
+            // Remove from local state on successful deletion
+            setScheduledPosts(prev => prev.filter((_, i) => i !== idx));
+            setScheduledActionMenu(null);
+            alert("Scheduled post deleted successfully!");
+          } else {
+            alert('Failed to delete scheduled post: ' + (response?.message || 'Unknown error'));
+          }
+        } catch (err) {
+          console.error("Error deleting scheduled post:", err);
+          if (err.response?.status === 404) {
+            alert('Scheduled post not found or already deleted.');
+          } else if (err.response?.status === 403) {
+            alert('You do not have permission to delete this scheduled post.');
+          } else {
+            alert('Failed to delete scheduled post: ' + (err.response?.data?.message || err.message || err));
+          }
+        }
+      } else {
+        // If no valid ID, just remove from local state
+        setScheduledPosts(prev => prev.filter((_, i) => i !== idx));
+        setScheduledActionMenu(null);
+        alert("Scheduled post removed from view. Note: Backend delete functionality will be available soon.");
+      }
+    }
+  };
+
+  const handleLoadDraft = (idx) => {
+    const draft = drafts[idx];
+    if (draft) {
+      // Load draft into form for editing
+      setNewAnnouncementTitle(draft.title || '');
+      setNewAnnouncement(draft.content || draft.text || '');
+      setAttachments(draft.attachments || []);
+      
+      // TODO: Student targeting - will be re-enabled when backend supports student_ids
+      // Handle student targeting - support both old and new field names
+      // const studentIds = draft.studentIds || draft.visible_to_student_ids || draft.visibleTo || [];
+      // setSelectedAnnouncementStudents(Array.isArray(studentIds) ? studentIds : []);
+      
+      // Remove from drafts and open form
+      setDrafts(prev => prev.filter((_, i) => i !== idx));
+      setFormExpanded(true);
+      setShowDraftsCollapse(false);
+      
+      alert("Draft loaded for editing!");
+    }
+  };
+
+  const handleDeleteDraft = async (idx) => {
+    if (window.confirm("Are you sure you want to delete this draft?")) {
+      const draft = drafts[idx];
+      if (draft && draft.id) {
+        try {
+          // Call the backend delete endpoint using the API service method
+          const response = await apiService.deleteClassroomStreamPost(code, draft.id);
+          
+          if (response?.status) {
+            // Remove from local state on successful deletion
+            setDrafts(prev => prev.filter((_, i) => i !== idx));
+            alert("Draft deleted successfully!");
+          } else {
+            alert('Failed to delete draft: ' + (response?.message || 'Unknown error'));
+          }
+        } catch (err) {
+          console.error("Error deleting draft:", err);
+          if (err.response?.status === 404) {
+            alert('Draft not found or already deleted.');
+          } else if (err.response?.status === 403) {
+            alert('You do not have permission to delete this draft.');
+          } else {
+            alert('Failed to delete draft: ' + (err.response?.data?.message || err.message || err));
+        }
+        }
+      } else {
+        // If no valid ID, just remove from local state
+        setDrafts(prev => prev.filter((_, i) => i !== idx));
+        alert("Draft removed from view. Note: Backend delete functionality will be available soon.");
+      }
+    }
+  };
+
   const handleCreateChange = e => setCreateForm({ ...createForm, [e.target.name]: e.target.value });
   const handleInviteChange = e => setInviteForm({ ...inviteForm, [e.target.name]: e.target.value });
   const handleGradeChange = e => setGradeForm({ ...gradeForm, [e.target.name]: e.target.value });
@@ -3091,8 +3807,30 @@ useEffect(() => {
     setEditSelectedStudents([]);
   };
 
-  const handleDeleteAnnouncement = (id) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
+  const handleDeleteAnnouncement = async (id) => {
+    if (window.confirm("Are you sure you want to delete this announcement? This action cannot be undone.")) {
+              try {
+          // Call the backend delete endpoint using the API service method
+          const response = await apiService.deleteClassroomStreamPost(code, id);
+        
+        if (response?.status) {
+          // Remove from local state on successful deletion
+          setAnnouncements(prev => prev.filter(a => a.id !== id));
+          alert('Announcement deleted successfully!');
+        } else {
+          alert('Failed to delete announcement: ' + (response?.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error("Error deleting announcement:", err);
+        if (err.response?.status === 404) {
+          alert('Announcement not found or already deleted.');
+        } else if (err.response?.status === 403) {
+          alert('You do not have permission to delete this announcement.');
+        } else {
+          alert('Failed to delete announcement: ' + (err.response?.data?.message || err.message || err));
+        }
+      }
+    }
   };
 
   const handleCancelPost = (e) => {
@@ -3722,18 +4460,33 @@ useEffect(() => {
         });
         
         toPost.forEach(item => {
+          // Get current logged-in user information
+          let currentUserName = 'You';
+          let currentUserProfilePic = null;
+          try {
+            const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+            if (stored) {
+              const u = JSON.parse(stored);
+              currentUserName = u.full_name || u.name || u.user_name || 'You';
+              currentUserProfilePic = u.profile_pic || u.profile_picture || u.avatar || null;
+            }
+          } catch (_) {}
+
           const newAnnouncement = {
             id: Date.now() + Math.random(),
-            title: item.title || 'Scheduled Announcement',
-            content: item.text,
-            author: "Prof. Smith",
+            title: item.title || item.content || 'Scheduled Announcement',
+            content: item.content || item.text || '',
+            author: item.author || currentUserName,
+            authorProfilePic: item.authorProfilePic || currentUserProfilePic,
             date: new Date().toISOString(),
             isPinned: false,
             reactions: { like: 0, likedBy: [] },
+            comments: [],
             attachments: item.attachments || [],
             year: item.year,
             audience: item.audience,
-            visibleTo: item.visibleTo || []
+            visibleTo: item.visibleTo || [],
+            allowComments: item.allowComments !== undefined ? item.allowComments : true
           };
           setAnnouncements(prev => [newAnnouncement, ...prev]);
         });
@@ -3769,6 +4522,18 @@ useEffect(() => {
         });
         
         toPost.forEach(item => {
+          // Get current logged-in user information
+          let currentUserName = 'You';
+          let currentUserProfilePic = null;
+          try {
+            const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+            if (stored) {
+              const u = JSON.parse(stored);
+              currentUserName = u.full_name || u.name || u.user_name || 'You';
+              currentUserProfilePic = u.profile_pic || u.profile_picture || u.avatar || null;
+            }
+          } catch (_) {}
+
           const newTask = {
             id: Date.now() + Math.random(),
             type: item.type,
@@ -3779,7 +4544,8 @@ useEffect(() => {
             allowComments: item.allowComments,
             attachments: item.attachments || [],
             assignedStudents: item.assignedStudents || [],
-            author: "Prof. Smith",
+            author: item.author || currentUserName,
+            authorProfilePic: item.authorProfilePic || currentUserProfilePic,
             date: new Date().toISOString(),
             isPinned: false,
             isLiked: false,
@@ -5202,7 +5968,9 @@ useEffect(() => {
   };
 
   const handleUpdateTask = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     
     if (!editingTaskId) return;
     
@@ -5631,7 +6399,7 @@ useEffect(() => {
             </div>
             <div className="mt-2">
               <Badge color="light" className="text-dark me-2">{classInfo.semester}</Badge>
-              <Badge color="light" className="text-dark">{classInfo.schoolYear}</Badge>
+              <Badge color="light" className="text-dark" style={{ marginLeft: 8 }}>{classInfo.schoolYear}</Badge>
             </div>
           </div>
           <div className="d-flex flex-column align-items-end" style={{ minWidth: 160, position: 'relative', zIndex: 2 }}>
@@ -5943,7 +6711,10 @@ useEffect(() => {
                   <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                     <button
                       type="button"
-                      onClick={() => { try { addNotification({ type: 'info', title: 'Feature Under Development', message: 'This section is currently under development.', duration: 4000 }); } catch (_) { alert('Feature Under Development'); } setShowScheduledCollapse(!showScheduledCollapse); }}
+                      onClick={() => { 
+                        setShowScheduledCollapse(!showScheduledCollapse); 
+                        setScheduledActionMenu(null); 
+                      }}
                       style={{
                         borderRadius: 6,
                         border: '1.2px solid #222',
@@ -5967,7 +6738,7 @@ useEffect(() => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { try { addNotification({ type: 'info', title: 'Feature Under Development', message: 'This section is currently under development.', duration: 4000 }); } catch (_) { alert('Feature Under Development'); } setShowDraftsCollapse(!showDraftsCollapse); }}
+                      onClick={() => setShowDraftsCollapse(!showDraftsCollapse)}
                       style={{
                         borderRadius: 6,
                         border: '1.2px solid #222',
@@ -5993,15 +6764,47 @@ useEffect(() => {
                   {/* Scheduled Announcements Collapse */}
                   <Collapse isOpen={showScheduledCollapse}>
                     <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: 'none', marginBottom: 24, marginTop: 0, padding: '2rem 2rem 1.5rem', maxWidth: '100%' }}>
-                      <div style={{ fontWeight: 700, color: '#2d3559', marginBottom: 8 }}>Scheduled Announcements</div>
-                      {scheduled.length === 0 ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, color: '#2d3559' }}>Scheduled Announcements</div>
+                        <button
+                          type="button"
+                          onClick={fetchStreamDraftsAndScheduled}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#324cdd',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                          }}
+                          title="Refresh scheduled posts"
+                        >
+                          <i className="fa fa-refresh"></i>
+                        </button>
+                      </div>
+                      {scheduledPosts.length === 0 ? (
                         <div style={{ color: '#888' }}>No scheduled announcements.</div>
                       ) : (
-                        scheduled.map((announcement, idx) => (
-                          <div key={idx} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px' }}>
+                        scheduledPosts.map((announcement, idx) => (
+                          <div key={idx} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px', position: 'relative' }}>
                             <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{announcement.title}</div>
                             <div style={{ color: '#444', fontSize: 15, marginBottom: 12 }}>{announcement.content || announcement.text}</div>
                             <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Scheduled for: {announcement.scheduledFor ? `${announcement.scheduledFor.date} ${announcement.scheduledFor.time}` : ''}</div>
+                            
+                            {/* TODO: Student targeting information - will be re-enabled when backend supports student_ids */}
+                            {/* Show student targeting information */}
+                            {/* {(announcement.studentIds || announcement.visible_to_student_ids) && (
+                              <div style={{ fontSize: 13, color: '#324cdd', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <i className="fa fa-users" style={{ fontSize: 12 }}></i>
+                                <span>Targeted to specific students</span>
+                              </div>
+                            )}
+                            {!(announcement.studentIds || announcement.visible_to_student_ids) && (
+                              <div style={{ fontSize: 13, color: '#28a745', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span>Visible to all students</span>
+                              </div>
+                            )} */}
                             {announcement.attachments && announcement.attachments.length > 0 && (
                               <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {announcement.attachments.map((att, idx2) => {
@@ -6086,6 +6889,111 @@ useEffect(() => {
                                 })}
                               </div>
                             )}
+                            
+                            {/* Action menu for scheduled posts */}
+                            <div className="scheduled-action-menu-container" style={{ position: 'absolute', top: 16, right: 16, marginTop: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => setScheduledActionMenu(idx === scheduledActionMenu ? null : idx)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#666',
+                                  fontSize: 18,
+                                  cursor: 'pointer',
+                                  padding: '4px 8px',
+                                  borderRadius: 4,
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = '#f0f0f0'}
+                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                              >
+                                <i className="fa fa-ellipsis-v"></i>
+                              </button>
+                              
+                              {/* Dropdown menu */}
+                              {scheduledActionMenu === idx && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    minWidth: 140,
+                                    background: '#fff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 16px rgba(50,76,221,0.13)',
+                                    zIndex: 50,
+                                    padding: '8px 0',
+                                    border: '1px solid #e9ecef',
+                                    marginTop: '4px'
+                                  }}
+                                >
+                                  <div
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 8, 
+                                      padding: '10px 16px', 
+                                      cursor: 'pointer', 
+                                      fontSize: 13, 
+                                      color: '#525F7F',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onClick={() => { 
+                                      setScheduledActionMenu(null); 
+                                      handlePublishScheduledNow(announcement.id); 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <i className="fa fa-play" style={{ fontSize: 13, color: '#28a745' }}></i>
+                                    Publish Now
+                                  </div>
+                                  <div
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 8, 
+                                      padding: '10px 16px', 
+                                      cursor: 'pointer', 
+                                      fontSize: 13, 
+                                      color: '#525F7F',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onClick={() => { 
+                                      setScheduledActionMenu(null); 
+                                      handleEditScheduled(idx); 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <i className="fa fa-edit" style={{ fontSize: 13, color: '#17a2b8' }}></i>
+                                    Edit
+                                  </div>
+                                  <div
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 8, 
+                                      padding: '10px 16px', 
+                                      cursor: 'pointer', 
+                                      fontSize: 13, 
+                                      color: '#525F7F',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onClick={() => { 
+                                      setScheduledActionMenu(null); 
+                                      handleDeleteScheduled(idx); 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <i className="fa fa-trash" style={{ fontSize: 13, color: '#dc3545' }}></i>
+                                    Delete
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}
@@ -6094,15 +7002,66 @@ useEffect(() => {
                   {/* Drafts Announcements Collapse */}
                   <Collapse isOpen={showDraftsCollapse}>
                     <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: 'none', marginBottom: 24, marginTop: 0, padding: '2rem 2rem 1.5rem', maxWidth: '100%' }}>
-                      <div style={{ fontWeight: 700, color: '#2d3559', marginBottom: 8 }}>Draft Announcements</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, color: '#2d3559' }}>Draft Announcements</div>
+                        <button
+                          type="button"
+                          onClick={fetchStreamDraftsAndScheduled}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#324cdd',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                          }}
+                          title="Refresh drafts"
+                        >
+                          <i className="fa fa-refresh"></i>
+                        </button>
+                      </div>
+                      
+                      {/* Debug: Show draft tracking info */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <div style={{ 
+                          background: '#f0f8ff', 
+                          border: '1px solid #b0d4f1', 
+                          borderRadius: '4px', 
+                          padding: '8px 12px', 
+                          marginBottom: '16px', 
+                          fontSize: '12px', 
+                          color: '#0066cc' 
+                        }}>
+                          <strong>Debug Info:</strong> 
+                          Current Draft ID: {currentDraftId || 'None'}, 
+                          Total Drafts: {drafts.length}, 
+                          Draft IDs: [{drafts.map(d => d.id).join(', ')}]
+                        </div>
+                      )}
                       {drafts.length === 0 ? (
                         <div style={{ color: '#888' }}>No drafts saved.</div>
                       ) : (
                         drafts.map((draft, idx) => (
-                          <div key={idx} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px' }}>
+                          <div key={idx} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px', position: 'relative' }}>
                             <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{draft.title}</div>
                             <div style={{ color: '#444', fontSize: 15, marginBottom: 12 }}>{draft.content || draft.text}</div>
-                            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Saved as draft: {draft.lastEdited ? new Date(draft.lastEdited).toLocaleString() : ''}</div>
+                            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Saved as draft: {draft.lastEdited ? formatRelativeTime(draft.lastEdited) : ''}</div>
+                            
+                            {/* TODO: Student targeting information - will be re-enabled when backend supports student_ids */}
+                            {/* Show student targeting information */}
+                            {/* {(draft.studentIds || draft.visible_to_student_ids) && (
+                              <div style={{ fontSize: 13, color: '#324cdd', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <i className="fa fa-users" style={{ fontSize: 12 }}></i>
+                                <span>Targeted to specific students</span>
+                              </div>
+                            )}
+                            {!(draft.studentIds || draft.visible_to_student_ids) && (
+                              <div style={{ fontSize: 13, color: '#28a745', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <i className="fa fa-globe" style={{ fontSize: 12 }}></i>
+                                <span>Visible to all students</span>
+                              </div>
+                            )} */}
                             {draft.attachments && draft.attachments.length > 0 && (
                               <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {draft.attachments.map((att, idx2) => (
@@ -6112,6 +7071,90 @@ useEffect(() => {
                                 ))}
                               </div>
                             )}
+                            
+                            {/* Action menu for drafts */}
+                            <div className="draft-action-menu-container" style={{ position: 'absolute', top: 16, right: 16, marginTop: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => setDraftActionMenu(idx === draftActionMenu ? null : idx)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#666',
+                                  fontSize: 18,
+                                  cursor: 'pointer',
+                                  padding: '4px 8px',
+                                  borderRadius: 4,
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = '#f0f0f0'}
+                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                              >
+                                <i className="fa fa-ellipsis-v"></i>
+                              </button>
+                              
+                              {/* Dropdown menu */}
+                              {draftActionMenu === idx && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    minWidth: 140,
+                                    background: '#fff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 16px rgba(50,76,221,0.13)',
+                                    zIndex: 50,
+                                    padding: '8px 0',
+                                    border: '1px solid #e9ecef',
+                                    marginTop: '4px'
+                                  }}
+                                >
+                                  <div
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 8, 
+                                      padding: '10px 16px', 
+                                      cursor: 'pointer', 
+                                      fontSize: 13, 
+                                      color: '#525F7F',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onClick={() => { 
+                                      setDraftActionMenu(null); 
+                                      handleEditDraft(draft.id); 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <i className="fa fa-edit" style={{ fontSize: 13, color: '#17a2b8' }}></i>
+                                    Load Draft
+                                  </div>
+                                  <div
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: 8, 
+                                      padding: '10px 16px', 
+                                      cursor: 'pointer', 
+                                      fontSize: 13, 
+                                      color: '#525F7F',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onClick={() => { 
+                                      setDraftActionMenu(null); 
+                                      handleDeleteDraft(idx); 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <i className="fa fa-trash" style={{ fontSize: 13, color: '#dc3545' }}></i>
+                                    Delete
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}
@@ -6121,7 +7164,10 @@ useEffect(() => {
                   {!(formExpanded) && (
                     <div
                       style={{ background: '#f7fafd', borderRadius: 14, padding: '22px 18px', minHeight: 56, color: '#444', fontSize: 16, border: 'none', boxShadow: 'none', marginBottom: 0, width: '100%', cursor: 'pointer', transition: 'box-shadow 0.2s, background 0.2s' }}
-                      onClick={() => setFormExpanded(true)}
+                      onClick={() => { 
+                        setFormExpanded(true); 
+                        setPostDropdownOpen(false); 
+                      }}
                       onMouseOver={e => e.currentTarget.style.boxShadow = '0 2px 8px #324cdd22'}
                       onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}
                     >
@@ -6130,11 +7176,16 @@ useEffect(() => {
                   )}
                   {/* Expanded announcement form */}
                   {formExpanded && (
-                    <div ref={formExpandedRef} style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd22', padding: 24, marginBottom: 0, width: '100%', position: 'relative', zIndex: 10, minHeight: 220 }}>
-                      {/* Add Student button floating in upper right of the card */}
+                    <div ref={formExpandedRef} className="post-form-container" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd22', padding: 24, marginBottom: 0, width: '100%', position: 'relative', zIndex: 10, minHeight: 220 }}>
+                      {/* Add Users button floating in upper right of the card */}
                       <button
                         type="button"
-                        onClick={() => setShowStudentSelectModal(true)}
+                        onClick={() => {
+                          console.log('Opening Add Students modal');
+                          console.log('Current students state:', students);
+                          console.log('Current availableUsers state:', availableUsers);
+                          setShowAddUsersModal(true);
+                        }}
                         style={{
                           position: 'absolute',
                           top: 12,
@@ -6155,7 +7206,7 @@ useEffect(() => {
                         }}
                         aria-label="Add Students"
                       >
-                        {selectedAnnouncementStudents.length > 0 && (
+                        {selectedUsers.length > 0 && (
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -6168,11 +7219,30 @@ useEffect(() => {
                             fontWeight: 600,
                             fontSize: 15,
                             marginRight: 2
-                          }}>{selectedAnnouncementStudents.length}</span>
+                          }}>{selectedUsers.length}</span>
                         )}
                         <i className="fa fa-user-plus" style={{ fontSize: 20, color: '#111' }}></i>
                       </button>
-                      <form onSubmit={handlePostAnnouncement} style={{ position: 'relative' }}>
+                      <form ref={postFormRef} onSubmit={handlePostAnnouncement} style={{ position: 'relative' }}>
+                        {/* Debug: Show current draft ID */}
+                        {process.env.NODE_ENV === 'development' && currentDraftId && (
+                          <div style={{ 
+                            background: '#fff3cd', 
+                            border: '1px solid #ffeaa7', 
+                            borderRadius: '4px', 
+                            padding: '8px 12px', 
+                            marginBottom: '12px', 
+                            fontSize: '12px', 
+                            color: '#856404',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <i className="fa fa-bug" style={{ fontSize: '12px' }}></i>
+                            <strong>Debug:</strong> Editing draft ID: {currentDraftId}
+                          </div>
+                        )}
+                        
                         {/* Allow comments checkbox */}
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                           <input
@@ -6405,7 +7475,14 @@ useEffect(() => {
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
                           <button
                             type="button"
-                            onClick={() => setFormExpanded(false)}
+                            onClick={() => { 
+                              setFormExpanded(false); 
+                              setPostDropdownOpen(false); 
+                              // If canceling a draft edit, clear the draft tracking
+                              if (currentDraftId) {
+                                setCurrentDraftId(null);
+                              }
+                            }}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -6419,38 +7496,131 @@ useEffect(() => {
                           >
                             Cancel
                           </button>
-                          <button
-                            type="submit"
-                            style={{
-                              background: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#7B8CFF' : '#e6e6fa',
-                              border: 'none',
-                              color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              borderRadius: 7,
-                              padding: '6px 18px',
-                              cursor: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 'pointer' : 'not-allowed',
-                              transition: 'background 0.15s',
-                              opacity: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 1 : 0.6,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              minWidth: 88
-                            }}
-                            disabled={!(newAnnouncement.trim().length > 0 || attachments.length > 0) || postLoading}
-                          >
-                            {postLoading ? (
-                              <>
-                                <i className="fa fa-spinner fa-spin" style={{ marginRight: 6 }}></i>
-                                Posting...
-                              </>
-                            ) : (
-                              <>
-                                <i className="fa fa-paper-plane" style={{ marginRight: 4, color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888' }}></i>
-                                Post
-                              </>
+                          
+                          {/* Split Button - Post with Dropdown */}
+                          <div className="post-dropdown-container" style={{ position: 'relative', display: 'flex' }}>
+                            {/* Main Post Button */}
+                            <button
+                              type="submit"
+                              style={{
+                                background: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#7B8CFF' : '#e6e6fa',
+                                border: 'none',
+                                color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888',
+                                fontWeight: 700,
+                                fontSize: 13,
+                                borderRadius: '7px 0 0 7px',
+                                padding: '6px 18px',
+                                cursor: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                                transition: 'background 0.15s',
+                                opacity: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 1 : 0.6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                minWidth: 88,
+                                borderRight: '1px solid rgba(255,255,255,0.3)'
+                              }}
+                              disabled={!(newAnnouncement.trim().length > 0 || attachments.length > 0) || postLoading}
+                            >
+                              {postLoading ? (
+                                <>
+                                  <i className="fa fa-spinner fa-spin" style={{ marginRight: 6 }}></i>
+                                  Posting...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fa fa-paper-plane" style={{ marginRight: 4, color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888' }}></i>
+                                  Post
+                                </>
+                              )}
+                            </button>
+                            
+                            {/* Dropdown Arrow Button */}
+                            <button
+                              type="button"
+                              onClick={() => setPostDropdownOpen(!postDropdownOpen)}
+                              style={{
+                                background: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#7B8CFF' : '#e6e6fa',
+                                border: 'none',
+                                color: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? '#fff' : '#888',
+                                fontWeight: 700,
+                                fontSize: 13,
+                                borderRadius: '0 7px 7px 0',
+                                padding: '6px 12px',
+                                cursor: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                                transition: 'background 0.15s',
+                                opacity: (newAnnouncement.trim().length > 0 || attachments.length > 0) ? 1 : 0.6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: 32
+                              }}
+                              disabled={!(newAnnouncement.trim().length > 0 || attachments.length > 0) || postLoading}
+                            >
+                              <i className="fa fa-chevron-down" style={{ fontSize: 12 }}></i>
+                            </button>
+                            
+                            {/* Dropdown Menu */}
+                            {postDropdownOpen && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  right: 0,
+                                  minWidth: 160,
+                                  background: '#fff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 16px rgba(50,76,221,0.13)',
+                                  zIndex: 50,
+                                  padding: '8px 0',
+                                  border: '1px solid #e9ecef',
+                                  marginTop: '4px'
+                                }}
+                              >
+                                <div
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    padding: '10px 16px', 
+                                    cursor: 'pointer', 
+                                    fontSize: 13, 
+                                    color: '#525F7F',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onClick={() => { 
+                                    setPostDropdownOpen(false); 
+                                    handleCreateDraft(); 
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                  <i className="fa fa-save" style={{ fontSize: 13, color: '#525F7F' }}></i>
+                                  Save as Draft
+                                </div>
+                                <div
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    padding: '10px 16px', 
+                                    cursor: 'pointer', 
+                                    fontSize: 13, 
+                                    color: '#525F7F',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onClick={() => { 
+                                    setPostDropdownOpen(false); 
+                                    setShowScheduleModal(true); 
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.background = '#f7fafd'}
+                                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                  <i className="fa fa-calendar" style={{ fontSize: 13, color: '#525F7F' }}></i>
+                                  Schedule Post
+                                </div>
+                              </div>
                             )}
-                          </button>
+                          </div>
                         </div>
                       </form>
                     </div>
@@ -6515,17 +7685,22 @@ useEffect(() => {
                                 <span style={{ color: (announcement.reactions?.likedBy?.includes('Prof. Smith') ? '#324cdd' : '#b0b0b0') }}>{announcement.reactions?.like || 0}</span>
                               </div>
                             )}
-                            <div style={{ position: 'relative' }}>
-                              <i
-                                className="fa fa-ellipsis-v"
-                                style={{ cursor: 'pointer' }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setAnnouncementDropdowns(prev => ({ ...prev, [announcement.id]: !prev[announcement.id] }));
-                                }}
-                                aria-label="Open announcement menu"
-                              />
-                              {announcementDropdowns[announcement.id] && (
+                            {/* Only show 3-dot menu if current user is the author */}
+                            {currentUserProfile && (
+                              (currentUserProfile.full_name === announcement.author || 
+                               currentUserProfile.name === announcement.author || 
+                               currentUserProfile.user_name === announcement.author) && (
+                              <div style={{ position: 'relative' }}>
+                                <i
+                                  className="fa fa-ellipsis-v"
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setAnnouncementDropdowns(prev => ({ ...prev, [announcement.id]: !prev[announcement.id] }));
+                                  }}
+                                  aria-label="Open announcement menu"
+                                />
+                                {announcementDropdowns[announcement.id] && (
                                 <div
                                   style={{
                                     position: 'absolute',
@@ -6588,6 +7763,8 @@ useEffect(() => {
                                 </div>
                               )}
                             </div>
+                              )
+                            )}
                           </div>
                           {/* Author info, date, and pinned badge */}
                           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
@@ -6630,7 +7807,7 @@ useEffect(() => {
                                     <Badge color="warning" className="ml-2">Pinned</Badge>
                                   )}
                                 </div>
-                                <small className="text-muted" style={{ fontSize: 11 }}>{new Date(announcement.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                                <small className="text-muted" style={{ fontSize: 11 }}>{formatRelativeTime(announcement.date)}</small>
                               </div>
                             </div>
                           </div>
@@ -6947,58 +8124,102 @@ useEffect(() => {
                       })()}
                     </div>
                   </div>
-                  {/* 3-dots menu */}
-                  <div style={{ position: 'relative', marginLeft: 8 }}>
-                    <button
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                onClick={e => {
-                                                  e.stopPropagation();
-                        setOpenCommentMenu(prev => ({ ...prev, [`${announcement.id}-${idx}`]: !prev[`${announcement.id}-${idx}`] }));
-                                                }}
-                                                aria-label="Open comment menu"
-                    >
-                      <span style={{ display: 'inline-block', fontSize: 18, color: '#6c7a89', lineHeight: 1 }}>
-                        <i className="fa fa-ellipsis-v" />
-                      </span>
-                    </button>
-                    {openCommentMenu[`${announcement.id}-${idx}`] && (
-                                                <div
-                                                  style={{
-                                                    position: 'absolute',
-                          top: 24,
-                                                    right: 0,
-                                                    background: '#fff',
-                                                    borderRadius: 10,
-                                                    boxShadow: '0 4px 16px rgba(44,62,80,0.13)',
-                                                    zIndex: 100,
-                                                    minWidth: 120,
-                                                    padding: '8px 0',
-                                                    border: '1px solid #e9ecef',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: 0
-                                                  }}
-                                                >
-                                                  <button
-                                                    style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
-                                                    onClick={e => {
-                                                      e.stopPropagation();
-                            setEditingComment({ [announcement.id]: idx });
-                            setEditingCommentText(prev => ({ ...prev, [`${announcement.id}-${idx}`]: comment.text || '' }));
-                            setOpenCommentMenu({});
-                                                    }}
-                                                  >Edit</button>
-                                                  <button
-                          style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
-                                                    onClick={e => {
-                                                      e.stopPropagation();
-                                                      handleDeleteComment(announcement.id, idx);
-                            setOpenCommentMenu({});
-                                                    }}
-                                                  >Delete</button>
-                                                </div>
-                                              )}
-                                          </div>
+                  {/* 3-dots menu - Only show for comment authors and announcement authors */}
+                  {(() => {
+                    // Check if current user can manage this comment
+                    const currentUser = currentUserProfile || (() => {
+                      try {
+                        const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+                        return stored ? JSON.parse(stored) : null;
+                      } catch (_) { return null; }
+                    })();
+                    
+                    const isCommentAuthor = currentUser && (
+                      currentUser.full_name === comment.author ||
+                      currentUser.name === comment.author ||
+                      currentUser.user_name === comment.author
+                    );
+                    
+                    const isAnnouncementAuthor = currentUser && (
+                      currentUser.full_name === announcement.author ||
+                      currentUser.name === announcement.author ||
+                      currentUser.user_name === announcement.author
+                    );
+                    
+                    // Show menu if user is comment author (can edit/delete) or announcement author (can delete any comment)
+                    if (isCommentAuthor || isAnnouncementAuthor) {
+                      // Debug logging for comment authorization
+                      console.log('Comment authorization:', {
+                        commentAuthor: comment.author,
+                        announcementAuthor: announcement.author,
+                        currentUser: currentUser?.full_name || currentUser?.name || currentUser?.user_name,
+                        isCommentAuthor,
+                        isAnnouncementAuthor,
+                        canEdit: isCommentAuthor,
+                        canDelete: true
+                      });
+                      
+                      return (
+                        <div style={{ position: 'relative', marginLeft: 8 }}>
+                          <button
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setOpenCommentMenu(prev => ({ ...prev, [`${announcement.id}-${idx}`]: !prev[`${announcement.id}-${idx}`] }));
+                            }}
+                            aria-label="Open comment menu"
+                          >
+                            <span style={{ display: 'inline-block', fontSize: 18, color: '#6c7a89', lineHeight: 1 }}>
+                              <i className="fa fa-ellipsis-v" />
+                            </span>
+                          </button>
+                          {openCommentMenu[`${announcement.id}-${idx}`] && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 24,
+                                right: 0,
+                                background: '#fff',
+                                borderRadius: 10,
+                                boxShadow: '0 4px 16px rgba(44,62,80,0.13)',
+                                zIndex: 100,
+                                minWidth: 120,
+                                padding: '8px 0',
+                                border: '1px solid #e9ecef',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 0
+                              }}
+                            >
+                              {/* Only show Edit button for comment authors */}
+                              {isCommentAuthor && (
+                                <button
+                                  style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setEditingComment({ [announcement.id]: idx });
+                                    setEditingCommentText(prev => ({ ...prev, [`${announcement.id}-${idx}`]: comment.text || '' }));
+                                    setOpenCommentMenu({});
+                                  }}
+                                >Edit</button>
+                              )}
+                              {/* Show Delete button for both comment authors and announcement authors */}
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#e74c3c', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleDeleteComment(announcement.id, idx);
+                                  setOpenCommentMenu({});
+                                }}
+                              >Delete</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    // Don't show menu for others
+                    return null;
+                  })()}
                                         </div>
                                         {isEditing ? (
                   <div style={{ width: '100%' }}>
@@ -7407,7 +8628,7 @@ useEffect(() => {
                                   {truncate(item.text, 60)}
                                         </div>
                                 <div style={{ fontSize: 11, color: '#8898AA', marginTop: 2 }}>
-                                  Scheduled for {new Date(item.scheduledFor).toLocaleString()}
+                                  Scheduled for {formatRelativeTime(item.scheduledFor)}
                                       </div>
                                 <div style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <span style={{ color: '#7D8FA9', fontWeight: 700, fontSize: 12 }}>
@@ -8500,7 +9721,7 @@ useEffect(() => {
                               )}
                             </div>
                             <div style={{ fontSize: 13, color: '#8898AA' }}>
-                              {mapTaskTypeToFrontend(task.type)} • {task.points} pts • Due {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
+                              {mapTaskTypeToFrontend(task.type)} • {task.points} pts • Due {task.due_date ? formatRelativeTime(task.due_date) : 'No due date'}
                             </div>
                           </div>
                           {task.allowComments && taskCommentsOpen[task.id] && (
@@ -8526,61 +9747,105 @@ useEffect(() => {
                                       <div>
                                         <div style={{ fontWeight: 600, fontSize: 14, color: '#232b3b' }}>{comment.author}</div>
                                           <div style={{ fontSize: 12, color: '#8898AA' }}>
-                                            {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                            {formatRelativeTime(comment.date)}
                                       </div>
                                     </div>
-                                        {/* 3-dots menu */}
-                                        <div style={{ position: 'relative', marginLeft: 8 }}>
-                                      <button
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                              setOpenCommentMenu(prev => ({ ...prev, [`${task.id}-${idx}`]: !prev[`${task.id}-${idx}`] }));
-                                            }}
-                                            aria-label="Open comment menu"
-                                          >
-                                            <span style={{ display: 'inline-block', fontSize: 18, color: '#6c7a89', lineHeight: 1 }}>
-                                              <i className="fa fa-ellipsis-v" />
-                                            </span>
-                                      </button>
-                                          {openCommentMenu[`${task.id}-${idx}`] && (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                                top: 24,
-                                    right: 0,
-                                    background: '#fff',
-                                    borderRadius: 10,
-                                    boxShadow: '0 4px 16px rgba(44,62,80,0.13)',
-                                    zIndex: 100,
-                                    minWidth: 120,
-                                    padding: '8px 0',
-                                    border: '1px solid #e9ecef',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 0
-                                  }}
-                                >
-                                  <button
-                                    style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                                  setEditingComment({ [task.id]: idx });
-                                                  setEditingCommentText(prev => ({ ...prev, [`${task.id}-${idx}`]: comment.text || '' }));
-                                                  setOpenCommentMenu({});
-                                    }}
-                                  >Edit</button>
-                                  <button
-                                                style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                                  handleDeleteComment(task.id, idx);
-                                                  setOpenCommentMenu({});
-                                    }}
-                                  >Delete</button>
-                                            </div>
-                                          )}
-                                        </div>
+                                        {/* 3-dots menu - Only show for comment authors and task authors */}
+                                        {(() => {
+                                          // Check if current user can manage this comment
+                                          const currentUser = currentUserProfile || (() => {
+                                            try {
+                                              const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+                                              return stored ? JSON.parse(stored) : null;
+                                            } catch (_) { return null; }
+                                          })();
+                                          
+                                          const isCommentAuthor = currentUser && (
+                                            currentUser.full_name === comment.author ||
+                                            currentUser.name === comment.author ||
+                                            currentUser.user_name === comment.author
+                                          );
+                                          
+                                          const isTaskAuthor = currentUser && (
+                                            currentUser.full_name === task.author ||
+                                            currentUser.name === task.author ||
+                                            currentUser.user_name === task.author
+                                          );
+                                          
+                                          // Show menu if user is comment author (can edit/delete) or task author (can delete any comment)
+                                          if (isCommentAuthor || isTaskAuthor) {
+                                            // Debug logging for task comment authorization
+                                            console.log('Task comment authorization:', {
+                                              commentAuthor: comment.author,
+                                              taskAuthor: task.author,
+                                              currentUser: currentUser?.full_name || currentUser?.name || currentUser?.user_name,
+                                              isCommentAuthor,
+                                              isTaskAuthor,
+                                              canEdit: isCommentAuthor,
+                                              canDelete: true
+                                            });
+                                            
+                                            return (
+                                              <div style={{ position: 'relative', marginLeft: 8 }}>
+                                                <button
+                                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                  onClick={e => {
+                                                    e.stopPropagation();
+                                                    setOpenCommentMenu(prev => ({ ...prev, [`${task.id}-${idx}`]: !prev[`${task.id}-${idx}`] }));
+                                                  }}
+                                                  aria-label="Open comment menu"
+                                                >
+                                                  <span style={{ display: 'inline-block', fontSize: 18, color: '#6c7a89', lineHeight: 1 }}>
+                                                    <i className="fa fa-ellipsis-v" />
+                                                  </span>
+                                                </button>
+                                                {openCommentMenu[`${task.id}-${idx}`] && (
+                                                  <div
+                                                    style={{
+                                                      position: 'absolute',
+                                                      top: 24,
+                                                      right: 0,
+                                                      background: '#fff',
+                                                      borderRadius: 10,
+                                                      boxShadow: '0 4px 16px rgba(44,62,80,0.13)',
+                                                      zIndex: 100,
+                                                      minWidth: 120,
+                                                      padding: '8px 0',
+                                                      border: '1px solid #e9ecef',
+                                                      display: 'flex',
+                                                      flexDirection: 'column',
+                                                      gap: 0
+                                                    }}
+                                                  >
+                                                    {/* Only show Edit button for comment authors */}
+                                                    {isCommentAuthor && (
+                                                      <button
+                                                        style={{ background: 'none', border: 'none', color: '#525F7F', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
+                                                        onClick={e => {
+                                                          e.stopPropagation();
+                                                          setEditingComment({ [task.id]: idx });
+                                                          setEditingCommentText(prev => ({ ...prev, [`${task.id}-${idx}`]: comment.text || '' }));
+                                                          setOpenCommentMenu({});
+                                                        }}
+                                                      >Edit</button>
+                                                    )}
+                                                    {/* Show Delete button for both comment authors and task authors */}
+                                                    <button
+                                                      style={{ background: 'none', border: 'none', color: '#e74c3c', fontWeight: 500, fontSize: 15, padding: '8px 18px', textAlign: 'left', cursor: 'pointer', borderRadius: 0 }}
+                                                      onClick={e => {
+                                                        e.stopPropagation();
+                                                        handleDeleteComment(task.id, idx);
+                                                        setOpenCommentMenu({});
+                                                      }}
+                                                    >Delete</button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          }
+                                          // Don't show menu for others
+                                          return null;
+                                        })()}
                                       </div>
                                       {isEditing ? (
                                         <div style={{ width: '100%' }}>
@@ -8787,7 +10052,7 @@ useEffect(() => {
                               {student.student_num || student.id}
                             </td>
                             <td style={{ fontWeight: 500, color: '#232b3b', fontSize: '14px', verticalAlign: 'middle', paddingTop: '6px', paddingBottom: '6px' }}>
-                              {student.joinedDate ? new Date(student.joinedDate).toLocaleString() : ''}
+                              {student.joinedDate ? formatRelativeTime(student.joinedDate) : ''}
                             </td>
                             {/* Actions column removed */}
                           </tr>
@@ -9968,45 +11233,52 @@ useEffect(() => {
                     onMouseOver={e => e.currentTarget.style.background = '#f8f9fa'}
                     onMouseOut={e => e.currentTarget.style.background = '#fff'}
                   >
-                    <div style={{ 
-                      width: 32, 
-                      height: 32, 
-                      borderRadius: '50%', 
-                      background: student.profile_pic ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontWeight: 600,
-                      fontSize: 14,
-                      marginRight: 12,
-                      overflow: 'hidden'
-                    }}>
-                      {student.profile_pic ? (
-                        <img
-                          src={getAvatarForUser(student)}
-                          alt={student.name}
-                          style={{
+                    {(() => {
+                      const avatarUrl = getProfilePictureUrl(student);
+                      const bgColor = getAvatarColor(student);
+                      const initials = getUserInitials(student);
+                      return (
+                        <div style={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: avatarUrl ? '#e9ecef' : bgColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 14,
+                          marginRight: 12,
+                          overflow: 'hidden'
+                        }}>
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={student.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <span style={{
+                            display: avatarUrl ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                          }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <span style={{
-                        display: student.profile_pic ? 'none' : 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%',
-                        height: '100%'
-                      }}>
-                        {student.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                            height: '100%'
+                          }}>
+                            {initials}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
                         {student.name}
@@ -10088,6 +11360,213 @@ useEffect(() => {
             </Button>
           </ModalFooter>
         </Modal>
+
+        {/* Add Users Modal */}
+        {showAddUsersModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 8px 32px rgba(44,62,80,.12)', minWidth: 400, maxWidth: 600, width: '90%', padding: 0 }}>
+              <div style={{ borderRadius: 20, background: '#fff', padding: 0 }}>
+                <div style={{ border: 'none', padding: '24px 24px 0 24px', fontWeight: 700, fontSize: 18, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Add Students</span>
+                  <button onClick={() => setShowAddUsersModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}>&times;</button>
+                </div>
+                <div style={{ padding: '0 24px 24px 24px' }}>
+                  {/* Debug information */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div style={{ background: '#f0f8ff', border: '1px solid #b0d4f1', borderRadius: 8, padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#0066cc' }}>
+                      <strong>Debug Info:</strong> availableStudents: {availableUsers.length}, classroomStudents: {students?.length || 0}, loading: {loadingUsers ? 'true' : 'false'}
+                    </div>
+                  )}
+                  <div style={{ position: 'relative', width: '100%', marginBottom: 18 }}>
+                    <i className="fa fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#b0b7c3', fontSize: 16, pointerEvents: 'none' }} />
+                    <input
+                      placeholder="Search students..."
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      style={{ background: '#f7f8fa', borderRadius: 8, border: '1px solid #e9ecef', fontSize: 15, color: '#232b3b', padding: '8px 14px 8px 40px', boxShadow: '0 1px 2px rgba(44,62,80,0.03)', minWidth: 0, width: '100%' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>
+                      Students ({selectedUsers.length}) - Total: {availableUsers.length}
+                    </span>
+                    {(() => {
+                      const filtered = availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase())));
+                      const allSelected = filtered.length > 0 && filtered.every(u => selectedUsers.includes(u.id));
+                      return (
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: '#5e72e4', fontWeight: 500, fontSize: 12, cursor: 'pointer', padding: '1px 6px', margin: 0 }}
+                          onClick={() => {
+                            if (allSelected) {
+                              setSelectedUsers(prev => prev.filter(id => !filtered.map(u => u.id).includes(id)));
+                            } else {
+                              setSelectedUsers(prev => Array.from(new Set([...prev, ...filtered.map(u => u.id)])));
+                            }
+                          }}
+                        >
+                          {allSelected ? 'Unselect All' : 'Select All'}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                  <div style={{ maxHeight: 220, overflowY: 'auto', border: 'none', borderRadius: 12, background: '#f9fafd', padding: '0 8px 0 0', marginBottom: 8 }}>
+                    {loadingUsers ? (
+                      <div className="text-center text-muted py-5">Loading class members...</div>
+                    ) : availableUsers.length === 0 ? (
+                      <div className="text-center text-muted py-5">
+                        No students found (Debug: availableUsers.length = {availableUsers.length})
+                      </div>
+                    ) : availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()))).length === 0 ? (
+                      <div className="text-center text-muted py-5">No students match your search</div>
+                    ) : (
+                      availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()))).map((u) => {
+                        const isSelected = selectedUsers.includes(u.id);
+                        return (
+                          <div
+                            key={u.id}
+                            style={{ display: 'flex', alignItems: 'center', padding: '6px 10px', borderRadius: 8, marginBottom: 2, cursor: 'pointer', background: isSelected ? '#eaf4fb' : 'transparent' }}
+                            onClick={e => {
+                              if (e.target.type === 'checkbox') return;
+                              if (isSelected) {
+                                setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                              } else {
+                                setSelectedUsers(prev => [...prev, u.id]);
+                              }
+                            }}
+                          >
+                            {(() => {
+                              const avatarUrl = getProfilePictureUrl(u);
+                              const bgColor = getAvatarColor(u);
+                              const initials = getUserInitials(u);
+                              return (
+                                <div style={{ 
+                                  width: 28, 
+                                  height: 28, 
+                                  borderRadius: '50%', 
+                                  marginRight: 10, 
+                                  overflow: 'hidden', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  background: avatarUrl ? '#e9ecef' : bgColor, 
+                                  color: '#fff', 
+                                  fontWeight: 700, 
+                                  border: '1px solid #e9ecef' 
+                                }}>
+                                  {avatarUrl ? (
+                                    <img
+                                      src={avatarUrl}
+                                      alt={u.name}
+                                      style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                </div>
+                              );
+                            })()}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: '#2d3748', textTransform: 'none' }}>{u.name}</div>
+                              <div style={{ fontSize: 12, color: '#7b8a9b', fontWeight: 400 }}>
+                                {u.email || ''} {u.role === 'teacher' && <span style={{ color: '#6366f1', fontWeight: 600 }}>(Teacher)</span>}
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedUsers(prev => [...prev, u.id]);
+                                } else {
+                                  setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                                }
+                              }}
+                              style={{ marginLeft: 10, cursor: 'pointer' }}
+                              aria-label={`Select ${u.name}`}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  {/* Selected users pills in modal */}
+                  <div style={{ minHeight: 50, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, alignItems: selectedUsers.length === 0 ? 'center' : 'flex-start', justifyContent: 'center', background: '#f7f8fa', borderRadius: 8, padding: 8, border: '1px solid #e9ecef', marginTop: 12 }}>
+                    {selectedUsers.length === 0 ? (
+                      <div style={{ width: '100%', height: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#b0b7c3', fontSize: 11, minHeight: 30, textAlign: 'center', gridColumn: '1 / -1', margin: '0 auto' }}>
+                        <i className="fa fa-user-plus" style={{ marginBottom: 2 }} />
+                        <div style={{ fontSize: 11, fontWeight: 500 }}>No students selected</div>
+                      </div>
+                    ) : (
+                      selectedUsers.map(id => {
+                        const u = availableUsers.find(user => user.id === id);
+                        return u ? (
+                          <span key={id} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 9, padding: '1px 6px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 22 }}>
+                            {(() => {
+                              const avatarUrl = getProfilePictureUrl(u);
+                              const bgColor = getAvatarColor(u);
+                              const initials = getUserInitials(u);
+                              return (
+                                <div style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 8 }}>
+                                  {avatarUrl ? (
+                                    <img
+                                      src={avatarUrl}
+                                      alt={u.name}
+                                      style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                </div>
+                              );
+                            })()}
+                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 5, lineHeight: 1.1 }}>
+                              <span style={{ fontWeight: 600, fontSize: 10, color: '#2d3748', textTransform: 'none' }}>{u.name}</span>
+                              <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9 }}>
+                                {u.email || ''} {u.role === 'teacher' && <span style={{ color: '#6366f1', fontWeight: 600, fontSize: 8 }}>(Teacher)</span>}
+                              </span>
+                            </span>
+                            <span style={{ flex: 1 }} />
+                            <i
+                              className="fa fa-times-circle"
+                              style={{ marginLeft: 2, cursor: 'pointer', color: '#7b8a9b', fontSize: 11 }}
+                              onClick={e => { e.stopPropagation(); setSelectedUsers(prev => prev.filter(id => id !== id)); }}
+                            />
+                          </span>
+                        ) : null;
+                      })
+                    )}
+                  </div>
+                </div>
+                <div style={{ padding: '0 24px 24px 24px', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowAddUsersModal(false)}
+                    style={{ background: '#f7fafd', color: '#222', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 500, cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Handle selected students - you can customize this based on your needs
+                      console.log('Selected students:', selectedUsers);
+                      setShowAddUsersModal(false);
+                    }}
+                    style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Task Options Modal */}
         <Modal isOpen={showTaskOptionsModal} toggle={() => setShowTaskOptionsModal(false)} centered>
@@ -10468,7 +11947,7 @@ useEffect(() => {
                   Task will be published on:
                 </div>
                 <div style={{ fontSize: 16, color: '#324cdd', marginTop: 4 }}>
-                  {new Date(`${taskScheduleDate}T${taskScheduleTime}`).toLocaleString()}
+                  {formatRelativeTime(`${taskScheduleDate}T${taskScheduleTime}`)}
                 </div>
               </div>
             )}
@@ -10550,6 +12029,96 @@ useEffect(() => {
         <ModalFooter>
           <Button color="secondary" onClick={() => setShowTaskDriveModal(false)}>Cancel</Button>
           <Button color="primary" onClick={handleAddTaskDrive}>Add</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Stream Post Schedule Modal */}
+      <Modal isOpen={showScheduleModal} toggle={() => setShowScheduleModal(false)} centered>
+        <ModalHeader toggle={() => setShowScheduleModal(false)} style={{ fontWeight: 700, fontSize: 20 }}>
+          <i className="ni ni-time-alarm" style={{ marginRight: 8, color: '#f39c12' }} />
+          Schedule Stream Post
+        </ModalHeader>
+        <ModalBody style={{ padding: '24px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+              Choose when you want this announcement to be published automatically.
+            </p>
+            
+            <div className="row">
+              <div className="col-md-6">
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222', marginBottom: 8, display: 'block' }}>
+                  Schedule Date *
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+              <div className="col-md-6">
+                <label style={{ fontWeight: 600, fontSize: 14, color: '#222', marginBottom: 8, display: 'block' }}>
+                  Schedule Time *
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="form-control"
+                  style={{ borderRadius: 8, fontSize: 14, background: '#f8fafc', border: '1px solid #bfcfff' }}
+                  required
+                />
+              </div>
+            </div>
+            
+            {scheduleDate && scheduleTime && (
+              <div style={{ 
+                marginTop: 16, 
+                padding: '12px 16px', 
+                background: '#e3eafe', 
+                borderRadius: 8, 
+                border: '1px solid #bfcfff' 
+              }}>
+                <div style={{ fontSize: 14, color: '#324cdd', fontWeight: 600 }}>
+                  <i className="ni ni-time-alarm" style={{ marginRight: 6 }} />
+                  Announcement will be published on:
+                </div>
+                <div style={{ fontSize: 16, color: '#324cdd', marginTop: 4 }}>
+                  {formatRelativeTime(`${scheduleDate}T${scheduleTime}`)}
+                </div>
+              </div>
+            )}
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            color="secondary"
+            onClick={() => setShowScheduleModal(false)}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              border: '1px solid #e9ecef'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="primary"
+            onClick={handleCreateScheduled}
+            disabled={!scheduleDate || !scheduleTime}
+            style={{ 
+              borderRadius: 8, 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #667eea 0%, #324cdd 100%)',
+              border: 'none'
+            }}
+          >
+            <i className="ni ni-time-alarm" style={{ marginRight: 6 }} />
+            Schedule Post
+          </Button>
         </ModalFooter>
       </Modal>
 

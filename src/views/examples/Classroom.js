@@ -749,7 +749,7 @@ const Classroom = () => {
             zIndex: 1
           }} />
           <div style={{ position: 'relative', zIndex: 2 }}>
-            <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center" style={{ rowGap: 12 }}>
               <div>
                 <h1 className="mb-2" style={{ fontWeight: 700, fontSize: "2.5rem", textShadow: "2px 2px 4px rgba(0,0,0,0.1)" }}>
                   My Classrooms
@@ -758,7 +758,7 @@ const Classroom = () => {
                   Manage your classes, materials, students, and activities in one place.
                 </p>
               </div>
-              <div className="d-flex gap-2">
+              <div className="classroom-actions d-flex flex-wrap mt-3 mt-md-0" style={{ columnGap: 12, rowGap: 8 }}>
                 <Button 
                   color="secondary" 
                   size="lg" 
@@ -879,7 +879,7 @@ const Classroom = () => {
                 <div 
                   className="card-img-top" 
                   style={{
-                    height: "120px",
+                    minHeight: "120px",
                     background: theme,
                     borderRadius: "16px 16px 0 0",
                     position: "relative",

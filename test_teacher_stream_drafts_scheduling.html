@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Stream Drafts & Scheduling Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .endpoint h3 {
+            color: #495057;
+            margin-top: 0;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+        .get { background: #28a745; color: white; }
+        .post { background: #007bff; color: white; }
+        .put { background: #ffc107; color: black; }
+        .delete { background: #dc3545; color: white; }
+        .url {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .example {
+            background: #f1f3f4;
+            border-left: 4px solid #4285f4;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .feature-list {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .feature-list h3 {
+            color: #155724;
+            margin-top: 0;
+        }
+        .feature-list ul {
+            margin: 10px 0;
+        }
+        .feature-list li {
+            margin: 8px 0;
+            color: #155724;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .note h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .note p {
+            color: #856404;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Teacher Stream Drafts & Scheduling Implementation</h1>
+    
+    <div class="container">
+        <h2>✨ New Features Implemented</h2>
+        
+        <div class="feature-list">
+            <h3>🎯 Core Functionality</h3>
+            <ul>
+                <li><strong>Create Drafts:</strong> Teachers can save posts as drafts instead of publishing immediately</li>
+                <li><strong>Schedule Posts:</strong> Set future publication dates and times for announcements</li>
+                <li><strong>Manage Drafts:</strong> View, edit, publish, or schedule existing drafts</li>
+                <li><strong>Manage Scheduled Posts:</strong> View, edit, or publish scheduled posts immediately</li>
+                <li><strong>API Integration:</strong> Full integration with the provided CRUD endpoints</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>🔧 Technical Implementation</h3>
+            <ul>
+                <li><strong>New API Methods:</strong> Added to src/services/api.js</li>
+                <li><strong>Enhanced UI:</strong> Updated ClassroomDetail.js with draft/schedule functionality</li>
+                <li><strong>State Management:</strong> Proper state handling for drafts and scheduled posts</li>
+                <li><strong>Error Handling:</strong> Comprehensive error handling and user feedback</li>
+                <li><strong>Real-time Updates:</strong> Automatic refresh of data after operations</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📡 API Endpoints Used</h2>
+        
+        <div class="endpoint">
+            <h3><span class="post">POST</span> Create Stream Post (Draft/Scheduled)</h3>
+            <div class="url">/api/teacher/classroom/{class_code}/stream</div>
+            <p>Creates new stream posts, drafts, or scheduled posts with support for multiple file and link attachments.</p>
+            
+            <div class="example">
+                <h4>Create Draft Example:</h4>
+                <pre>{
+  "title": "Draft Announcement",
+  "content": "This is saved as draft...",
+  "is_draft": 1,
+  "is_scheduled": 0,
+  "scheduled_at": "",
+  "allow_comments": 1
+}</pre>
+            </div>
+            
+            <div class="example">
+                <h4>Create Scheduled Post Example:</h4>
+                <pre>{
+  "title": "Scheduled Announcement",
+  "content": "This will be published later...",
+  "is_draft": 0,
+  "is_scheduled": 1,
+  "scheduled_at": "2024-01-30 09:00:00",
+  "allow_comments": 1
+}</pre>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="get">GET</span> Fetch Draft Posts</h3>
+            <div class="url">/api/teacher/classroom/{class_code}/stream/drafts</div>
+            <p>Retrieves all draft posts for a specific classroom.</p>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="get">GET</span> Fetch Scheduled Posts</h3>
+            <div class="url">/api/teacher/classroom/{class_code}/stream/scheduled</div>
+            <p>Retrieves all scheduled posts for a specific classroom.</p>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="put">PUT</span> Update Draft Post</h3>
+            <div class="url">/api/teacher/classroom/{class_code}/stream/draft/{draft_id}</div>
+            <p>Updates existing draft posts, publishes drafts, or converts to scheduled posts.</p>
+            
+            <div class="example">
+                <h4>Publish Draft Example:</h4>
+                <pre>{
+  "title": "Updated Title",
+  "content": "Updated content...",
+  "is_draft": 0,
+  "is_scheduled": 0,
+  "scheduled_at": "",
+  "allow_comments": 1
+}</pre>
+            </div>
+            
+            <div class="example">
+                <h4>Schedule Draft Example:</h4>
+                <pre>{
+  "title": "Updated Title",
+  "content": "Updated content...",
+  "is_draft": 0,
+  "is_scheduled": 1,
+  "scheduled_at": "2024-01-30 09:00:00",
+  "allow_comments": 1
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎨 User Interface Features</h2>
+        
+        <div class="feature-list">
+            <h3>📝 Post Creation</h3>
+            <ul>
+                <li><strong>Dropdown Menu:</strong> Post button with options for "Post", "Save as Draft", and "Schedule Post"</li>
+                <li><strong>Draft Creation:</strong> One-click draft saving with current form content</li>
+                <li><strong>Scheduling Modal:</strong> Date and time picker for scheduling posts</li>
+                <li><strong>Attachment Support:</strong> Full support for files, links, YouTube, and Google Drive</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>📋 Draft Management</h3>
+            <ul>
+                <li><strong>Drafts Section:</strong> Collapsible section showing all saved drafts</li>
+                <li><strong>Action Buttons:</strong> Publish, Schedule, and Delete options for each draft</li>
+                <li><strong>Content Preview:</strong> Shows draft title, content, and attachments</li>
+                <li><strong>Last Modified:</strong> Displays when the draft was last edited</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>📅 Scheduled Posts Management</h3>
+            <ul>
+                <li><strong>Scheduled Section:</strong> Collapsible section showing all scheduled posts</li>
+                <li><strong>Action Menu:</strong> Three-dot menu with Publish Now, Edit, and Delete options</li>
+                <li><strong>Schedule Display:</strong> Shows scheduled date and time clearly</li>
+                <li><strong>Immediate Publishing:</strong> Option to publish scheduled posts immediately</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>🔄 Data Management</h3>
+            <ul>
+                <li><strong>Auto-refresh:</strong> Automatic data refresh after operations</li>
+                <li><strong>Manual Refresh:</strong> Refresh buttons in each section</li>
+                <li><strong>Real-time Updates:</strong> Changes reflect immediately in the UI</li>
+                <li><strong>Error Handling:</strong> User-friendly error messages and fallbacks</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🔐 Authentication & Security</h2>
+        
+        <div class="note">
+            <h4>⚠️ Important Notes</h4>
+            <p><strong>All endpoints require JWT authentication:</strong></p>
+            <ul>
+                <li>Authorization header: <code>Bearer {JWT_TOKEN}</code></li>
+                <li>Content-Type: <code>application/json</code> or <code>multipart/form-data</code></li>
+                <li>Teacher role verification required</li>
+                <li>Classroom access validation</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📱 How to Use</h2>
+        
+        <div class="feature-list">
+            <h3>1. Creating a Draft</h3>
+            <ol>
+                <li>Navigate to a classroom</li>
+                <li>Click "Share an announcement with your class..."</li>
+                <li>Fill in title and content</li>
+                <li>Click the dropdown arrow next to "Post"</li>
+                <li>Select "Save as Draft"</li>
+            </ol>
+        </div>
+
+        <div class="feature-list">
+            <h3>2. Scheduling a Post</h3>
+            <ol>
+                <li>Fill in the announcement form</li>
+                <li>Click the dropdown arrow next to "Post"</li>
+                <li>Select "Schedule Post"</li>
+                <li>Choose date and time in the modal</li>
+                <li>Click "Schedule Post"</li>
+            </ol>
+        </div>
+
+        <div class="feature-list">
+            <h3>3. Managing Drafts</h3>
+            <ol>
+                <li>Click "Drafts" button to expand the section</li>
+                <li>Use "Publish" to publish immediately</li>
+                <li>Use "Schedule" to set a future publication time</li>
+                <li>Use "Delete" to remove unwanted drafts</li>
+            </ol>
+        </div>
+
+        <div class="feature-list">
+            <h3>4. Managing Scheduled Posts</h3>
+            <ol>
+                <li>Click "Scheduled" button to expand the section</li>
+                <li>Use the three-dot menu for each post</li>
+                <li>Select "Publish Now" to publish immediately</li>
+                <li>Select "Edit" to modify the post</li>
+                <li>Select "Delete" to remove the scheduled post</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🚀 Next Steps</h2>
+        
+        <div class="note">
+            <h4>🎯 Ready for Testing</h4>
+            <p>The implementation is complete and ready for testing with the provided API endpoints. Teachers can now:</p>
+            <ul>
+                <li>Create and manage drafts</li>
+                <li>Schedule posts for future publication</li>
+                <li>Publish drafts immediately</li>
+                <li>Convert drafts to scheduled posts</li>
+                <li>Manage all stream content efficiently</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactivity to the test page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add click handlers for better UX
+            const endpoints = document.querySelectorAll('.endpoint');
+            endpoints.forEach(endpoint => {
+                endpoint.addEventListener('click', function() {
+                    this.style.transform = 'scale(1.02)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 200);
+                });
+            });
+
+            // Add hover effects
+            const featureLists = document.querySelectorAll('.feature-list');
+            featureLists.forEach(list => {
+                list.addEventListener('mouseenter', function() {
+                    this.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15)';
+                });
+                list.addEventListener('mouseleave', function() {
+                    this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

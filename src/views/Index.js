@@ -158,18 +158,172 @@ function getCurrentDateTime() {
   return now.toLocaleString();
 }
 
-// Mock chart (static SVG line chart)
+// Student attendance chart – Admin-style line/area chart with weekly attendance %
 function TrendChart() {
+  const [points, setPoints] = useState("20,140 380,140");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [summary, setSummary] = useState({ present: 0, absent: 0, late: 0, total: 0, percent: 0 });
+  const [labels, setLabels] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Build a 8-week window
+        const today = new Date();
+        const to = today.toISOString().split("T")[0];
+        const fromDate = new Date(today.getTime() - 56 * 24 * 60 * 60 * 1000);
+        const from = fromDate.toISOString().split("T")[0];
+
+        // Fetch student's attendance records within window
+        const res = await apiService.getStudentAttendance({ dateFrom: from, dateTo: to });
+        const raw = res?.data?.records || res?.data?.data || res?.data || [];
+
+        // Normalize records: { date: 'YYYY-MM-DD', status: 'present'|'absent'|'late'|... }
+        const normalized = (Array.isArray(raw) ? raw : []).map((r) => ({
+          date: r.date || r.attendance_date || r.created_at?.split(" ")?.[0] || r.record_date || "",
+          status: (r.status || r.attendance_status || r.present || r.is_present)?.toString().toLowerCase(),
+        })).filter(r => r.date);
+
+        // Overall summary
+        let present = 0, absent = 0, late = 0, total = 0;
+        normalized.forEach(rec => {
+          total += 1;
+          if (rec.status === "present" || rec.status === "1" || rec.status === "true") present += 1;
+          else if (rec.status === "late") late += 1;
+          else absent += 1;
+        });
+        const percent = total > 0 ? Math.round((present / total) * 100) : 0;
+        if (isMounted) setSummary({ present, absent, late, total, percent });
+
+        // Group by week (Mon-Sun)
+        const buckets = [];
+        for (let i = 7; i >= 0; i--) {
+          const d = new Date(today.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+          const weekStart = new Date(d);
+          weekStart.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday as start
+          const key = weekStart.toISOString().split("T")[0];
+          buckets.push({ key, present: 0, total: 0 });
+        }
+
+        const findBucketIndex = (dateStr) => {
+          const d = new Date(dateStr);
+          // Find the bucket whose weekStart <= d < weekStart+7
+          for (let i = 0; i < buckets.length; i++) {
+            const ws = new Date(buckets[i].key);
+            const we = new Date(ws.getTime() + 7 * 24 * 60 * 60 * 1000);
+            if (d >= ws && d < we) return i;
+          }
+          return -1;
+        };
+
+        normalized.forEach(rec => {
+          const idx = findBucketIndex(rec.date);
+          if (idx !== -1) {
+            buckets[idx].total += 1;
+            const isPresent = rec.status === "present" || rec.status === "1" || rec.status === "true";
+            if (isPresent) buckets[idx].present += 1;
+          }
+        });
+
+        // Convert to percentages (0..100)
+        const percentages = buckets.map(b => b.total > 0 ? Math.round((b.present / b.total) * 100) : 0);
+        const labelStrings = buckets.map(b => {
+          const d = new Date(b.key);
+          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        });
+
+        // Map to SVG coordinates within 400x160, padding: left 20, right 20, top 20, bottom 20
+        const w = 400, h = 160, pad = 30;
+        const count = percentages.length || 1;
+        const step = (w - pad * 2) / (count - 1 || 1);
+        const toY = (pct) => {
+          const y = pad + (100 - Math.max(0, Math.min(100, pct))) * ((h - pad * 2) / 100);
+          return y;
+        };
+        const pts = percentages.map((pct, i) => ({ x: Math.round(pad + i * step), y: Math.round(toY(pct)) }));
+        const poly = pts.map(p => `${p.x},${p.y}`).join(" ");
+        if (isMounted) {
+          setPoints(poly || "20,140 380,140");
+          setLabels(labelStrings);
+        }
+      } catch (e) {
+        if (isMounted) setError("Failed to load attendance trend");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    load();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Chart dims (wide so it scales to the card width via viewBox)
+  const w = 1200, h = 380, pad = 60;
+  const baselineY = h - pad;
+
+  // Build area path from points string
+  const pts = points.split(" ").map(s => s.split(",").map(n => parseInt(n, 10)));
+  let areaD = "";
+  if (pts.length > 0) {
+    areaD = `M ${pts[0][0]} ${baselineY} ` + pts.map(p => `L ${p[0]} ${p[1]}`).join(" ") + ` L ${pts[pts.length-1][0]} ${baselineY} Z`;
+  }
+
   return (
-    <svg width="100%" height="160" viewBox="0 0 400 160">
-      <rect x="0" y="0" width="400" height="160" rx="16" fill="#232b4d" />
-      <polyline
-        fill="none"
-        stroke="#5e72e4"
-        strokeWidth="4"
-        points="20,140 70,120 120,100 170,110 220,80 270,60 320,40 380,30"
-      />
-      <text x="30" y="30" fill="#fff" fontSize="18" fontWeight="bold">Attendance Trend</text>
+    <svg width="100%" height="380" viewBox={`0 0 ${w} ${h}`}>
+      <rect x="0" y="0" width={w} height={h} rx="16" fill="#232b4d" />
+
+      {/* grid lines */}
+      {[0,25,50,75,100].map((v,i)=>{
+        const y = pad + (100 - v) * ((h - pad*2)/100);
+        return <g key={i}>
+          <line x1={pad} y1={y} x2={w-pad} y2={y} stroke="#2e355a" strokeWidth="1.25" />
+          <text x={pad-12} y={y+5} fill="#7c86ad" fontSize="12" textAnchor="end">{v}</text>
+        </g>;
+      })}
+
+      {/* axes */}
+      <line x1={pad} y1={h-pad} x2={w-pad} y2={h-pad} stroke="#3a3f66" strokeWidth="2" />
+      <line x1={pad} y1={pad} x2={pad} y2={h-pad} stroke="#3a3f66" strokeWidth="2" />
+
+      {/* area fill */}
+      {areaD && <path d={areaD} fill="#5e72e4" opacity="0.2" />}
+      {/* line */}
+      <polyline fill="none" stroke="#5e72e4" strokeWidth="5" points={points} />
+
+      {/* x labels */}
+      {labels.map((lab, i)=>{
+        const x = pad + i*((w-pad*2)/Math.max(1,labels.length-1));
+        return <text key={i} x={x} y={h-10} fill="#b0b7d3" fontSize="12" textAnchor="middle">{lab}</text>;
+      })}
+
+      {/* legend - upper right */}
+      {(() => {
+        const lx = w - pad - 170; // anchor near top-right within padding
+        const ly = pad - 48; // lift legend even higher
+        return (
+          <g>
+            <rect x={lx-10} y={ly-8} width={170} height={64} rx={8} fill="#2a3154" opacity="0.35" />
+            <rect x={lx} y={ly} width="12" height="12" fill="#5e72e4" rx="2" />
+            <text x={lx+18} y={ly+10} fill="#fff" fontSize="13" fontWeight="600">Present</text>
+            <text x={lx+120} y={ly+10} fill="#b0b7d3" fontSize="13" textAnchor="end">{summary.present}</text>
+
+            <rect x={lx} y={ly+22} width="12" height="12" fill="#f5365c" rx="2" />
+            <text x={lx+18} y={ly+32} fill="#fff" fontSize="13" fontWeight="600">Absent</text>
+            <text x={lx+120} y={ly+32} fill="#b0b7d3" fontSize="13" textAnchor="end">{summary.absent}</text>
+
+            <rect x={lx} y={ly+44} width="12" height="12" fill="#ff9f43" rx="2" />
+            <text x={lx+18} y={ly+54} fill="#fff" fontSize="13" fontWeight="600">Late</text>
+            <text x={lx+120} y={ly+54} fill="#b0b7d3" fontSize="13" textAnchor="end">{summary.late}</text>
+          </g>
+        );
+      })()}
+
+      {loading && <text x="24" y="40" fill="#b0b7d3" fontSize="12">Loading...</text>}
+      {error && <text x="24" y="40" fill="#f5365c" fontSize="12">{error}</text>}
     </svg>
   );
 }

@@ -1095,6 +1095,31 @@ class ApiService {
     });
   }
 
+  // Teacher Get Draft Posts Only
+  async getClassroomStreamDrafts(classCode) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/drafts`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher Get Scheduled Posts Only
+  async getClassroomStreamScheduled(classCode) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/scheduled`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher Update Draft Post (can also publish or schedule)
+  async updateClassroomStreamDraft(classCode, draftId, postData) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/draft/${draftId}`, {
+      method: 'PUT',
+      body: JSON.stringify(postData),
+      requireAuth: true,
+    });
+  }
+
   // Teacher Create Classroom Stream Post API
   async createClassroomStreamPost(classCode, postData) {
     // Support both JSON and FormData payloads
@@ -1102,6 +1127,14 @@ class ApiService {
     return this.makeRequest(`/teacher/classroom/${classCode}/stream`, {
       method: 'POST',
       body: isForm ? postData : JSON.stringify(postData),
+      requireAuth: true,
+    });
+  }
+
+  // Teacher Delete Classroom Stream Post API
+  async deleteClassroomStreamPost(classCode, postId) {
+    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}`, {
+      method: 'DELETE',
       requireAuth: true,
     });
   }

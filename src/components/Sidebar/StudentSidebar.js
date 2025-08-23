@@ -49,6 +49,8 @@ import {
   Col,
 } from "reactstrap";
 import apiService from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 
 var ps;
 
@@ -59,6 +61,23 @@ const StudentSidebar = (props) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await apiService.getProfile();
+        if (res && res.status && res.data) setUserProfile(res.data);
+      } catch (e) {}
+    };
+    fetchProfile();
+  }, []);
+
+  const currentUser = userProfile || user;
+  const profilePictureUrl = getProfilePictureUrl(currentUser);
+  const userInitials = getUserInitials(currentUser);
+  const avatarColor = getAvatarColor(currentUser);
   
   const activeRoute = (routeName) => {
     return props.location.pathname.indexOf(routeName) > -1 ? "active" : "";
@@ -291,10 +310,33 @@ const StudentSidebar = (props) => {
             <DropdownToggle nav>
               <Media className="align-items-center">
                 <span className="avatar avatar-sm rounded-circle">
-                  <img
-                    alt="..."
-                    src={require("../../assets/img/theme/team-1-800x800.jpg")}
-                  />
+                  {profilePictureUrl ? (
+                    <img
+                      alt="Profile"
+                      src={profilePictureUrl}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    style={{
+                      display: profilePictureUrl ? "none" : "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      backgroundColor: avatarColor,
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      borderRadius: "50%"
+                    }}
+                  >
+                    {userInitials}
+                  </span>
                 </span>
               </Media>
             </DropdownToggle>
@@ -311,7 +353,7 @@ const StudentSidebar = (props) => {
                 <span>Settings</span>
               </DropdownItem>
               <DropdownItem divider />
-              <DropdownItem href="#pablo" onClick={(e) => e.preventDefault()}>
+              <DropdownItem href="#logout" onClick={async (e) => { e.preventDefault(); await logout(); }}>
                 <i className="ni ni-user-run" />
                 <span>Logout</span>
               </DropdownItem>

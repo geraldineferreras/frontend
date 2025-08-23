@@ -102,8 +102,9 @@ const AdminNavbar = (props) => {
       >
         <Container fluid>
           <Link
-            className="h4 mb-0 text-white text-uppercase d-none d-lg-inline-block"
+            className="h4 mb-0 text-white text-uppercase"
             to="/"
+            style={{ display: 'flex', alignItems: 'center', marginLeft: 20 }}
           >
             {props.brandText}
           </Link>
@@ -175,7 +176,7 @@ const AdminNavbar = (props) => {
                   </Media>
                 </Media>
               </DropdownToggle>
-              <DropdownMenu className="dropdown-menu-arrow" right>
+              <DropdownMenu className="dropdown-menu-arrow" right style={{ position: 'fixed', top: 70, right: 8, zIndex: 2147483646 }}>
                 <DropdownItem className="noti-title" header tag="div">
                   <h6 className="text-overflow m-0">Welcome, {currentUser?.full_name || currentUser?.name || 'User'}!</h6>
                 </DropdownItem>
@@ -188,10 +189,7 @@ const AdminNavbar = (props) => {
                   <span>Settings</span>
                 </DropdownItem>
                 <DropdownItem divider />
-                <DropdownItem href="#pablo" onClick={(e) => {
-                  e.preventDefault();
-                  logout();
-                }}>
+                <DropdownItem href="#logout" onClick={async (e) => { e.preventDefault(); await logout(); }}>
                   <i className="ni ni-user-run" />
                   <span>Logout</span>
                 </DropdownItem>

@@ -191,10 +191,14 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       if (token) {
-        await ApiService.logout();
+        try {
+          await ApiService.logout();
+        } catch (apiErr) {
+          console.warn('Logout API call failed or unavailable, proceeding to clear session:', apiErr?.message || apiErr);
+        }
       }
       // Also sign out from Google
-      await googleAuthService.signOut();
+      try { await googleAuthService.signOut(); } catch (_) {}
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -203,8 +207,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('scms_logged_in_user');
       setUser(null);
       setToken(null);
-      // Navigate to login page
-      window.location.href = '/auth/login';
+      // Navigate to login page (use replace to avoid back navigation into protected pages)
+      try {
+        window.location.replace('/auth/login');
+      } catch (_) {
+        window.location.href = '/auth/login';
+      }
     }
   };
 

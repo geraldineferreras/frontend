@@ -163,6 +163,8 @@
     padding: 0.75rem 1.5rem;
     font-size: 0.9rem;
   }
+  .classroom-actions { width: 100%; }
+  .classroom-actions .btn-lg { width: 100%; justify-content: center; }
 }
 
 /* Loading states */

@@ -16,9 +16,12 @@
 
 */
 /*eslint-disable*/
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, NavLink as NavLinkRRD } from "react-router-dom";
 import { PropTypes } from "prop-types";
+import { useAuth } from "../../contexts/AuthContext";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import ApiService from "../../services/api";
 import {
   Button,
   Card,
@@ -55,7 +58,6 @@ var ps;
 const teacherModules = [
   { name: "Dashboard", icon: "ni ni-tv-2 text-primary", path: "/index" },
   { name: "Classroom", icon: "ni ni-building text-success", path: "/classroom" },
-  { name: "Video Conferencing", icon: "ni ni-camera-compact text-purple", path: "/video-conferencing" },
   { name: "Attendance", icon: "ni ni-check-bold text-green", path: "/attendance" },
   { name: "Excuse Management", icon: "ni ni-single-copy-04 text-pink", path: "/excuse-management" },
   { name: "Notifications", icon: "ni ni-notification-70 text-info", path: "/notifications" },
@@ -63,6 +65,27 @@ const teacherModules = [
 
 const TeacherSidebar = (props) => {
   const [collapseOpen, setCollapseOpen] = useState();
+  const { user, logout } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await ApiService.getProfile();
+        if (res && res.status && res.data) {
+          setUserProfile(res.data);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const currentUser = userProfile || user;
+  const profilePictureUrl = getProfilePictureUrl(currentUser);
+  const userInitials = getUserInitials(currentUser);
+  const avatarColor = getAvatarColor(currentUser);
   const activeRoute = (routeName) => {
     return props.location.pathname.indexOf(routeName) > -1 ? "active" : "";
   };
@@ -142,14 +165,37 @@ const TeacherSidebar = (props) => {
             <DropdownToggle nav>
               <Media className="align-items-center">
                 <span className="avatar avatar-sm rounded-circle">
-                  <img
-                    alt="..."
-                    src={require("../../assets/img/theme/team-1-800x800.jpg")}
-                  />
+                  {profilePictureUrl ? (
+                    <img
+                      alt="Profile"
+                      src={profilePictureUrl}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    style={{
+                      display: profilePictureUrl ? "none" : "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      backgroundColor: avatarColor,
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      borderRadius: "50%"
+                    }}
+                  >
+                    {userInitials}
+                  </span>
                 </span>
               </Media>
             </DropdownToggle>
-            <DropdownMenu className="dropdown-menu-arrow" right>
+            <DropdownMenu className="dropdown-menu-arrow" right style={{ zIndex: 2147483646 }}>
               <DropdownItem className="noti-title" header tag="div">
                 <h6 className="text-overflow m-0">Welcome!</h6>
               </DropdownItem>
@@ -162,7 +208,7 @@ const TeacherSidebar = (props) => {
                 <span>Settings</span>
               </DropdownItem>
               <DropdownItem divider />
-              <DropdownItem href="#pablo" onClick={(e) => e.preventDefault()}>
+              <DropdownItem href="#logout" onClick={async (e) => { e.preventDefault(); await logout(); }}>
                 <i className="ni ni-user-run" />
                 <span>Logout</span>
               </DropdownItem>

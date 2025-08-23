@@ -4,8 +4,9 @@ import {
 } from "reactstrap";
 import { FaCheck, FaTimes, FaEye, FaSearch, FaFileImage, FaUser, FaCheckCircle } from "react-icons/fa";
 import LottieLoader from "components/LottieLoader";
-import apiService from "../../services/api";
 import useMinDelay from "utils/useMinDelay";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import apiService from "../../services/api";
 
 const ExcuseManagement = () => {
   const [selectedClass, setSelectedClass] = useState("");
@@ -22,6 +23,7 @@ const ExcuseManagement = () => {
   const [error, setError] = useState("");
   const [teacherNotes, setTeacherNotes] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [studentAvatars, setStudentAvatars] = useState({}); // cache: student_id -> absolute image URL or null
 
   // Load excuse letters on component mount
   useEffect(() => {
@@ -85,6 +87,36 @@ const ExcuseManagement = () => {
       setLoading(false);
     }
   };
+
+  // Fetch missing avatars for students in the current excuses list
+  useEffect(() => {
+    const fetchMissingAvatars = async () => {
+      try {
+        const ids = [...new Set((excuses || []).map(e => e.student_id).filter(Boolean))];
+        const missing = ids.filter(id => !(id in studentAvatars));
+        if (missing.length === 0) return;
+
+        const results = await Promise.all(missing.map(async (id) => {
+          try {
+            const res = await apiService.getUserById(id, 'student');
+            const user = res?.data || res || {};
+            const url = getProfilePictureUrl(user);
+            return [id, url || null];
+          } catch (err) {
+            return [id, null];
+          }
+        }));
+
+        const mapUpdate = {};
+        results.forEach(([id, url]) => { mapUpdate[id] = url; });
+        setStudentAvatars(prev => ({ ...prev, ...mapUpdate }));
+      } catch (e) {
+        // ignore avatar fetch errors to avoid blocking UI
+      }
+    };
+
+    fetchMissingAvatars();
+  }, [excuses]);
 
   // Filter logic
   const filteredExcuses = excuses.filter(e => {
@@ -518,15 +550,16 @@ const ExcuseManagement = () => {
                 </div>
               </div>
 
-              <Table className="align-items-center table-flush" style={{ width: '100%', minWidth: 'auto' }}>
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <Table className="align-items-center table-flush" style={{ width: '100%', tableLayout: 'auto' }}>
                 <thead className="thead-light">
                   <tr>
-                    <th scope="col" className="text-uppercase text-muted" style={{ width: '35%' }}>Student</th>
+                    <th scope="col" className="text-uppercase text-muted">Student</th>
                     <th scope="col" className="text-uppercase text-muted d-none d-sm-table-cell" style={{ width: '12%' }}>Date</th>
                     <th scope="col" className="text-uppercase text-muted d-none d-md-table-cell" style={{ width: '18%' }}>Reason</th>
                     <th scope="col" className="text-uppercase text-muted d-none d-lg-table-cell" style={{ width: '10%' }}>Attachment</th>
-                    <th scope="col" className="text-uppercase text-muted" style={{ width: '10%' }}>Status</th>
-                    <th scope="col" className="text-uppercase text-muted" style={{ width: '15%' }}>Actions</th>
+                    <th scope="col" className="text-uppercase text-muted" style={{ width: '1%', whiteSpace: 'nowrap' }}>Status</th>
+                    <th scope="col" className="text-uppercase text-muted" style={{ width: '1%', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -538,26 +571,30 @@ const ExcuseManagement = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredExcuses.map(e => (
+                    filteredExcuses.map(e => {
+                      const studentUser = {
+                        full_name: e.student_name,
+                        name: e.student_name,
+                        profile_image_url: e.profile_image_url || e.google_profile_image_url,
+                        profile_pic: e.profile_pic || e.student_profile_pic || e.user_profile_pic || e.profile_picture
+                      };
+                      const resolvedFromRow = getProfilePictureUrl(studentUser);
+                      const avatarUrl = studentAvatars[e.student_id] || resolvedFromRow;
+                      const initials = getUserInitials(studentUser);
+                      const avatarBg = getAvatarColor(studentUser);
+                      return (
                       <tr key={e.letter_id} className={getRowClass(e.status)}>
-                        <td style={{ maxWidth: '0', width: '35%' }}>
-                          <div className="media align-items-center">
-                            <div
-                              className="bg-gradient-primary mr-3"
-                              style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}
-                            >
-                              <i className="fas fa-user text-white" style={{ fontSize: '16px' }}></i>
+                        <td>
+                          <div className="media align-items-center" style={{ flexWrap: 'nowrap' }}>
+                            <div className="mr-3" style={{ width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: avatarUrl ? 'transparent' : avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #e9ecef' }}>
+                              {avatarUrl ? (
+                                <img src={avatarUrl} alt={e.student_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(ev) => { ev.currentTarget.remove(); }} />
+                              ) : (
+                                <span style={{ color: '#fff', fontWeight: 700, fontSize: 12 }}>{initials}</span>
+                              )}
                             </div>
-                            <div className="media-body" style={{ minWidth: '0', overflow: 'hidden' }}>
-                              <span className="font-weight-bold text-dark d-block" style={{ wordBreak: 'break-word', lineHeight: '1.2' }}>{e.student_name}</span>
+                            <div className="media-body" style={{ minWidth: 0, overflow: 'hidden' }}>
+                              <span className="font-weight-bold text-dark d-block" style={{ lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.student_name}</span>
                               <div className="text-muted small">ID: {e.student_id}</div>
                               <div className="text-muted small">Section: {e.section_name}</div>
                               {/* Mobile-only info */}
@@ -583,10 +620,10 @@ const ExcuseManagement = () => {
                             </Button>
                           )}
                         </td>
-                        <td style={{ width: '10%' }}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           <Badge color={statusColors[e.status]} className="badge-pill">{e.status}</Badge>
                         </td>
-                        <td style={{ width: '15%' }}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           <div className="d-flex flex-column flex-sm-row gap-1">
                             {e.status === "pending" && (
                               <>
@@ -607,10 +644,11 @@ const ExcuseManagement = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
+                    )})
                   )}
                 </tbody>
               </Table>
+              </div>
             </CardBody>
           </Card>
         )}

@@ -257,19 +257,50 @@ export const NotificationProvider = ({ children }) => {
       try {
         const data = await notificationService.getRecentNotifications();
         data.forEach((item) => {
-          // Normalize to expected shape
-          addNotification({
-            id: item.id,
-            type: item.type || 'info',
-            title: item.title,
-            message: item.message,
-            timestamp: item.created_at || Date.now(),
-            data: item.data,
-            link: item.data?.link,
-          });
-          // Also surface OS and sound cues during polling fallback
-          maybeDesktopNotify(item);
-          maybePlaySound(item.type || 'info');
+          const scheduledAtCandidate = (
+            item?.data?.scheduled_at ||
+            item?.scheduled_at ||
+            item?.data?.post?.scheduled_at ||
+            item?.post?.scheduled_at ||
+            null
+          );
+
+          const notifyNow = () => {
+            addNotification({
+              id: item.id,
+              type: item.type || 'info',
+              title: item.title,
+              message: item.message,
+              timestamp: item.created_at || Date.now(),
+              data: item.data,
+              link: item.data?.link,
+            });
+            maybeDesktopNotify(item);
+            maybePlaySound(item.type || 'info');
+          };
+
+          if (scheduledAtCandidate) {
+            const parseSqlLocal = (dateTimeStr) => {
+              try {
+                const [d, t] = String(dateTimeStr).split(' ');
+                if (!d || !t) return new Date(dateTimeStr);
+                const [y, m, day] = d.split('-').map(n => parseInt(n, 10));
+                const [hh, mm, ss] = t.split(':').map(n => parseInt(n, 10));
+                return new Date(y, (m - 1), day, hh, mm, ss || 0);
+              } catch (_) {
+                return new Date(dateTimeStr);
+              }
+            };
+            const publishTime = parseSqlLocal(scheduledAtCandidate);
+            const now = new Date();
+            if (publishTime instanceof Date && !isNaN(publishTime) && publishTime > now) {
+              const delayMs = Math.min(24 * 60 * 60 * 1000, publishTime.getTime() - now.getTime());
+              console.log('[Notifications][Polling] Deferring notification until scheduled time:', publishTime.toString());
+              setTimeout(notifyNow, Math.max(0, delayMs));
+              return; // skip immediate
+            }
+          }
+          notifyNow();
         });
       } catch (_) {
         // ignore
@@ -297,6 +328,56 @@ export const NotificationProvider = ({ children }) => {
       // addNotification({ type: 'error', message: 'Notification stream closed' });
     });
     const unsubNotification = svc.on('notification', async (data) => {
+      try {
+        // Defer or suppress ANY stream/announcement notification for scheduled posts
+        // Probe common fields in payload
+        const scheduledAtCandidate = (
+          data?.data?.scheduled_at ||
+          data?.scheduled_at ||
+          data?.data?.post?.scheduled_at ||
+          data?.post?.scheduled_at ||
+          null
+        );
+        const isScheduledFlag = (
+          data?.data?.is_scheduled === 1 || data?.data?.is_scheduled === '1' ||
+          data?.is_scheduled === 1 || data?.is_scheduled === '1' ||
+          data?.data?.post?.is_scheduled === 1 || data?.data?.post?.is_scheduled === '1' ||
+          data?.post?.is_scheduled === 1 || data?.post?.is_scheduled === '1'
+        );
+
+        if (scheduledAtCandidate) {
+          const parseSqlLocal = (dateTimeStr) => {
+            try {
+              const [d, t] = String(dateTimeStr).split(' ');
+              if (!d || !t) return new Date(dateTimeStr);
+              const [y, m, day] = d.split('-').map(n => parseInt(n, 10));
+              const [hh, mm, ss] = t.split(':').map(n => parseInt(n, 10));
+              return new Date(y, (m - 1), day, hh, mm, ss || 0);
+            } catch (_) {
+              return new Date(dateTimeStr);
+            }
+          };
+          const publishTime = parseSqlLocal(scheduledAtCandidate);
+          const now = new Date();
+          if (publishTime instanceof Date && !isNaN(publishTime) && publishTime > now) {
+            const delayMs = Math.min(24 * 60 * 60 * 1000, publishTime.getTime() - now.getTime());
+            console.log('[Notifications] Deferring notification until scheduled time:', publishTime.toString());
+            setTimeout(() => {
+              addNotification(data);
+              maybeDesktopNotify(data);
+              maybePlaySound(data.type || 'info');
+            }, Math.max(0, delayMs));
+            return; // skip immediate notify
+          }
+        }
+        // If marked as scheduled but no scheduled_at present, suppress immediate notification
+        if (isScheduledFlag && !scheduledAtCandidate) {
+          console.log('[Notifications] Suppressing immediate notification for scheduled post without scheduled_at');
+          return;
+        }
+      } catch (e) {
+        console.warn('[Notifications] Scheduled notification handling failed, showing immediately:', e?.message || e);
+      }
       addNotification(data);
       maybeDesktopNotify(data);
       maybePlaySound(data.type || 'info');

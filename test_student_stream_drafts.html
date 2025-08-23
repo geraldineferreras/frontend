@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Student Stream Drafts</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        button { padding: 8px 15px; margin: 5px; cursor: pointer; }
+        input, textarea { margin: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        textarea { width: 300px; height: 80px; }
+    </style>
+</head>
+<body>
+    <h1>Student Stream Drafts API Test</h1>
+    
+    <div class="test-section">
+        <h3>Authentication</h3>
+        <input type="text" id="jwtToken" placeholder="Enter JWT Token" style="width: 400px;">
+        <button onclick="setToken()">Set Token</button>
+        <div id="tokenResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Create Student Draft</h3>
+        <input type="text" id="classCode" placeholder="Class Code (e.g., A4V9TE)" value="A4V9TE">
+        <br>
+        <input type="text" id="draftTitle" placeholder="Draft Title" value="Test Draft">
+        <br>
+        <textarea id="draftContent" placeholder="Draft Content">This is a test draft content.</textarea>
+        <br>
+        <button onclick="createDraft()">Create Draft</button>
+        <div id="createResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Get Student Drafts</h3>
+        <button onclick="getDrafts()">Get Drafts</button>
+        <div id="draftsResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Get Student Scheduled Posts</h3>
+        <button onclick="getScheduled()">Get Scheduled Posts</button>
+        <div id="scheduledResult" class="result"></div>
+    </div>
+
+    <script>
+        let token = '';
+        const BASE_URL = 'http://localhost/scms_new_backup/index.php/api';
+
+        function setToken() {
+            token = document.getElementById('jwtToken').value;
+            document.getElementById('tokenResult').innerHTML = token ? 
+                '<span class="success">Token set successfully</span>' : 
+                '<span class="error">Please enter a token</span>';
+        }
+
+        async function makeRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${BASE_URL}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        ...options.headers
+                    }
+                });
+
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function createDraft() {
+            const classCode = document.getElementById('classCode').value;
+            const title = document.getElementById('draftTitle').value;
+            const content = document.getElementById('draftContent').value;
+
+            if (!token) {
+                document.getElementById('createResult').innerHTML = '<span class="error">Please set JWT token first</span>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('is_draft', '1');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('allow_comments', '1');
+
+            const result = await makeRequest(`/student/classroom/${classCode}/stream`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const resultDiv = document.getElementById('createResult');
+            if (result.success) {
+                resultDiv.innerHTML = `<span class="success">Draft created successfully!</span><br>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                resultDiv.innerHTML = `<span class="error">Error: ${result.error || result.data?.message || 'Unknown error'}</span><br>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>`;
+            }
+        }
+
+        async function getDrafts() {
+            const classCode = document.getElementById('classCode').value;
+
+            if (!token) {
+                document.getElementById('draftsResult').innerHTML = '<span class="error">Please set JWT token first</span>';
+                return;
+            }
+
+            const result = await makeRequest(`/student/classroom/${classCode}/stream/drafts`);
+
+            const resultDiv = document.getElementById('draftsResult');
+            if (result.success) {
+                resultDiv.innerHTML = `<span class="success">Drafts fetched successfully!</span><br>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                resultDiv.innerHTML = `<span class="error">Error: ${result.error || result.data?.message || 'Unknown error'}</span><br>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>`;
+            }
+        }
+
+        async function getScheduled() {
+            const classCode = document.getElementById('classCode').value;
+
+            if (!token) {
+                document.getElementById('scheduledResult').innerHTML = '<span class="error">Please set JWT token first</span>';
+                return;
+            }
+
+            const result = await makeRequest(`/student/classroom/${classCode}/stream/scheduled`);
+
+            const resultDiv = document.getElementById('scheduledResult');
+            if (result.success) {
+                resultDiv.innerHTML = `<span class="success">Scheduled posts fetched successfully!</span><br>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                resultDiv.innerHTML = `<span class="error">Error: ${result.error || result.data?.message || 'Unknown error'}</span><br>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>

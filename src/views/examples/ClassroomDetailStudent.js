@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, Tooltip, Alert } from "reactstrap";
+import { Row, Col, Badge, Button, Input, Modal, ModalHeader, ModalBody, ModalFooter, Tooltip, Alert } from "reactstrap";
 import LottieLoader from "components/LottieLoader";
 
 
@@ -269,7 +269,7 @@ const ClassroomDetailStudent = () => {
       }
     } catch (_) {}
   }, []);
-  const [activeStreamTab, setActiveStreamTab] = useState(null); // 'scheduled' | 'drafts' | null
+
   const [announcement, setAnnouncement] = useState("");
   const [expandedId, setExpandedId] = useState(7);
   const [gradeFilter, setGradeFilter] = useState("All");
@@ -293,6 +293,10 @@ const ClassroomDetailStudent = () => {
   const [attachmentDropdownOpenId, setAttachmentDropdownOpenId] = useState(null); // id of announcement or 'new' for new post
   const attachmentMenuRef = useRef();
   const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+  
+  // Add current user profile state for conditional menu rendering
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+
   const notifyUnderDevelopment = () => {
     try {
       addNotification({
@@ -320,6 +324,12 @@ const ClassroomDetailStudent = () => {
   // Add emoji picker state and emoji list
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef();
+  
+  // Student post functionality state
+
+
+
+
 
   const emojiList = [
     "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗", "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😟", "😤", "😢", "😭", "😦", "😧", "😨", "😩", "🤯", "😬", "😰", "😱", "🥵", "🥶", "😳", "🤪", "😵", "😡", "😠", "🤬", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "😇", "🥳", "🥺", "🤠", "🥸", "😈", "👿", "👹", "👺", "💀", "👻", "👽", "🤖", "💩", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
@@ -366,6 +376,21 @@ const ClassroomDetailStudent = () => {
       return () => { if (typeof previewAttachment.file !== 'string') URL.revokeObjectURL(url); };
     }
   }, [previewAttachment]);
+
+  // Fetch current user profile for conditional menu rendering
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await apiService.getCurrentUser();
+        if (isMounted && res && (res.status === true || res.success === true) && (res.data || res.user)) {
+          const data = res.data || res.user;
+          setCurrentUserProfile(data);
+        }
+      } catch (_) {}
+    })();
+    return () => { isMounted = false; };
+  }, []);
   
   useEffect(() => {
     const audio = audioRef.current;
@@ -716,6 +741,12 @@ const ClassroomDetailStudent = () => {
     }
   };
 
+
+
+  
+
+
+
   // Add state for comment input and emoji picker per announcement
   const [commentInputs, setCommentInputs] = useState({}); // { [announcementId]: value }
   const [showCommentEmojiPicker, setShowCommentEmojiPicker] = useState({}); // { [announcementId]: bool }
@@ -733,6 +764,12 @@ const ClassroomDetailStudent = () => {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showCommentEmojiPicker]);
+
+
+
+
+
+
 
   function handleCommentInputChange(announcementId, value) {
     setCommentInputs(inputs => ({ ...inputs, [announcementId]: value }));
@@ -815,8 +852,61 @@ const ClassroomDetailStudent = () => {
             .replace('/api', '')
             .replace(/\/$/, '');
 
+          // Helper: parse "YYYY-MM-DD HH:mm:ss" as local date
+          const parseSqlLocal = (dateTimeStr) => {
+            if (!dateTimeStr || typeof dateTimeStr !== 'string') return null;
+            try {
+              const [d, t] = dateTimeStr.split(' ');
+              if (!d || !t) return null;
+              const [y, m, day] = d.split('-').map(n => parseInt(n, 10));
+              const [hh, mm, ss] = t.split(':').map(n => parseInt(n, 10));
+              return new Date(y, (m - 1), day, hh, mm, ss || 0);
+            } catch (_) {
+              return new Date(dateTimeStr);
+            }
+          };
+
+          // Fetch scheduled posts and include only those due and visible to current student
+          let combinedData = res.data.data;
+          try {
+            const scheduledRes = await apiService.getClassroomStreamScheduled(code);
+            if (scheduledRes?.status && Array.isArray(scheduledRes.data)) {
+              let currentStudentId = null;
+              try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                  const parsedUser = JSON.parse(storedUser);
+                  currentStudentId = parsedUser.id || parsedUser.user_id || parsedUser.userId || parsedUser.uid || parsedUser._id || null;
+                }
+              } catch (_) {}
+
+              const now = new Date();
+              const dueScheduled = scheduledRes.data.filter((item) => {
+                if (!item || !item.scheduled_at) return false;
+                const scheduleTime = parseSqlLocal(item.scheduled_at);
+                if (!scheduleTime || scheduleTime > now) return false; // only include posts due now or earlier
+
+                // Visibility: if no student_ids, visible to all; otherwise must include current student
+                const sid = item.student_ids;
+                if (!sid || sid === 'null' || sid === '[]') return true;
+                try {
+                  const arr = Array.isArray(sid) ? sid : JSON.parse(sid);
+                  return Array.isArray(arr) && arr.map(String).includes(String(currentStudentId));
+                } catch (_) {
+                  return false;
+                }
+              });
+
+              if (Array.isArray(dueScheduled) && dueScheduled.length > 0) {
+                combinedData = [...combinedData, ...dueScheduled];
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to fetch scheduled posts for student stream:', e?.message || e);
+          }
+
           // Map API data to UI structure
-          const mapped = res.data.data.map((item) => {
+          const mapped = combinedData.map((item) => {
             let attachments = [];
 
             // 1) Prefer explicit attachments array from API
@@ -868,13 +958,16 @@ const ClassroomDetailStudent = () => {
               }
             }
 
+            // Prefer scheduled_at as the visible date if present (so scheduled posts sort by publish time)
+            const effectiveDate = item.scheduled_at || item.created_at;
+
             return {
               id: item.id,
               title: item.title || '',
               content: item.content || '',
               author: item.user_name || 'Unknown',
               avatar: item.user_avatar ? `${base}/${String(item.user_avatar).replace(/\\/g, '/')}` : undefined,
-              date: item.created_at,
+              date: effectiveDate,
               isPinned: item.is_pinned === '1' || item.is_pinned === 1,
               reactions: { like: item.like_count || 0, likedBy: [] },
               comments: [],
@@ -936,6 +1029,9 @@ const ClassroomDetailStudent = () => {
       }
     }
     fetchAnnouncements();
+    // Auto-refresh student stream every 60s to pick up newly-published scheduled posts
+    const refreshId = setInterval(fetchAnnouncements, 60000);
+    return () => clearInterval(refreshId);
   }, []);
 
   const sortedAnnouncements = [
@@ -959,10 +1055,16 @@ const ClassroomDetailStudent = () => {
   const [classroomMembersError, setClassroomMembersError] = useState(null);
   
   const getAvatarForUser = (user) => {
-    if (user.profile_pic) {
-      return `http://localhost/scms_new_backup/${user.profile_pic.replace(/\\/g, "/")}`;
+    if (!user) return null;
+    
+    // Use the imported getProfilePictureUrl utility for proper URL handling
+    const profilePictureUrl = getProfilePictureUrl(user);
+    if (profilePictureUrl) {
+      return profilePictureUrl;
     }
-    return "https://randomuser.me/api/portraits/men/75.jpg";
+    
+    // Fallback to default avatar if no profile picture
+    return null;
   };
 
   // Find a classroom member (teacher or student) by name for avatar resolution
@@ -1499,7 +1601,7 @@ const ClassroomDetailStudent = () => {
           </div>
           <div className="mt-2">
             <Badge color="light" className="text-dark me-2">{currentClass.semester}</Badge>
-            <Badge color="light" className="text-dark">{currentClass.schoolYear}</Badge>
+            <Badge color="light" className="text-dark" style={{ marginLeft: 8 }}>{currentClass.schoolYear}</Badge>
           </div>
         </div>
 
@@ -1542,279 +1644,10 @@ const ClassroomDetailStudent = () => {
           <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 8px 32px rgba(50,76,221,0.10)', border: '1.5px solid #e9ecef', padding: 32, marginBottom: 24 }}>
             <div style={{ fontWeight: 800, color: '#324cdd', letterSpacing: 1, marginBottom: 10, display: 'flex', alignItems: 'center', fontSize: '13px' }}>
               <i className="ni ni-chat-round" style={{ fontSize: 18, marginRight: 6, color: '#2096ff' }} /> Stream
-            </div>
-            {/* Scheduled/Drafts toggles (clickable, outlined style) */}
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => { notifyUnderDevelopment(); setActiveStreamTab(activeStreamTab === 'scheduled' ? null : 'scheduled'); }}
-                style={{
-                  borderRadius: 8,
-                  fontWeight: 500,
-                  padding: '6px 18px',
-                  minHeight: 'auto',
-                  lineHeight: 1.2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: activeStreamTab === 'scheduled' ? '#1976d2' : '#fff',
-                  color: activeStreamTab === 'scheduled' ? '#fff' : '#222',
-                  border: '1.5px solid #222',
-                  boxShadow: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <i className="fa fa-calendar" style={{ fontSize: 18, marginRight: 6, color: activeStreamTab === 'scheduled' ? '#fff' : '#222' }} /> Scheduled
-              </button>
-              <button
-                type="button"
-                onClick={() => { notifyUnderDevelopment(); setActiveStreamTab(activeStreamTab === 'drafts' ? null : 'drafts'); }}
-                style={{
-                  borderRadius: 8,
-                  fontWeight: 500,
-                  padding: '6px 18px',
-                  minHeight: 'auto',
-                  lineHeight: 1.2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: activeStreamTab === 'drafts' ? '#1976d2' : '#fff',
-                  color: activeStreamTab === 'drafts' ? '#fff' : '#222',
-                  border: '1.5px solid #222',
-                  boxShadow: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <i className="fa fa-file-alt" style={{ fontSize: 18, marginRight: 6, color: activeStreamTab === 'drafts' ? '#fff' : '#222' }} /> Drafts
-              </button>
-            </div>
-            {/* Dropdown panel for Scheduled/Drafts */}
-            {activeStreamTab === 'scheduled' && (
-              <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: 'none', marginBottom: 24, marginTop: 0, padding: '2rem 2rem 1.5rem', maxWidth: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#2d3559', marginBottom: 8 }}>Scheduled Announcements</div>
-                {loadingAnnouncements ? (
-                  <div style={{ color: '#888' }}>Loading announcements...</div>
-                ) : errorAnnouncements ? (
-                  <div style={{ color: '#ff0000' }}>{errorAnnouncements}</div>
-                ) : apiAnnouncements.length === 0 ? (
-                  <div style={{ color: '#888' }}>No announcements available.</div>
-                ) : (
-                  apiAnnouncements.map((announcement) => (
-                    <div key={announcement.id} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px' }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{announcement.title}</div>
-                      <div style={{ color: '#444', fontSize: 13, marginBottom: 10 }}>{announcement.content}</div>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Scheduled for: {new Date(announcement.date).toLocaleString()}</div>
-                      {announcement.attachments && announcement.attachments.length > 0 && (
-                        <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          {announcement.attachments.map((att, idx2) => {
-                            // Debug: Log the attachment data to see its structure
-                            console.log('Student attachment data:', att);
-                            
-                            const { preview, type, color } = getFileTypeIconOrPreview(att);
-                            console.log('getFileTypeIconOrPreview result:', { preview, type, color });
-                            
-                            let url = undefined;
-                            if (att.file && (att.file instanceof File || att.file instanceof Blob)) {
-                              url = URL.createObjectURL(att.file);
-                            } else if (att.url) {
-                              url = att.url;
-                            }
-                            const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
-                                         att.type === "link" || att.type === "youtube" || att.type === "google_drive" ||
-                                         att.type === "googledrive";
-                            console.log('isLink detection:', isLink, 'att.type:', att.type);
-                            // Ensure link URLs are absolute external URLs and remove localhost prefixes
-                            let linkUrl = att.url;
-                            
-                            if (isLink && linkUrl) {
-                              // Remove localhost prefixes if they exist
-                              if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
-                                console.log('Removed localhost prefix, new URL:', linkUrl);
-                              } else if (linkUrl.includes('localhost/')) {
-                                // Handle other localhost variations
-                                linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
-                                console.log('Removed localhost prefix, new URL:', linkUrl);
-                              }
-                              
-                              // Ensure it's a valid external URL
-                              if (!linkUrl.startsWith('http')) {
-                                // If it's a relative URL, try to construct the full URL
-                                if (linkUrl.startsWith('/')) {
-                                  linkUrl = window.location.origin + linkUrl;
-                                } else {
-                                  // If it's just a path, assume it should be an external link
-                                  console.warn('Link attachment has relative URL:', linkUrl);
-                                  linkUrl = null; // Don't open invalid URLs
-                                }
-                              }
-                            }
-                            const displayName = isLink ? (linkUrl || att.url) : att.name;
-                            return (
-                              <div
-                                key={idx2}
-                                style={{ 
-                                  background: isLink ? `${color}08` : '#fff', 
-                                  border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
-                                  borderRadius: 12, 
-                                  boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
-                                  padding: '10px 18px', 
-                                  minWidth: 220, 
-                                  maxWidth: 340, 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: 12, 
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease'
-                                }}
-                                onClick={() => {
-                                  if (isLink && linkUrl) {
-                                    window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                                  } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
-                                    // For YouTube, Google Drive, and Link types, always open in new tab
-                                    if (linkUrl) {
-                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                                    } else {
-                                      console.warn('Cannot open link: invalid URL');
-                                    }
-                                  } else {
-                                    handlePreviewAttachment(att);
-                                  }
-                                }}
-                              >
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
-                                  <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
-                                    {type}
-                                    {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
-                                    {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-            {activeStreamTab === 'drafts' && (
-              <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', border: 'none', marginBottom: 24, marginTop: 0, padding: '2rem 2rem 1.5rem', maxWidth: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#2d3559', marginBottom: 8 }}>Draft Announcements</div>
-                {draftAnnouncements.length === 0 ? (
-                  <div style={{ color: '#888' }}>No drafts saved.</div>
-                ) : (
-                  draftAnnouncements.map((announcement) => (
-                    <div key={announcement.id} style={{ background: '#f8fafd', borderRadius: 12, boxShadow: '0 2px 8px #324cdd11', marginBottom: 18, padding: '18px 24px', cursor: 'pointer' }}
-                      onClick={() => {
-                        setStudentAnnouncement(announcement.content);
-                        setAnnouncementTitle(announcement.title);
-                        setAllowComments(announcement.allowComments);
-                        setAttachments(announcement.attachments || []);
-                        setFormExpanded(true);
-                        setEditingDraftId(announcement.id);
-                        setDraftAnnouncements(draftAnnouncements.filter(d => d.id !== announcement.id));
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{announcement.title}</div>
-                      <div style={{ color: '#444', fontSize: 13, marginBottom: 10 }}>{announcement.content}</div>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Saved as draft: {new Date(announcement.date).toLocaleString()}</div>
-                                              {announcement.attachments && announcement.attachments.length > 0 && (
-                          <div style={{ margin: '10px 0 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {announcement.attachments.map((att, idx2) => {
-                              const { preview, type, color } = getFileTypeIconOrPreview(att);
-                              let url = undefined;
-                              if (att.file && (att.file instanceof File || att.file instanceof Blob)) {
-                                url = URL.createObjectURL(att.file);
-                              } else if (att.url) {
-                                url = att.url;
-                              }
-                              const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
-                                           att.type === "link" || att.type === "youtube" || att.type === "google_drive" ||
-                                           att.type === "googledrive";
-                              // Ensure link URLs are absolute external URLs and remove localhost prefixes
-                              let linkUrl = att.url;
-                              
-                              if (isLink && linkUrl) {
-                                // Remove localhost prefixes if they exist
-                                if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                  linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
-                                  console.log('Removed localhost prefix, new URL:', linkUrl);
-                                } else if (linkUrl.includes('localhost/')) {
-                                  // Handle other localhost variations
-                                  linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');
-                                  console.log('Removed localhost prefix, new URL:', linkUrl);
-                                }
-                                
-                                // Ensure it's a valid external URL
-                                if (!linkUrl.startsWith('http')) {
-                                  // If it's a relative URL, try to construct the full URL
-                                  if (linkUrl.startsWith('/')) {
-                                    linkUrl = window.location.origin + linkUrl;
-                                  } else {
-                                    // If it's just a path, assume it should be an external link
-                                    console.warn('Link attachment has relative URL:', linkUrl);
-                                    linkUrl = null; // Don't open invalid URLs
-                                  }
-                                }
-                              }
-                              const displayName = isLink ? (linkUrl || att.url) : att.name;
-                              return (
-                                <div
-                                  key={idx2}
-                                  style={{ 
-                                    background: isLink ? `${color}08` : '#fff', 
-                                    border: `1px solid ${isLink ? `${color}20` : '#e9ecef'}`,
-                                    borderRadius: 12, 
-                                    boxShadow: isLink ? `0 2px 12px ${color}15` : '0 1px 4px #e9ecef', 
-                                    padding: '10px 18px', 
-                                    minWidth: 220, 
-                                    maxWidth: 340, 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: 12, 
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                  }}
-                                  onClick={() => {
-                                    if (isLink && linkUrl) {
-                                      window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                                    } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
-                                      // For YouTube, Google Drive, and Link types, always open in new tab
-                                      if (linkUrl) {
-                                        window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                                      } else {
-                                        console.warn('Cannot open link: invalid URL');
-                                      }
-                                    } else {
-                                      handlePreviewAttachment(att);
-                                    }
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
-                                    <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
-                                      {type}
-                                      {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
-                                      {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                      </div>
+                      
+            
+            
             {/* Student Announcement Post Form */}
             {!formExpanded ? (
               <div style={{ marginBottom: 24 }}>
@@ -2014,13 +1847,35 @@ const ClassroomDetailStudent = () => {
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                  <button type="button" style={{ fontWeight: 500, borderRadius: 8, minWidth: 80, fontSize: 14, background: '#f7fafd', color: '#222', border: 'none', padding: '8px 14px', cursor: 'pointer', height: 32 }} onClick={() => { setFormExpanded(false); setStudentAnnouncement(""); setAnnouncementTitle(""); setAllowComments(true); }}>
+                  <button type="button" style={{ fontWeight: 500, borderRadius: 8, minWidth: 80, fontSize: 14, background: '#f7fafd', color: '#222', border: 'none', padding: '8px 14px', cursor: 'pointer', height: 32 }} onClick={() => { setFormExpanded(false); setStudentAnnouncement(""); setAnnouncementTitle(""); setAllowComments(true); setAttachments([]); }}>
                     Cancel
                   </button>
-                  <button type="submit" style={{ fontWeight: 600, borderRadius: 8, minWidth: 90, fontSize: 14, background: '#7b8cff', color: '#fff', border: 'none', padding: '8px 14px', cursor: studentAnnouncement.trim() ? 'pointer' : 'not-allowed', opacity: studentAnnouncement.trim() ? 1 : 0.6, height: 32 }} disabled={!studentAnnouncement.trim()}>
-                    <i className="ni ni-send" style={{ fontSize: 14, marginRight: 4 }} />
-                    Post
-                  </button>
+                  
+                  {/* Simple Post Button */}
+                    <button
+                      type="submit"
+                      style={{
+                        background: studentAnnouncement.trim() ? '#7b8cff' : '#e6e6fa',
+                        border: 'none',
+                        color: studentAnnouncement.trim() ? '#fff' : '#888',
+                        fontWeight: 600,
+                        fontSize: 14,
+                      borderRadius: '8px',
+                      padding: '8px 18px',
+                        cursor: studentAnnouncement.trim() ? 'pointer' : 'not-allowed',
+                        transition: 'background 0.15s',
+                        opacity: studentAnnouncement.trim() ? 1 : 0.6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        minWidth: 90,
+                      height: 32
+                      }}
+                      disabled={!studentAnnouncement.trim()}
+                    >
+                      <i className="ni ni-send" style={{ fontSize: 14, marginRight: 4 }} />
+                      Post
+                    </button>
                 </div>
               </form>
             )}
@@ -2042,20 +1897,27 @@ const ClassroomDetailStudent = () => {
                   <div style={{ padding: '0.75rem 1rem', position: 'relative' }}>
                     {/* Menu group in upper right (likes removed) */}
                     <div style={{ position: 'absolute', top: 16, right: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ color: '#5e6e8c', fontSize: 20, cursor: 'pointer', paddingLeft: 4, position: 'relative' }}>
-                        <i className="fa fa-ellipsis-v" onClick={() => setOpenMenuId(openMenuId === announcement.id ? null : announcement.id)} />
-                        {openMenuId === announcement.id && (
-                          <div ref={menuRef} style={{ position: 'absolute', top: 28, right: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '18px 0', minWidth: 160, zIndex: 10 }}>
-                            <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleEditClick(announcement)}>Edit</div>
-                            <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => { setOpenMenuId(null); /* handle delete here */ }}>Delete</div>
-                            {announcement.isPinned ? (
-                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleUnpin(announcement)}>Unpin</div>
-                            ) : (
-                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handlePin(announcement)}>Pin this announcement</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      {/* Only show 3-dot menu if current user is the author */}
+                      {currentUserProfile && (
+                        (currentUserProfile.full_name === announcement.author || 
+                         currentUserProfile.name === announcement.author || 
+                         currentUserProfile.user_name === announcement.author) && (
+                        <div style={{ color: '#5e6e8c', fontSize: 20, cursor: 'pointer', paddingLeft: 4, position: 'relative' }}>
+                          <i className="fa fa-ellipsis-v" onClick={() => setOpenMenuId(openMenuId === announcement.id ? null : announcement.id)} />
+                          {openMenuId === announcement.id && (
+                            <div ref={menuRef} style={{ position: 'absolute', top: 28, right: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '18px 0', minWidth: 160, zIndex: 10 }}>
+                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleEditClick(announcement)}>Edit</div>
+                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => { setOpenMenuId(null); /* handle delete here */ }}>Delete</div>
+                              {announcement.isPinned ? (
+                                <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleUnpin(announcement)}>Unpin</div>
+                              ) : (
+                                <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handlePin(announcement)}>Pin this announcement</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        )
+                      )}
                     </div>
                         {/* Inline edit form if editing */}
                     {editingAnnouncementId === announcement.id ? (
@@ -2374,15 +2236,63 @@ const ClassroomDetailStudent = () => {
                                     <div style={{ fontSize: 12, color: '#444' }}>{comment.text}</div>
                                   )}
                                 </div>
-                                <div style={{ position: 'relative', marginLeft: 8 }}>
-                                  <i className="fa fa-ellipsis-v" style={{ color: '#5e6e8c', fontSize: 18, cursor: 'pointer' }} onClick={() => handleCommentMenu(announcement.id, idx)} />
-                                  {openCommentMenu.announcementId === announcement.id && openCommentMenu.idx === idx && (
-                                    <div ref={commentMenuRef} style={{ position: 'absolute', top: 22, right: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '10px 0', minWidth: 120, zIndex: 20 }}>
-                                      <div style={{ padding: '10px 20px', cursor: 'pointer' }} onClick={() => handleCommentEdit(announcement.id, idx)}>Edit</div>
-                                      <div style={{ padding: '10px 20px', cursor: 'pointer' }} onClick={() => handleCommentDelete(announcement.id, idx)}>Delete</div>
-                                    </div>
-                                  )}
-                                </div>
+                                {/* 3-dots menu - Only show for comment authors and announcement authors */}
+                                {(() => {
+                                  // Check if current user can manage this comment
+                                  const currentUser = currentUserProfile || user || (() => {
+                                    try {
+                                      const stored = localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user');
+                                      return stored ? JSON.parse(stored) : null;
+                                    } catch (_) { return null; }
+                                  })();
+                                  
+                                  const isCommentAuthor = currentUser && (
+                                    currentUser.full_name === comment.author ||
+                                    currentUser.name === comment.author ||
+                                    currentUser.user_name === comment.author ||
+                                    loggedInName === comment.author
+                                  );
+                                  
+                                  const isAnnouncementAuthor = currentUser && (
+                                    currentUser.full_name === announcement.author ||
+                                    currentUser.name === announcement.author ||
+                                    currentUser.user_name === announcement.author ||
+                                    loggedInName === announcement.author
+                                  );
+                                  
+                                  // Show menu if user is comment author (can edit/delete) or announcement author (can delete any comment)
+                                  if (isCommentAuthor || isAnnouncementAuthor) {
+                                    // Debug logging for comment authorization
+                                    console.log('Student comment authorization:', {
+                                      commentAuthor: comment.author,
+                                      announcementAuthor: announcement.author,
+                                      currentUser: currentUser?.full_name || currentUser?.name || currentUser?.user_name || loggedInName,
+                                      loggedInName,
+                                      isCommentAuthor,
+                                      isAnnouncementAuthor,
+                                      canEdit: isCommentAuthor,
+                                      canDelete: true
+                                    });
+                                    
+                                    return (
+                                      <div style={{ position: 'relative', marginLeft: 8 }}>
+                                        <i className="fa fa-ellipsis-v" style={{ color: '#5e6e8c', fontSize: 18, cursor: 'pointer' }} onClick={() => handleCommentMenu(announcement.id, idx)} />
+                                        {openCommentMenu.announcementId === announcement.id && openCommentMenu.idx === idx && (
+                                          <div ref={commentMenuRef} style={{ position: 'absolute', top: 22, right: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '10px 0', minWidth: 120, zIndex: 20 }}>
+                                            {/* Only show Edit button for comment authors */}
+                                            {isCommentAuthor && (
+                                              <div style={{ padding: '10px 20px', cursor: 'pointer' }} onClick={() => handleCommentEdit(announcement.id, idx)}>Edit</div>
+                                            )}
+                                            {/* Show Delete button for both comment authors and announcement authors */}
+                                            <div style={{ padding: '10px 20px', cursor: 'pointer' }} onClick={() => handleCommentDelete(announcement.id, idx)}>Delete</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  // Don't show menu for others
+                                  return null;
+                                })()}
                               </div>
                             ))}
                             {/* Comment input box */}
@@ -2834,54 +2744,47 @@ const ClassroomDetailStudent = () => {
                           height: '100%',
                           background: '#dee2e6'
                         }} />
-                        {peopleData.teacher.profile_pic ? (
-                          <img
-                            src={(() => {
-                              let imageUrl;
-                              if (peopleData.teacher.profile_pic.startsWith('uploads/')) {
-                                imageUrl = `http://localhost/scms_new_backup/${peopleData.teacher.profile_pic}`;
-                              } else if (peopleData.teacher.profile_pic.startsWith('http://') || peopleData.teacher.profile_pic.startsWith('https://')) {
-                                imageUrl = peopleData.teacher.profile_pic;
-                              } else if (peopleData.teacher.profile_pic.startsWith('data:')) {
-                                imageUrl = peopleData.teacher.profile_pic;
-                              } else {
-                                imageUrl = `http://localhost/scms_new_backup/uploads/profile/${peopleData.teacher.profile_pic}`;
-                              }
-                              return imageUrl;
-                            })()}
-                            alt={peopleData.teacher.full_name}
-                            style={{
+                        {(() => {
+                          const avatarUrl = getProfilePictureUrl(peopleData.teacher);
+                          const bgColor = getAvatarColor(peopleData.teacher);
+                          const initials = getUserInitials(peopleData.teacher);
+                          return (
+                            <div style={{
                               width: '52px',
                               height: '52px',
                               borderRadius: '14px',
-                              objectFit: 'cover',
+                              background: avatarUrl ? '#e9ecef' : bgColor,
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '18px',
                               marginRight: '16px',
-                              border: '2px solid #e9ecef',
-                              marginLeft: '8px'
-                            }}
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : (
-                          <div style={{
-                            width: '52px',
-                            height: '52px',
-                            borderRadius: '14px',
-                            background: '#e9ecef',
-                            color: '#6c757d',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: '18px',
-                            marginRight: '16px',
-                            marginLeft: '8px'
-                          }}>
-                            {peopleData.teacher.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                          </div>
-                        )}
+                              marginLeft: '8px',
+                              overflow: 'hidden'
+                            }}>
+                              {avatarUrl ? (
+                                <img
+                                  src={avatarUrl}
+                                  alt={peopleData.teacher.full_name}
+                                  style={{
+                                    width: '52px',
+                                    height: '52px',
+                                    borderRadius: '14px',
+                                    objectFit: 'cover',
+                                    display: 'block'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                            </div>
+                          );
+                        })()}
                         <div style={{ flex: 1 }}>
                           <div style={{
                             fontSize: '16px',
@@ -2991,54 +2894,47 @@ const ClassroomDetailStudent = () => {
                             height: '100%',
                             background: '#dee2e6'
                           }} />
-                          {student.profile_pic ? (
-                            <img
-                              src={(() => {
-                                let imageUrl;
-                                if (student.profile_pic.startsWith('uploads/')) {
-                                  imageUrl = `http://localhost/scms_new_backup/${student.profile_pic}`;
-                                } else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
-                                  imageUrl = student.profile_pic;
-                                } else if (student.profile_pic.startsWith('data:')) {
-                                  imageUrl = student.profile_pic;
-                                } else {
-                                  imageUrl = `http://localhost/scms_new_backup/uploads/profile/${student.profile_pic}`;
-                                }
-                                return imageUrl;
-                              })()}
-                              alt={student.full_name}
-                              style={{
+                          {(() => {
+                            const avatarUrl = getProfilePictureUrl(student);
+                            const bgColor = getAvatarColor(student);
+                            const initials = getUserInitials(student);
+                            return (
+                              <div style={{
                                 width: '48px',
                                 height: '48px',
                                 borderRadius: '12px',
-                                objectFit: 'cover',
+                                background: avatarUrl ? '#e9ecef' : bgColor,
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: '16px',
                                 marginRight: '16px',
-                                border: '2px solid #e9ecef',
-                                marginLeft: '8px'
-                              }}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : (
-                            <div style={{
-                              width: '48px',
-                              height: '48px',
-                              borderRadius: '12px',
-                              background: '#e9ecef',
-                              color: '#6c757d',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 700,
-                              fontSize: '16px',
-                              marginRight: '16px',
-                              marginLeft: '8px'
-                            }}>
-                              {student.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                            </div>
-                          )}
+                                marginLeft: '8px',
+                                overflow: 'hidden'
+                              }}>
+                                {avatarUrl ? (
+                                  <img
+                                    src={avatarUrl}
+                                    alt={student.full_name}
+                                    style={{
+                                      width: '48px',
+                                      height: '48px',
+                                      borderRadius: '12px',
+                                      objectFit: 'cover',
+                                      display: 'block'
+                                    }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                              </div>
+                            );
+                          })()}
                           <div style={{ flex: 1 }}>
                             <div style={{
                               fontSize: '15px',
@@ -3586,7 +3482,27 @@ const ClassroomDetailStudent = () => {
                             }
                           }}
                         >
-                          <img src={getAvatarForUser(s)} alt={s.name} style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover', border: '1px solid #e9ecef' }} />
+                          {(() => {
+                            const avatarUrl = getAvatarForUser(s);
+                            const bgColor = getAvatarColor(s);
+                            const initials = getUserInitials(s);
+                            return (
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #e9ecef' }}>
+                                {avatarUrl ? (
+                                  <img
+                                    src={avatarUrl}
+                                    alt={s.name}
+                                    style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                              </div>
+                            );
+                          })()}
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: 14, color: '#2d3748', textTransform: 'none' }}>{s.name}</div>
                             <div style={{ fontSize: 12, color: '#7b8a9b', fontWeight: 400 }}>
@@ -3624,7 +3540,27 @@ const ClassroomDetailStudent = () => {
                       const s = classroomMembers.find(stu => stu.name === name);
                       return s ? (
                         <span key={name} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 9, padding: '1px 6px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 22 }}>
-                          <img src={getAvatarForUser(s)} alt={s.name} style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, objectFit: 'cover', border: '1px solid #fff' }} />
+                          {(() => {
+                            const avatarUrl = getAvatarForUser(s);
+                            const bgColor = getAvatarColor(s);
+                            const initials = getUserInitials(s);
+                            return (
+                              <div style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 8 }}>
+                                {avatarUrl ? (
+                                  <img
+                                    src={avatarUrl}
+                                    alt={s.name}
+                                    style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                              </div>
+                            );
+                          })()}
                           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 5, lineHeight: 1.1 }}>
                             <span style={{ fontWeight: 600, fontSize: 10, color: '#2d3748', textTransform: 'none' }}>{s.name}</span>
                             <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9 }}>
@@ -4027,8 +3963,11 @@ const ClassroomDetailStudent = () => {
             })()}
           </div>
         ) : null}
-      </ModalBody>
-</Modal>
+              </ModalBody>
+      </Modal>
+
+      {/* Student Stream Post Schedule Modal */}
+
     </div>
   );
 };

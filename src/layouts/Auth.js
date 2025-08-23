@@ -57,7 +57,7 @@ const Auth = (props) => {
   return (
     <>
       <div className="main-content" ref={mainContent}>
-        <div className="header bg-gradient-info py-7 py-lg-8">
+        <div className="header bg-gradient-info" style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem' }}>
 
           <div className="separator separator-bottom separator-skew zindex-100">
             <svg
@@ -76,8 +76,8 @@ const Auth = (props) => {
           </div>
         </div>
         {/* Page content */}
-        <Container className="mt--8 pb-5">
-          <Row className="justify-content-center">
+        <Container className="pb-3">
+          <Row className="justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 260px)' }}>
             <Routes>
               {getRoutes(routes)}
               <Route path="*" element={<Navigate to="/auth/login" replace />} />
@@ -85,7 +85,7 @@ const Auth = (props) => {
           </Row>
         </Container>
       </div>
-      <AuthFooter />
+      <div className="d-none d-md-block"><AuthFooter /></div>
     </>
   );
 };

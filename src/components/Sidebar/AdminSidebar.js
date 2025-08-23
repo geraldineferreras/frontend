@@ -16,9 +16,12 @@
 
 */
 /*eslint-disable*/
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, NavLink as NavLinkRRD, useLocation } from "react-router-dom";
 import { PropTypes } from "prop-types";
+import { useAuth } from "../../contexts/AuthContext";
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import ApiService from "../../services/api";
 import {
   Button,
   Card,
@@ -82,6 +85,21 @@ const allowedModules = {
 
 const AdminSidebar = (props) => {
   const [collapseOpen, setCollapseOpen] = useState();
+  const { user, logout } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await ApiService.getProfile();
+        if (res && res.status && res.data) setUserProfile(res.data);
+      } catch (e) {}
+    };
+    fetchProfile();
+  }, []);
+  const currentUser = userProfile || user;
+  const profilePictureUrl = getProfilePictureUrl(currentUser);
+  const userInitials = getUserInitials(currentUser);
+  const avatarColor = getAvatarColor(currentUser);
   const [reportsOpen, setReportsOpen] = useState(false);
   const location = props.location || useLocation();
   const activeRoute = (routeName) => {
@@ -262,10 +280,33 @@ const AdminSidebar = (props) => {
             <DropdownToggle nav>
               <Media className="align-items-center">
                 <span className="avatar avatar-sm rounded-circle">
-                  <img
-                    alt="..."
-                    src={require("../../assets/img/theme/team-1-800x800.jpg")}
-                  />
+                  {profilePictureUrl ? (
+                    <img
+                      alt="Profile"
+                      src={profilePictureUrl}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    style={{
+                      display: profilePictureUrl ? "none" : "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      backgroundColor: avatarColor,
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      borderRadius: "50%"
+                    }}
+                  >
+                    {userInitials}
+                  </span>
                 </span>
               </Media>
             </DropdownToggle>
@@ -282,7 +323,7 @@ const AdminSidebar = (props) => {
                 <span>Settings</span>
               </DropdownItem>
               <DropdownItem divider />
-              <DropdownItem href="#pablo" onClick={(e) => e.preventDefault()}>
+              <DropdownItem href="#logout" onClick={async (e) => { e.preventDefault(); await logout(); }}>
                 <i className="ni ni-user-run" />
                 <span>Logout</span>
               </DropdownItem>

@@ -116,7 +116,7 @@ const StudentNavbar = (props) => {
         <Container fluid>
           <Link
             className="h4 mb-0 text-white text-uppercase"
-            style={{ marginLeft: 16 }}
+            style={{ marginLeft: 20, display: 'flex', alignItems: 'center' }}
             to="/"
           >
             {props.brandText}
@@ -192,7 +192,7 @@ const StudentNavbar = (props) => {
                   </Media>
                 </Media>
               </DropdownToggle>
-              <DropdownMenu className="dropdown-menu-arrow" right>
+              <DropdownMenu className="dropdown-menu-arrow" right style={{ position: 'fixed', top: 70, right: 8, zIndex: 2147483646 }}>
                 <DropdownItem className="noti-title" header tag="div">
                   <h6 className="text-overflow m-0">Welcome, {currentUser?.full_name || currentUser?.name || 'User'}!</h6>
                 </DropdownItem>
@@ -205,10 +205,7 @@ const StudentNavbar = (props) => {
                   <span>Settings</span>
                 </DropdownItem>
                 <DropdownItem divider />
-                <DropdownItem href="#pablo" onClick={(e) => {
-                  e.preventDefault();
-                  logout();
-                }}>
+                <DropdownItem href="#logout" onClick={async (e) => { e.preventDefault(); await logout(); }}>
                   <i className="ni ni-user-run" />
                   <span>Logout</span>
                 </DropdownItem>
