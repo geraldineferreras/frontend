@@ -348,7 +348,7 @@ const StudentSidebar = (props) => {
                 <i className="ni ni-single-02" />
                 <span>My profile</span>
               </DropdownItem>
-              <DropdownItem to="/student/user-profile" tag={Link}>
+              <DropdownItem to="/student/settings" tag={Link}>
                 <i className="ni ni-settings-gear-65" />
                 <span>Settings</span>
               </DropdownItem>

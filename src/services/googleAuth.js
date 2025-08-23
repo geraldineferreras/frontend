@@ -85,15 +85,21 @@ class GoogleAuthService {
    * Handle credential response from Google
    */
   handleCredentialResponse(response) {
+    console.log('🔐 Google credential response received:', response);
+    
     if (this.pendingCallback) {
       try {
         const userData = this.parseJwtCredential(response.credential);
+        console.log('✅ Parsed user data:', userData);
         this.pendingCallback.resolve(userData);
         this.pendingCallback = null;
       } catch (error) {
+        console.error('❌ Failed to parse credential:', error);
         this.pendingCallback.reject(error);
         this.pendingCallback = null;
       }
+    } else {
+      console.warn('⚠️ No pending callback found for credential response');
     }
   }
 
@@ -102,7 +108,10 @@ class GoogleAuthService {
    */
   async signIn() {
     try {
+      console.log('🔐 Starting Google sign in process...');
+      
       if (!this.isInitialized) {
+        console.log('🔄 Google Auth not initialized, initializing now...');
         const initialized = await this.initialize();
         if (!initialized) {
           throw new Error('Failed to initialize Google Auth');
@@ -122,9 +131,12 @@ class GoogleAuthService {
       console.log('🌐 Project ID: scms-469206');
       console.log('🔗 Authorized Origins: http://localhost:3000, http://localhost');
       
-      return this.performRealGoogleSignIn();
+      console.log('🔄 Calling performRealGoogleSignIn...');
+      const result = await this.performRealGoogleSignIn();
+      console.log('✅ Google sign in completed successfully:', result);
+      return result;
     } catch (error) {
-      console.error('Google sign in failed:', error);
+      console.error('❌ Google sign in failed:', error);
       throw error;
     }
   }
@@ -139,8 +151,9 @@ class GoogleAuthService {
         this.pendingCallback = { resolve, reject };
 
         // Use Google Identity Services prompt
+        console.log('🔄 Attempting to show Google Identity prompt...');
         window.google.accounts.id.prompt((notification) => {
-          console.log('Google Identity prompt notification:', notification);
+          console.log('🔔 Google Identity prompt notification received:', notification);
           
           if (notification.isNotDisplayed()) {
             console.log('❌ Google prompt not displayed - trying button approach');

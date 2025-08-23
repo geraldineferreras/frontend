@@ -22,6 +22,7 @@ import Tables from "views/examples/Tables.js";
 import Icons from "views/examples/Icons.js";
 import UserManagement from "views/examples/UserManagement.js";
 import ForgotPassword from "views/examples/ForgotPassword.js";
+import ResetPassword from "views/examples/ResetPassword.js";
 import QRLogin from "views/examples/QRLogin.js";
 import QRRegister from "views/examples/QRRegister.js";
 import CreateUser from "views/examples/CreateUser.js";
@@ -70,6 +71,10 @@ import TestProfilePics from "views/examples/TestProfilePics.js";
 import ProfilePictureDebug from "components/ProfilePictureDebug.js";
 import SimpleProfileTest from "components/SimpleProfileTest.js";
 import GoogleOAuthCallback from "components/GoogleOAuthCallback.jsx";
+import Settings from "views/examples/Settings.js";
+import TeacherSettings from "views/examples/TeacherSettings.js";
+import StudentSettings from "views/examples/StudentSettings.js";
+import AdminSettings from "views/examples/AdminSettings.js";
 
 var routes = [
   {
@@ -144,6 +149,14 @@ var routes = [
     layout: "/auth",
   },
   {
+    path: "/reset-password",
+    name: "Reset Password",
+    icon: "ni ni-key-25 text-info",
+    component: <ResetPassword />,
+    layout: "/auth",
+    hideInSidebar: true,
+  },
+  {
     path: "/qr-login",
     name: "QR Login",
     icon: "ni ni-camera-compact text-info",
@@ -207,6 +220,13 @@ var routes = [
     layout: "/admin",
   },
   {
+    path: "/settings",
+    name: "Settings",
+    icon: "ni ni-settings-gear-65 text-info",
+    component: <AdminSettings />,
+    layout: "/admin",
+  },
+  {
     path: "/index",
     name: "Dashboard",
     icon: "ni ni-tv-2 text-primary",
@@ -254,6 +274,13 @@ var routes = [
     name: "Edit User",
     icon: "ni ni-single-02 text-primary",
     component: <EditUser />,
+    layout: "/student",
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    icon: "ni ni-settings-gear-65 text-info",
+    component: <StudentSettings />,
     layout: "/student",
   },
   {
@@ -499,6 +526,13 @@ var routes = [
     icon: "ni ni-notification-70 text-info",
     component: <StudentNotifications />,
     layout: "/student",
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    icon: "ni ni-settings-gear-65 text-info",
+    component: <TeacherSettings />,
+    layout: "/teacher",
   },
   {
     path: "/task/:taskId",

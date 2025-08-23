@@ -17,26 +17,27 @@
 */
 
 import React, { useState } from "react";
-// reactstrap components
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
-  Button,
   Card,
-  CardHeader,
   CardBody,
-  FormGroup,
+  CardHeader,
   Form,
+  FormGroup,
   Input,
+  InputGroup,
   InputGroupAddon,
   InputGroupText,
-  InputGroup,
+  Button,
+  Alert,
+  Spinner,
   Row,
   Col,
 } from "reactstrap";
-import { Link, useNavigate } from "react-router-dom";
-import ApiService from "../../services/api";
-import { useAuth } from "../../contexts/AuthContext";
+import UnifiedLoginForm from "../../components/UnifiedLoginForm";
+import Login2FAModal from "../../components/Login2FAModal";
 import GoogleOAuthButton from "../../components/GoogleOAuthButton";
-
 
 const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
@@ -44,8 +45,10 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [tempUserData, setTempUserData] = useState(null);
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { login: authLogin, complete2FALogin } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -55,20 +58,28 @@ const Login = () => {
     try {
       // Use the auth context login method
       const result = await authLogin(email, password);
+      console.log('🔐 Login.js: Login result:', result);
       
       if (result.success) {
-        // Support both result.data.role and result.data.user.role
-        const role = result.data.role || (result.data.user && result.data.user.role);
-        if (role === "student") {
-          navigate("/student/index");
-        } else if (role === "admin") {
-          navigate("/admin/index");
-        } else if (role === "teacher") {
-          navigate("/teacher/index");
+        if (result.requires2FA) {
+          console.log('🔐 Login.js: 2FA required, showing modal');
+          // Store temporary user data and show 2FA modal
+          setTempUserData(result.tempUser);
+          setShow2FAModal(true);
         } else {
-          navigate("/");
+          console.log('🔐 Login.js: No 2FA required, login successful');
+          // Normal login success - navigate based on role
+          const role = result.data.role || (result.data.user && result.data.user.role);
+          if (role === "student") {
+            navigate("/student/index");
+          } else if (role === "admin") {
+            navigate("/admin/index");
+          } else if (role === "teacher") {
+            navigate("/teacher/index");
+          } else {
+            navigate("/");
+          }
         }
-
       } else {
         setError(result.message || 'Login failed');
       }
@@ -99,6 +110,56 @@ const Login = () => {
     setError(errorMessage);
   };
 
+  // 🔐 NEW: Handle 2FA verification success
+  const handle2FASuccess = async (verificationData) => {
+    console.log('🔐 Login.js: handle2FASuccess called with:', verificationData);
+    try {
+      console.log('🔐 Login.js: Calling complete2FALogin...');
+      const result = await complete2FALogin(email, verificationData.code || verificationData);
+      console.log('🔐 Login.js: complete2FALogin result:', result);
+      
+      if (result.success) {
+        console.log('🔐 Login.js: 2FA login completed successfully');
+        console.log('🔐 Login.js: User data:', result.data);
+        console.log('🔐 Login.js: About to close modal and navigate...');
+        
+        setShow2FAModal(false);
+        
+        // Navigate based on user role
+        const role = result.data.role || (result.data.user && result.data.user.role);
+        console.log('🔐 Login.js: User role:', role);
+        console.log('🔐 Login.js: Navigating to role-specific page...');
+        
+        if (role === "student") {
+          navigate("/student/index");
+        } else if (role === "admin") {
+          navigate("/admin/index");
+        } else if (role === "teacher") {
+          navigate("/teacher/index");
+        } else {
+          navigate("/");
+        }
+        
+        console.log('🔐 Login.js: Navigation completed');
+      } else {
+        console.error('🔐 Login.js: 2FA login completion failed:', result.message);
+        setError(result.message || 'Failed to complete 2FA login');
+      }
+    } catch (error) {
+      console.error('🔐 Login.js: Error completing 2FA login:', error);
+      setError(error.message || 'Error completing 2FA verification');
+    }
+  };
+
+  // 🔐 NEW: Handle 2FA cancellation
+  const handle2FACancel = () => {
+    console.log('🔐 Login.js: 2FA cancelled, clearing temp data');
+    setShow2FAModal(false);
+    setTempUserData(null);
+    // Clear any temporary data
+    localStorage.removeItem('temp_token');
+    localStorage.removeItem('temp_user');
+  };
 
 
   return (
@@ -204,6 +265,15 @@ const Login = () => {
           </Col>
         </Row>
       </Col>
+
+      {/* 🔐 NEW: 2FA Verification Modal */}
+      <Login2FAModal
+        isOpen={show2FAModal}
+        toggle={() => setShow2FAModal(!show2FAModal)}
+        email={email}
+        onVerificationSuccess={handle2FASuccess}
+        onCancel={handle2FACancel}
+      />
     </>
   );
 };

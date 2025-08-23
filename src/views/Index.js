@@ -303,6 +303,7 @@ function TrendChart() {
       {/* legend - upper right */}
       {(() => {
         const lx = w - pad - 170; // anchor near top-right within padding
+
         const ly = pad - 48; // lift legend even higher
         return (
           <g>

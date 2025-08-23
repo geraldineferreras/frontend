@@ -77,7 +77,7 @@ const Auth = (props) => {
         </div>
         {/* Page content */}
         <Container className="pb-3">
-          <Row className="justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 260px)' }}>
+          <Row className="justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 260px)', paddingTop: '6rem' }}>
             <Routes>
               {getRoutes(routes)}
               <Route path="*" element={<Navigate to="/auth/login" replace />} />
