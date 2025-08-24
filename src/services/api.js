@@ -2686,6 +2686,7 @@ class ApiService {
       
       // Try multiple URL variations to find the working one
       const urls = [
+        'http://localhost/scms_new_backup/index.php//api/2fa/status',
         'http://localhost/scms_new_backup/index.php/api/2fa/status',
         'http://localhost/scms_new_backup/api/2fa/status',
         'http://localhost/scms_new_backup/index.php/2fa/status',
@@ -2787,6 +2788,7 @@ class ApiService {
       
       // Try multiple URL variations to find the working one
       const urls = [
+        'http://localhost/scms_new_backup/index.php//api/2fa/setup',
         'http://localhost/scms_new_backup/index.php/api/2fa/setup',
         'http://localhost/scms_new_backup/api/2fa/setup',
         'http://localhost/scms_new_backup/index.php/2fa/setup',
@@ -2873,7 +2875,7 @@ class ApiService {
       const token = this.getToken();
       console.log('🔐 validate2FACode: Token exists:', !!token);
       
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/verify', {
+      const response = await fetch('http://localhost/scms_new_backup/index.php//api/2fa/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2959,7 +2961,7 @@ class ApiService {
     try {
       console.log('🔐 disable2FA: Disabling 2FA with code:', code);
       
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/disable', {
+      const response = await fetch('http://localhost/scms_new_backup/index.php//api/2fa/disable', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3013,6 +3015,7 @@ class ApiService {
     
     // Try multiple URL variations to find the working one
     const urls = [
+      'http://localhost/scms_new_backup/index.php//api/2fa/login-verify',
       'http://localhost/scms_new_backup/index.php/api/2fa/login-verify',
       'http://localhost/scms_new_backup/api/2fa/login-verify',
       'http://localhost/scms_new_backup/index.php/2fa/login-verify',
@@ -3205,9 +3208,105 @@ class ApiService {
     }
   }
 
-  // 🔑 NEW: Use Backup Code (for account recovery)
-  async useBackupCode(email, backupCode) {
-    console.log('🔐 useBackupCode called with:', { email, backupCode });
+  // 🔑 NEW: Get Current Backup Codes
+  async getBackupCodes() {
+    try {
+      console.log('🔐 getBackupCodes: Fetching current backup codes');
+      const token = this.getToken();
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-codes', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('🔐 getBackupCodes response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔐 getBackupCodes success data:', data);
+        return {
+          success: true,
+          data: data.data || data
+        };
+      } else {
+        const errorText = await response.text();
+        console.error('🔐 getBackupCodes: HTTP error:', response.status, response.statusText);
+        console.error('🔐 getBackupCodes: Error response body:', errorText);
+        
+        return {
+          success: false,
+          message: `Failed to get backup codes: ${response.status} ${response.statusText}`,
+          error: errorText
+        };
+      }
+    } catch (error) {
+      console.error('🔐 getBackupCodes error:', error);
+      return {
+        success: false,
+        message: `Failed to get backup codes: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  // 🔑 NEW: Generate New Backup Codes
+  async generateNewBackupCodes() {
+    try {
+      console.log('🔐 generateNewBackupCodes: Generating new backup codes');
+      const token = this.getToken();
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-codes/generate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('🔐 generateNewBackupCodes response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔐 generateNewBackupCodes success data:', data);
+        return {
+          success: true,
+          data: data.data || data
+        };
+      } else {
+        const errorText = await response.text();
+        console.error('🔐 generateNewBackupCodes: HTTP error:', response.status, response.statusText);
+        console.error('🔐 generateNewBackupCodes: Error response body:', errorText);
+        
+        return {
+          success: false,
+          message: `Failed to generate new backup codes: ${response.status} ${response.statusText}`,
+          error: errorText
+        };
+      }
+    } catch (error) {
+      console.error('🔐 generateNewBackupCodes error:', error);
+      return {
+        success: false,
+        message: `Failed to generate new backup codes: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  // 🔑 NEW: Verify Backup Code (for account recovery)
+  async verifyBackupCode(email, backupCode) {
+    console.log('🔐 verifyBackupCode called with:', { email, backupCode });
     try {
       const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-code', {
         method: 'POST',
@@ -3217,43 +3316,165 @@ class ApiService {
         body: JSON.stringify({ email, backup_code: backupCode })
       });
       
-      console.log('🔐 useBackupCode response status:', response.status);
+      console.log('🔐 verifyBackupCode response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('🔐 useBackupCode success data:', data);
+        console.log('🔐 verifyBackupCode success data:', data);
         return {
           success: data.status,
           message: data.message,
           data: data.data
         };
-      } else if (response.status === 500) {
-        console.error('🔐 useBackupCode: Backend server error (500)');
-        // Return mock success for development when backend is broken
-        return {
-          success: true,
-          message: 'Backup code verification successful (mock data)',
-          data: {
-            user_id: '12345',
-            email: email,
-            backup_code_used: true
-          }
-        };
       } else {
-        console.error('🔐 useBackupCode: HTTP error:', response.status, response.statusText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.error('🔐 verifyBackupCode: HTTP error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('🔐 verifyBackupCode: Error response body:', errorText);
+        
+        // Try to parse the error response as JSON to get the actual error message
+        let errorMessage = `Failed to verify backup code: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          // If not JSON, use the raw error text
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        
+        return {
+          success: false,
+          message: errorMessage,
+          data: null
+        };
       }
     } catch (error) {
-      console.error('🔐 useBackupCode error:', error);
-      // Return mock success for development
+      console.error('🔐 verifyBackupCode error:', error);
       return {
-        success: true,
-        message: 'Backup code verification successful (mock data)',
-        data: {
-          user_id: '12345',
-          email: email,
-          backup_code_used: true
-        }
+        success: false,
+        message: 'Network error: Unable to connect to the server. Please check your internet connection and try again.',
+        data: null
+      };
+    }
+  }
+
+  // 🔑 NEW: Change Password
+  async changePassword(currentPassword, newPassword, confirmPassword) {
+    console.log('🔐 changePassword called');
+    
+    if (!this.validateToken()) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.',
+        data: null
+      };
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost/scms_new_backup/index.php/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword
+        })
+      });
+      
+      console.log('🔐 changePassword response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔐 changePassword success data:', data);
+        return {
+          success: data.status,
+          message: data.message || 'Password changed successfully',
+          data: data.data
+        };
+      } else if (response.status === 401) {
+        // Unauthorized - current password is incorrect
+        return {
+          success: false,
+          message: 'Current password is incorrect',
+          data: null
+        };
+      } else if (response.status === 400) {
+        // Bad request - validation error
+        const errorData = await response.json();
+        return {
+          success: false,
+          message: errorData.message || 'Invalid password format',
+          data: null
+        };
+      } else {
+        console.error('🔐 changePassword: HTTP error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('🔐 changePassword: Error response body:', errorText);
+        
+        return {
+          success: false,
+          message: `Failed to change password: ${response.status} ${response.statusText}`,
+          data: null
+        };
+      }
+    } catch (error) {
+      console.error('🔐 changePassword error:', error);
+      return {
+        success: false,
+        message: 'Network error: Unable to connect to the server. Please check your internet connection and try again.',
+        data: null
+      };
+    }
+  }
+
+  // 📊 NEW: Admin Dashboard Statistics
+  async getAdminDashboardStats() {
+    try {
+      const response = await this.get('/admin/dashboard/stats', true);
+      return response;
+    } catch (error) {
+      console.error('Error fetching admin dashboard stats:', error);
+      return {
+        status: false,
+        message: error.message || 'Failed to fetch dashboard statistics',
+        data: null
+      };
+    }
+  }
+
+  // 👥 NEW: Admin User Count Summary
+  async getAdminUserCount() {
+    try {
+      const response = await this.get('/admin/users/count', true);
+      return response;
+    } catch (error) {
+      console.error('Error fetching admin user count:', error);
+      return {
+        status: false,
+        message: error.message || 'Failed to fetch user count',
+        data: null
+      };
+    }
+  }
+
+  // 📚 NEW: Admin Section Count Summary
+  async getAdminSectionCount() {
+    try {
+      const response = await this.get('/admin/sections/count', true);
+      return response;
+    } catch (error) {
+      console.error('Error fetching admin section count:', error);
+      return {
+        status: false,
+        message: error.message || 'Failed to fetch section count',
+        data: null
       };
     }
   }

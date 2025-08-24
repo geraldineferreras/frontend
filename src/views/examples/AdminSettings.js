@@ -23,34 +23,31 @@ import {
 import classnames from 'classnames';
 import TwoFactorAuth from '../../components/TwoFactorAuth';
 import Disable2FAModal from '../../components/Disable2FAModal';
+import BackupCodesModal from '../../components/BackupCodesModal';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
 
 const AdminSettings = () => {
   const { user, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('1');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [lastFetched, setLastFetched] = useState(null);
   
   // 2FA Modal states
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showDisable2FAModal, setShowDisable2FAModal] = useState(false);
+  const [showBackupCodesModal, setShowBackupCodesModal] = useState(false);
+  const [backupCodesCount, setBackupCodesCount] = useState(8);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   
   // Profile settings
   const [profileData, setProfileData] = useState({
-    full_name: user?.full_name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    department: user?.department || '',
-    role: user?.role || 'admin'
-  });
-
-  // System settings
-  const [systemSettings, setSystemSettings] = useState({
-    maintenanceMode: false,
-    allowUserRegistration: true,
-    requireEmailVerification: true,
-    maxFileUploadSize: 10,
-    sessionTimeout: 30,
-    backupFrequency: 'daily'
+    full_name: '',
+    email: '',
+    phone: '',
+    department: '',
+    role: 'admin'
   });
 
   // Security settings
@@ -68,32 +65,9 @@ const AdminSettings = () => {
     }
   });
 
-  // Notification settings
-  const [notificationSettings, setNotificationSettings] = useState({
-    email: {
-      systemAlerts: true,
-      userReports: true,
-      securityEvents: true,
-      backupNotifications: true
-    },
-    push: {
-      criticalAlerts: true,
-      dailyReports: false,
-      userActivity: false
-    }
-  });
 
-  // User management settings
-  const [userManagementSettings, setUserManagementSettings] = useState({
-    allowBulkOperations: true,
-    requireApprovalForNewUsers: false,
-    autoAssignRoles: false,
-    defaultUserRole: 'student',
-    allowProfileEditing: true,
-    requirePasswordChange: false
-  });
 
-  // Load 2FA status on component mount
+  // Load 2FA status and backup codes count on component mount
   useEffect(() => {
     const load2FAStatus = async () => {
       try {
@@ -108,9 +82,76 @@ const AdminSettings = () => {
         console.error('Failed to load 2FA status:', error);
       }
     };
+
+    const loadBackupCodesCount = async () => {
+      try {
+        const response = await ApiService.getBackupCodes();
+        if (response.success) {
+          const count = response.data.count || response.data.remaining_codes || 8;
+          setBackupCodesCount(count);
+        }
+      } catch (error) {
+        console.error('Failed to load backup codes count:', error);
+        setBackupCodesCount(8);
+      }
+    };
+
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        setProfileLoading(true);
+        
+        const response = await ApiService.getProfile();
+        
+        if (response && response.status && response.data) {
+          const userData = response.data;
+          
+          // Update profile data with fetched information
+          const newProfileData = {
+            full_name: userData.full_name || '',
+            email: userData.email || '',
+            phone: userData.contact_num || userData.phone || userData.contactNumber || '',
+            department: userData.program || userData.department || '',
+            role: userData.role || 'admin'
+          };
+          
+          setProfileData(newProfileData);
+          setLastFetched(new Date());
+        } else {
+          // Fallback to auth context user data
+          if (user) {
+            const fallbackData = {
+              full_name: user.full_name || user.name || '',
+              email: user.email || '',
+              phone: user.phone || user.contact_num || '',
+              department: user.department || user.program || '',
+              role: user.role || 'admin'
+            };
+            setProfileData(fallbackData);
+          }
+        }
+      } catch (error) {
+        // Fallback to auth context user data
+        if (user) {
+          const fallbackData = {
+            full_name: user.full_name || user.name || '',
+            email: user.email || '',
+            phone: user.phone || user.contact_num || '',
+            department: user.department || user.program || '',
+            role: user.role || 'admin'
+          };
+          setProfileData(fallbackData);
+        }
+      } finally {
+        setProfileLoading(false);
+      }
+    };
     
+    fetchUserProfile();
     load2FAStatus();
-  }, []);
+    loadBackupCodesCount();
+  }, [user]);
 
   const handle2FAToggle = (enabled) => {
     if (enabled) {
@@ -145,27 +186,37 @@ const AdminSettings = () => {
     setMessage({ type: '', text: '' });
     
     try {
-      const response = await updateProfile(profileData);
-      if (response.success) {
+      // Validate required user data
+      if (!user.role) {
+        throw new Error('User role is required but not available');
+      }
+      
+      const userId = user.id || user.user_id || user.userId;
+      if (!userId) {
+        throw new Error('User ID is required but not available');
+      }
+
+      // Prepare data for backend update
+      const updateData = {
+        full_name: profileData.full_name,
+        email: profileData.email,
+        contact_num: profileData.phone,
+        program: profileData.department,
+        role: user.role,
+        user_id: userId
+      };
+
+      const response = await ApiService.updateProfile(updateData);
+      
+      if (response.status) {
+        await updateProfile(updateData);
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        setLastFetched(new Date());
       } else {
         setMessage({ type: 'danger', text: response.message || 'Failed to update profile' });
       }
     } catch (error) {
-      setMessage({ type: 'danger', text: error.message || 'An error occurred' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSystemUpdate = async () => {
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-    
-    try {
-      setMessage({ type: 'success', text: 'System settings updated successfully!' });
-    } catch (error) {
-      setMessage({ type: 'danger', text: error.message || 'An error occurred' });
+      setMessage({ type: 'danger', text: 'An error occurred while updating profile' });
     } finally {
       setLoading(false);
     }
@@ -184,31 +235,29 @@ const AdminSettings = () => {
     }
   };
 
-  const handleNotificationUpdate = async () => {
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-    
-    try {
-      setMessage({ type: 'success', text: 'Notification settings updated successfully!' });
-    } catch (error) {
-      setMessage({ type: 'danger', text: error.message || 'An error occurred' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleUserManagementUpdate = async () => {
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-    
-    try {
-      setMessage({ type: 'success', text: 'User management settings updated successfully!' });
-    } catch (error) {
-      setMessage({ type: 'danger', text: error.message || 'An error occurred' });
-    } finally {
-      setLoading(false);
-    }
-  };
+
+  if (!user) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="sr-only">Loading...</span>
+        </div>
+        <p className="mt-2">Loading settings...</p>
+      </div>
+    );
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="sr-only">Loading...</span>
+        </div>
+        <p className="mt-2">Loading profile information...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-5">
@@ -239,35 +288,8 @@ const AdminSettings = () => {
                     className={classnames({ active: activeTab === '2' })}
                     onClick={() => toggleTab('2')}
                   >
-                    <i className="ni ni-settings-gear-65 mr-2" />
-                    System
-                  </NavLink>
-                </NavItem>
-                <NavItem>
-                  <NavLink
-                    className={classnames({ active: activeTab === '3' })}
-                    onClick={() => toggleTab('3')}
-                  >
                     <i className="ni ni-lock-circle-open mr-2" />
                     Security
-                  </NavLink>
-                </NavItem>
-                <NavItem>
-                  <NavLink
-                    className={classnames({ active: activeTab === '4' })}
-                    onClick={() => toggleTab('4')}
-                  >
-                    <i className="ni ni-bell-55 mr-2" />
-                    Notifications
-                  </NavLink>
-                </NavItem>
-                <NavItem>
-                  <NavLink
-                    className={classnames({ active: activeTab === '5' })}
-                    onClick={() => toggleTab('5')}
-                  >
-                    <i className="ni ni-single-02 mr-2" />
-                    User Management
                   </NavLink>
                 </NavItem>
               </Nav>
@@ -275,507 +297,419 @@ const AdminSettings = () => {
               <TabContent activeTab={activeTab} className="mt-4">
                 {/* Profile Tab */}
                 <TabPane tabId="1">
-                  <Row>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="fullName">Full Name</Label>
-                        <Input
-                          id="fullName"
-                          type="text"
-                          value={profileData.full_name}
-                          onChange={(e) => setProfileData({...profileData, full_name: e.target.value})}
-                        />
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={profileData.email}
-                          onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                        />
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="phone">Phone</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          value={profileData.phone}
-                          onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                        />
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="department">Department</Label>
-                        <Input
-                          id="department"
-                          type="text"
-                          value={profileData.department}
-                          onChange={(e) => setProfileData({...profileData, department: e.target.value})}
-                        />
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="role">Role</Label>
-                        <Input
-                          id="role"
-                          type="text"
-                          value={profileData.role}
-                          disabled
-                        />
-                        <small className="form-text text-muted">
-                          Admin role cannot be changed
-                        </small>
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Button color="primary" onClick={handleProfileUpdate} disabled={loading}>
-                    {loading ? 'Updating...' : 'Update Profile'}
-                  </Button>
-                </TabPane>
-
-                {/* System Tab */}
-                <TabPane tabId="2">
-                  <Row>
-                    <Col md="6">
-                      <h6>System Configuration</h6>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={systemSettings.maintenanceMode}
-                            onChange={(e) => setSystemSettings({...systemSettings, maintenanceMode: e.target.checked})}
-                          />
-                          Maintenance Mode
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={systemSettings.allowUserRegistration}
-                            onChange={(e) => setSystemSettings({...systemSettings, allowUserRegistration: e.target.checked})}
-                          />
-                          Allow User Registration
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={systemSettings.requireEmailVerification}
-                            onChange={(e) => setSystemSettings({...systemSettings, requireEmailVerification: e.target.checked})}
-                          />
-                          Require Email Verification
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <h6>System Limits</h6>
-                      <FormGroup>
-                        <Label for="maxFileUploadSize">Max File Upload Size (MB)</Label>
-                        <Input
-                          id="maxFileUploadSize"
-                          type="select"
-                          value={systemSettings.maxFileUploadSize}
-                          onChange={(e) => setSystemSettings({...systemSettings, maxFileUploadSize: parseInt(e.target.value)})}
+                  <Card className="shadow-lg border-0" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+                    <CardHeader className="bg-gradient-primary text-white border-0" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <h5 className="mb-0 text-white font-weight-bold">
+                            <i className="ni ni-single-02 mr-2"></i>
+                            Profile Information
+                          </h5>
+                          <small className="text-white-50">
+                            {user?.email && `Logged in as: ${user.email}`}
+                            {lastFetched && (
+                              <span className="ml-2">
+                                • Last updated: {lastFetched.toLocaleTimeString()}
+                              </span>
+                            )}
+                          </small>
+                        </div>
+                        <Button 
+                          color="outline-light" 
+                          size="sm"
+                          className="border-white text-white"
+                          style={{ 
+                            borderRadius: '20px',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            background: 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(10px)'
+                          }}
+                          onClick={async () => {
+                            setProfileLoading(true);
+                            try {
+                              const response = await ApiService.getProfile();
+                              if (response && response.status && response.data) {
+                                const userData = response.data;
+                                setProfileData({
+                                  full_name: userData.full_name || '',
+                                  email: userData.email || '',
+                                  phone: userData.contact_num || userData.phone || userData.contactNumber || '',
+                                  department: userData.program || userData.department || '',
+                                  role: userData.role || 'admin'
+                                });
+                                setLastFetched(new Date());
+                                setMessage({ type: 'success', text: 'Profile refreshed successfully!' });
+                              }
+                            } catch (error) {
+                              setMessage({ type: 'danger', text: 'Failed to refresh profile' });
+                            } finally {
+                              setProfileLoading(false);
+                            }
+                          }}
+                          disabled={profileLoading}
                         >
-                          <option value={5}>5 MB</option>
-                          <option value={10}>10 MB</option>
-                          <option value={25}>25 MB</option>
-                          <option value={50}>50 MB</option>
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label for="backupFrequency">Backup Frequency</Label>
-                        <Input
-                          id="backupFrequency"
-                          type="select"
-                          value={systemSettings.backupFrequency}
-                          onChange={(e) => setSystemSettings({...systemSettings, backupFrequency: e.target.value})}
+                          <i className="ni ni-refresh mr-1"></i>
+                          {profileLoading ? <div className="spinner-border spinner-border-sm" role="status"><span className="sr-only">Loading...</span></div> : 'Refresh'}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardBody className="p-4">
+                      <div className="mb-3">
+                        <h6 className="text-muted mb-2">
+                          <i className="ni ni-single-02 mr-2"></i>
+                          Personal Information
+                        </h6>
+                        <Row>
+                          <Col md="6">
+                            <div className="mb-2">
+                              <Label for="fullName" className="font-weight-bold text-dark">Full Name</Label>
+                              <Input
+                                id="fullName"
+                                type="text"
+                                value={profileData.full_name}
+                                onChange={(e) => setProfileData({...profileData, full_name: e.target.value})}
+                                required
+                                className="border-0"
+                                style={{ 
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  fontSize: '14px',
+                                  border: '1px solid #e9ecef',
+                                  color: '#333',
+                                  backgroundColor: '#f8f9fa'
+                                }}
+                              />
+                            </div>
+                          </Col>
+                          <Col md="6">
+                            <div className="mb-2">
+                              <Label for="email" className="font-weight-bold text-dark">Email Address</Label>
+                              <Input
+                                id="email"
+                                type="email"
+                                value={profileData.email}
+                                onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                                required
+                                className="border-0"
+                                style={{ 
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  fontSize: '14px',
+                                  border: '1px solid #e9ecef',
+                                  color: '#333',
+                                  backgroundColor: '#f8f9fa'
+                                }}
+                              />
+                            </div>
+                          </Col>
+                        </Row>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <h6 className="text-muted mb-2">
+                          <i className="ni ni-email-83 mr-2"></i>
+                          Contact Information
+                        </h6>
+                        <Row>
+                          <Col md="6">
+                            <div className="mb-2">
+                              <Label for="phone" className="font-weight-bold text-dark">Phone Number</Label>
+                              <Input
+                                id="phone"
+                                type="tel"
+                                value={profileData.phone}
+                                onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                                className="border-0"
+                                style={{ 
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  fontSize: '14px',
+                                  border: '1px solid #e9ecef',
+                                  color: '#333',
+                                  backgroundColor: '#f8f9fa'
+                                }}
+                              />
+                            </div>
+                          </Col>
+                          <Col md="6">
+                            <div className="mb-2">
+                              <Label for="department" className="font-weight-bold text-dark">Department</Label>
+                              <Input
+                                id="department"
+                                type="text"
+                                value={profileData.department}
+                                onChange={(e) => setProfileData({...profileData, department: e.target.value})}
+                                className="border-0"
+                                style={{ 
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  fontSize: '14px',
+                                  border: '1px solid #e9ecef',
+                                  color: '#333',
+                                  backgroundColor: '#f8f9fa'
+                                }}
+                              />
+                            </div>
+                          </Col>
+                        </Row>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <h6 className="text-muted mb-2">
+                          <i className="ni ni-badge mr-2"></i>
+                          Role Information
+                        </h6>
+                        <Row>
+                          <Col md="6">
+                            <div className="mb-2">
+                              <Label for="role" className="font-weight-bold text-dark">Role</Label>
+                              <Input
+                                id="role"
+                                type="text"
+                                value={profileData.role}
+                                disabled
+                                className="border-0"
+                                style={{ 
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  fontSize: '14px',
+                                  border: '1px solid #e9ecef',
+                                  color: '#6c757d',
+                                  backgroundColor: '#e9ecef'
+                                }}
+                              />
+                              <small className="form-text text-muted">
+                                Admin role cannot be changed
+                              </small>
+                            </div>
+                          </Col>
+                        </Row>
+                      </div>
+                      
+                      <div className="text-center pt-4 border-top">
+                        <Button 
+                          color="primary" 
+                          size="lg"
+                          onClick={handleProfileUpdate}
+                          disabled={loading}
+                          className="px-5 py-3"
+                          style={{ 
+                            borderRadius: '25px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            border: 'none',
+                            boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+                          }}
                         >
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="monthly">Monthly</option>
-                        </Input>
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Button color="primary" onClick={handleSystemUpdate} disabled={loading}>
-                    {loading ? 'Updating...' : 'Update System Settings'}
-                  </Button>
+                          {loading ? (
+                            <>
+                              <div className="spinner-border spinner-border-sm mr-2" role="status">
+                                <span className="sr-only">Loading...</span>
+                              </div>
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <i className="ni ni-check-bold mr-2"></i>
+                              Update Profile
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardBody>
+                  </Card>
                 </TabPane>
 
                 {/* Security Tab */}
-                <TabPane tabId="3">
-                  <Row>
-                    <Col md="6">
-                      <h6>Two-Factor Authentication</h6>
-                      <FormGroup>
-                        <Label for="twoFA">Two-Factor Authentication</Label>
-                        <div className="d-flex align-items-center">
-                          <div className="custom-control custom-switch">
-                            <Input
-                              type="checkbox"
-                              id="twoFAToggle"
-                              checked={securitySettings.twoFAEnabled}
-                              onChange={(e) => handle2FAToggle(e.target.checked)}
-                              className="custom-control-input"
-                            />
-                            <Label className="custom-control-label" for="twoFAToggle">
-                              Enable Two-Factor Authentication
-                            </Label>
+                <TabPane tabId="2">
+                  <Card className="shadow-lg border-0" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+                    <CardHeader className="bg-gradient-primary text-white border-0" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                      <h5 className="mb-0 text-white font-weight-bold">
+                        <i className="ni ni-lock-circle-open mr-2"></i>
+                        Security Settings
+                      </h5>
+                      <small className="text-white-50">Manage your account security and authentication</small>
+                    </CardHeader>
+                    <CardBody className="p-4">
+                      <div className="mb-4">
+                        <h6 className="text-muted mb-3">
+                          <i className="ni ni-shield-check mr-2"></i>
+                          Two-Factor Authentication
+                        </h6>
+                        <div className="p-3 border rounded-lg mb-3" style={{ backgroundColor: 'rgb(248, 249, 250)' }}>
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center">
+                              <i className="ni ni-lock-circle-open text-success mr-3" style={{ fontSize: '1.5rem' }}></i>
+                              <div>
+                                <h6 className="mb-1 font-weight-bold">Security Level: {securitySettings.twoFAEnabled ? 'Enhanced' : 'Basic'}</h6>
+                                <small className="text-muted">{securitySettings.twoFAEnabled ? 'Your account is protected with two-factor authentication' : 'Your account uses basic password authentication only'}</small>
+                              </div>
+                            </div>
+                            <Badge color={securitySettings.twoFAEnabled ? "success" : "secondary"} className="px-3 py-2">
+                              <i className={`ni ni-${securitySettings.twoFAEnabled ? 'check-bold' : 'fat-remove'} mr-1`}></i>
+                              {securitySettings.twoFAEnabled ? 'ENABLED' : 'DISABLED'}
+                            </Badge>
                           </div>
-                          <Badge 
-                            color={securitySettings.twoFAEnabled ? 'success' : 'secondary'} 
-                            className="ml-3"
-                          >
-                            {securitySettings.twoFAEnabled ? 'Enabled' : 'Disabled'}
-                          </Badge>
                         </div>
-                        <small className="form-text text-muted">
-                          Add an extra layer of security to your account with two-factor authentication.
-                        </small>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={securitySettings.require2FAForAdmins}
-                            onChange={(e) => setSecuritySettings({...securitySettings, require2FAForAdmins: e.target.checked})}
-                          />
-                          Require 2FA for All Admins
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <h6>Login Security</h6>
-                      <FormGroup>
-                        <Label for="loginAttempts">Max Login Attempts</Label>
-                        <Input
-                          id="loginAttempts"
-                          type="select"
-                          value={securitySettings.loginAttempts}
-                          onChange={(e) => setSecuritySettings({...securitySettings, loginAttempts: parseInt(e.target.value)})}
-                        >
-                          <option value={3}>3 attempts</option>
-                          <option value={5}>5 attempts</option>
-                          <option value={10}>10 attempts</option>
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label for="lockoutDuration">Lockout Duration (minutes)</Label>
-                        <Input
-                          id="lockoutDuration"
-                          type="select"
-                          value={securitySettings.lockoutDuration}
-                          onChange={(e) => setSecuritySettings({...securitySettings, lockoutDuration: parseInt(e.target.value)})}
-                        >
-                          <option value={15}>15 minutes</option>
-                          <option value={30}>30 minutes</option>
-                          <option value={60}>1 hour</option>
-                        </Input>
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col md="12">
-                      <h6>Password Policy</h6>
-                      <Row>
-                        <Col md="3">
-                          <FormGroup>
-                            <Label for="minLength">Minimum Length</Label>
-                            <Input
-                              id="minLength"
-                              type="select"
-                              value={securitySettings.passwordPolicy.minLength}
-                              onChange={(e) => setSecuritySettings({
-                                ...securitySettings,
-                                passwordPolicy: {
-                                  ...securitySettings.passwordPolicy,
-                                  minLength: parseInt(e.target.value)
-                                }
-                              })}
+                        
+                        <Row className="mb-3">
+                          <Col md="4">
+                            <div className="p-3 border rounded-lg text-center" style={{ backgroundColor: 'rgb(248, 249, 250)' }}>
+                              <i className="ni ni-mobile-button text-primary mb-2" style={{ fontSize: '2rem' }}></i>
+                              <div>
+                                <small className="text-muted d-block">Method</small>
+                                <strong>Authenticator App (TOTP)</strong>
+                              </div>
+                            </div>
+                          </Col>
+                          <Col md="4">
+                            <div className="p-3 border rounded-lg text-center" style={{ backgroundColor: 'rgb(248, 249, 250)' }}>
+                              <i className="ni ni-time-alarm text-warning mb-2" style={{ fontSize: '2rem' }}></i>
+                              <div>
+                                <small className="text-muted d-block">Last Used</small>
+                                <strong>Never</strong>
+                              </div>
+                            </div>
+                          </Col>
+                          <Col md="4">
+                            <div className="p-3 border rounded-lg text-center" style={{ backgroundColor: 'rgb(248, 249, 250)' }}>
+                              <i className="ni ni-collection text-info mb-2" style={{ fontSize: '2rem' }}></i>
+                              <div>
+                                <small className="text-muted d-block">Backup Codes</small>
+                                <strong>{backupCodesCount} remaining</strong>
+                              </div>
+                            </div>
+                          </Col>
+                        </Row>
+                        
+                        <Alert color={securitySettings.twoFAEnabled ? "success" : "warning"} className="border-0" style={{ 
+                          borderRadius: '12px',
+                          background: securitySettings.twoFAEnabled ? '#28a745' : '#ffc107',
+                          border: securitySettings.twoFAEnabled ? '1px solid #28a745' : '1px solid #ffc107'
+                        }}>
+                          <i className={`ni ni-${securitySettings.twoFAEnabled ? 'check-bold' : 'fat-remove'} mr-2`}></i>
+                          <strong>{securitySettings.twoFAEnabled ? '2FA is Active!' : '2FA is Disabled!'}</strong> {securitySettings.twoFAEnabled ? 'Your account is now protected with two-factor authentication. You\'ll need to enter a verification code each time you log in.' : 'Your account is not protected with two-factor authentication. Enable 2FA for enhanced security.'}
+                        </Alert>
+                        
+                        <div className="d-flex flex-wrap gap-2 mt-3">
+                          {securitySettings.twoFAEnabled ? (
+                            <Button 
+                              color="outline-danger" 
+                              size="sm"
+                              className="px-3 py-2"
+                              style={{ 
+                                borderRadius: '20px',
+                                border: '1px solid #dc3545',
+                                color: '#dc3545',
+                                transition: 'all 0.3s ease',
+                                cursor: 'pointer'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#dc3545';
+                                e.target.style.color = '#ffffff';
+                                e.target.style.borderColor = '#dc3545';
+                                e.target.style.boxShadow = '0 4px 12px rgba(220, 53, 69, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#dc3545';
+                                e.target.style.borderColor = '#dc3545';
+                                e.target.style.boxShadow = 'none';
+                              }}
+                              onClick={() => setShowDisable2FAModal(true)}
                             >
-                              <option value={6}>6 characters</option>
-                              <option value={8}>8 characters</option>
-                              <option value={10}>10 characters</option>
-                              <option value={12}>12 characters</option>
-                            </Input>
-                          </FormGroup>
-                        </Col>
-                        <Col md="9">
-                          <FormGroup check>
-                            <Label check>
-                              <Input
-                                type="checkbox"
-                                checked={securitySettings.passwordPolicy.requireUppercase}
-                                onChange={(e) => setSecuritySettings({
-                                  ...securitySettings,
-                                  passwordPolicy: {
-                                    ...securitySettings.passwordPolicy,
-                                    requireUppercase: e.target.checked
-                                  }
-                                })}
-                              />
-                              Require Uppercase Letters
-                            </Label>
-                          </FormGroup>
-                          <FormGroup check>
-                            <Label check>
-                              <Input
-                                type="checkbox"
-                                checked={securitySettings.passwordPolicy.requireLowercase}
-                                onChange={(e) => setSecuritySettings({
-                                  ...securitySettings,
-                                  passwordPolicy: {
-                                    ...securitySettings.passwordPolicy,
-                                    requireLowercase: e.target.checked
-                                  }
-                                })}
-                              />
-                              Require Lowercase Letters
-                            </Label>
-                          </FormGroup>
-                          <FormGroup check>
-                            <Label check>
-                              <Input
-                                type="checkbox"
-                                checked={securitySettings.passwordPolicy.requireNumbers}
-                                onChange={(e) => setSecuritySettings({
-                                  ...securitySettings,
-                                  passwordPolicy: {
-                                    ...securitySettings.passwordPolicy,
-                                    requireNumbers: e.target.checked
-                                  }
-                                })}
-                              />
-                              Require Numbers
-                            </Label>
-                          </FormGroup>
-                          <FormGroup check>
-                            <Label check>
-                              <Input
-                                type="checkbox"
-                                checked={securitySettings.passwordPolicy.requireSpecialChars}
-                                onChange={(e) => setSecuritySettings({
-                                  ...securitySettings,
-                                  passwordPolicy: {
-                                    ...securitySettings.passwordPolicy,
-                                    requireSpecialChars: e.target.checked
-                                  }
-                                })}
-                              />
-                              Require Special Characters
-                            </Label>
-                          </FormGroup>
-                        </Col>
-                      </Row>
-                    </Col>
-                  </Row>
-                  <Button color="primary" onClick={handleSecurityUpdate} disabled={loading}>
-                    {loading ? 'Updating...' : 'Update Security Settings'}
-                  </Button>
-                </TabPane>
+                              <i className="ni ni-lock-circle-open mr-2"></i>
+                              Disable 2FA
+                            </Button>
+                          ) : (
+                            <Button 
+                              color="outline-success" 
+                              size="sm"
+                              className="px-3 py-2"
+                              style={{ 
+                                borderRadius: '20px',
+                                border: '1px solid #28a745',
+                                color: '#28a745',
+                                transition: 'all 0.3s ease',
+                                cursor: 'pointer'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#28a745';
+                                e.target.style.color = '#ffffff';
+                                e.target.style.borderColor = '#28a745';
+                                e.target.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#28a745';
+                                e.target.style.borderColor = '#28a745';
+                                e.target.style.boxShadow = 'none';
+                              }}
+                              onClick={() => setShow2FAModal(true)}
+                            >
+                              <i className="ni ni-lock-circle-open mr-2"></i>
+                              Enable 2FA
+                            </Button>
+                          )}
 
-                {/* Notifications Tab */}
-                <TabPane tabId="4">
-                  <Row>
-                    <Col md="6">
-                      <h6>Email Notifications</h6>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.email.systemAlerts}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              email: {
-                                ...notificationSettings.email,
-                                systemAlerts: e.target.checked
-                              }
-                            })}
-                          />
-                          System Alerts
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.email.userReports}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              email: {
-                                ...notificationSettings.email,
-                                userReports: e.target.checked
-                              }
-                            })}
-                          />
-                          User Reports
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.email.securityEvents}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              email: {
-                                ...notificationSettings.email,
-                                securityEvents: e.target.checked
-                              }
-                            })}
-                          />
-                          Security Events
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <h6>Push Notifications</h6>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.push.criticalAlerts}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              push: {
-                                ...notificationSettings.push,
-                                criticalAlerts: e.target.checked
-                              }
-                            })}
-                          />
-                          Critical Alerts
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.push.dailyReports}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              push: {
-                                ...notificationSettings.push,
-                                dailyReports: e.target.checked
-                              }
-                            })}
-                          />
-                          Daily Reports
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={notificationSettings.push.userActivity}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              push: {
-                                ...notificationSettings.push,
-                                userActivity: e.target.checked
-                              }
-                            })}
-                          />
-                          User Activity
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Button color="primary" onClick={handleNotificationUpdate} disabled={loading}>
-                    {loading ? 'Updating...' : 'Update Notification Settings'}
-                  </Button>
-                </TabPane>
-
-                {/* User Management Tab */}
-                <TabPane tabId="5">
-                  <Row>
-                    <Col md="6">
-                      <h6>User Operations</h6>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={userManagementSettings.allowBulkOperations}
-                            onChange={(e) => setUserManagementSettings({...userManagementSettings, allowBulkOperations: e.target.checked})}
-                          />
-                          Allow Bulk Operations
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={userManagementSettings.requireApprovalForNewUsers}
-                            onChange={(e) => setUserManagementSettings({...userManagementSettings, requireApprovalForNewUsers: e.target.checked})}
-                          />
-                          Require Approval for New Users
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={userManagementSettings.autoAssignRoles}
-                            onChange={(e) => setUserManagementSettings({...userManagementSettings, autoAssignRoles: e.target.checked})}
-                          />
-                          Auto-Assign Roles
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <h6>User Preferences</h6>
-                      <FormGroup>
-                        <Label for="defaultUserRole">Default User Role</Label>
-                        <Input
-                          id="defaultUserRole"
-                          type="select"
-                          value={userManagementSettings.defaultUserRole}
-                          onChange={(e) => setUserManagementSettings({...userManagementSettings, defaultUserRole: e.target.value})}
-                        >
-                          <option value="student">Student</option>
-                          <option value="teacher">Teacher</option>
-                          <option value="admin">Admin</option>
-                        </Input>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={userManagementSettings.allowProfileEditing}
-                            onChange={(e) => setUserManagementSettings({...userManagementSettings, allowProfileEditing: e.target.checked})}
-                          />
-                          Allow Profile Editing
-                        </Label>
-                      </FormGroup>
-                      <FormGroup check>
-                        <Label check>
-                          <Input
-                            type="checkbox"
-                            checked={userManagementSettings.requirePasswordChange}
-                            onChange={(e) => setUserManagementSettings({...userManagementSettings, requirePasswordChange: e.target.checked})}
-                          />
-                          Require Password Change on First Login
-                        </Label>
-                      </FormGroup>
-                    </Col>
-                  </Row>
-                  <Button color="primary" onClick={handleUserManagementUpdate} disabled={loading}>
-                    {loading ? 'Updating...' : 'Update User Management Settings'}
-                  </Button>
+                          <Button 
+                            color="outline-warning" 
+                            size="sm"
+                            className="px-3 py-2"
+                            style={{ 
+                              borderRadius: '20px',
+                              border: '1px solid #ffc107',
+                              color: '#ffc107',
+                              transition: 'all 0.3s ease',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = '#ffc107';
+                              e.target.style.color = '#ffffff';
+                              e.target.style.borderColor = '#ffc107';
+                              e.target.style.boxShadow = '0 4px 12px rgba(255, 193, 7, 0.4)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'transparent';
+                              e.target.style.color = '#ffc107';
+                              e.target.style.borderColor = '#ffc107';
+                              e.target.style.boxShadow = 'none';
+                            }}
+                            onClick={() => setShowBackupCodesModal(true)}
+                          >
+                            <i className="ni ni-collection mr-2"></i>
+                            Manage Backup Codes
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-top">
+                        <h6 className="text-muted mb-3">
+                          <i className="ni ni-key-25 mr-2"></i>
+                          Password Management
+                        </h6>
+                        <div className="p-3 border rounded-lg mb-3" style={{ backgroundColor: 'rgb(248, 249, 250)' }}>
+                          <p className="text-muted mb-3">
+                            Keep your password secure and change it regularly for better account protection.
+                          </p>
+                          <Button 
+                            color="primary" 
+                            size="sm"
+                            className="px-4 py-2"
+                            style={{ 
+                              borderRadius: '20px',
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              border: 'none',
+                              boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                            }}
+                            onClick={() => setShowChangePasswordModal(true)}
+                          >
+                            <i className="ni ni-key-25 mr-2"></i>
+                            Change Password
+                          </Button>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
                 </TabPane>
               </TabContent>
             </CardBody>
@@ -797,6 +731,28 @@ const AdminSettings = () => {
         toggle={() => setShowDisable2FAModal(!showDisable2FAModal)}
         onSuccess={handle2FADisableSuccess}
         onCancel={() => setShowDisable2FAModal(false)}
+      />
+
+      {/* Backup Codes Modal */}
+      <BackupCodesModal
+        isOpen={showBackupCodesModal}
+        toggle={() => setShowBackupCodesModal(!showBackupCodesModal)}
+        onSuccess={() => {
+          setMessage({ type: 'success', text: 'Backup codes regenerated successfully!' });
+          setShowBackupCodesModal(false);
+        }}
+        onCancel={() => setShowBackupCodesModal(false)}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        toggle={() => setShowChangePasswordModal(!showChangePasswordModal)}
+        onSuccess={() => {
+          setMessage({ type: 'success', text: 'Password changed successfully!' });
+          setShowChangePasswordModal(false);
+        }}
+        onCancel={() => setShowChangePasswordModal(false)}
       />
     </div>
   );

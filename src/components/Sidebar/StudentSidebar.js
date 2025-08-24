@@ -149,7 +149,7 @@ const StudentSidebar = (props) => {
       if (mod.name === "Classroom") {
         links.push(
           <NavItem key="enrolled-classes">
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', overflowX: 'hidden', maxWidth: '100%' }}>
               <Button
                 color="link"
                 className="nav-link d-flex align-items-center"
@@ -164,7 +164,10 @@ const StudentSidebar = (props) => {
                   width: '100%',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  boxShadow: 'none'
+                  boxShadow: 'none',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}
                 onClick={e => { e.preventDefault(); setEnrolledOpen(!enrolledOpen); }}
               >
@@ -173,7 +176,7 @@ const StudentSidebar = (props) => {
                 <i className={`fa fa-chevron-${enrolledOpen ? "down" : "right"}`} style={{ position: 'absolute', right: -8, fontSize: 13, color: "#8898aa" }} />
               </Button>
               {enrolledOpen && (
-                <div style={{ marginLeft: 32 }}>
+                <div style={{ marginLeft: 32, overflowX: 'hidden', maxWidth: '100%' }}>
                   {/* To-Do module at the top */}
                   <NavItem key="todo-module">
                     <NavLink
@@ -235,11 +238,17 @@ const StudentSidebar = (props) => {
                             padding: "0.5rem 1rem",
                             fontSize: "0.93rem",
                             fontWeight: 400,
-                            color: "#525f7f"
+                            color: "#525f7f",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            maxWidth: "100%"
                           }}
                         >
                           <i className="ni ni-hat-3 mr-2 text-info" />
-                          {cls.subject_name || cls.subject} <span className="text-muted" style={{ fontSize: "0.85em", marginLeft: 6 }}>({cls.section_name || cls.section})</span>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {cls.subject_name || cls.subject} <span className="text-muted" style={{ fontSize: "0.85em", marginLeft: 6 }}>({cls.section_name || cls.section})</span>
+                          </span>
                         </NavLink>
                       </NavItem>
                     ))
@@ -272,8 +281,9 @@ const StudentSidebar = (props) => {
       className="navbar-vertical fixed-left navbar-light bg-white"
       expand="md"
       id="sidenav-main"
+      style={{ overflowX: 'hidden' }}
     >
-      <Container fluid>
+      <Container fluid style={{ overflowX: 'hidden', maxWidth: '100%' }}>
         <button
           className="navbar-toggler"
           type="button"
@@ -360,7 +370,7 @@ const StudentSidebar = (props) => {
             </DropdownMenu>
           </UncontrolledDropdown>
         </Nav>
-        <Collapse navbar isOpen={collapseOpen}>
+        <Collapse navbar isOpen={collapseOpen} style={{ overflowX: 'hidden' }}>
           <div className="navbar-collapse-header d-md-none">
             <Row>
               {logo ? (
@@ -388,7 +398,7 @@ const StudentSidebar = (props) => {
               </Col>
             </Row>
           </div>
-          <Nav navbar>{createLinks()}</Nav>
+          <Nav navbar style={{ overflowX: 'hidden', maxWidth: '100%' }}>{createLinks()}</Nav>
         </Collapse>
       </Container>
     </Navbar>

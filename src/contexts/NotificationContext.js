@@ -222,12 +222,7 @@ export const NotificationProvider = ({ children }) => {
               // Check for user ID in different possible fields
      const userId = user?.id || user?.user_id || user?.userId || user?.uid || user?._id;
      
-     // Add a test notification to verify the component is working
-     addNotification({ 
-       type: 'info', 
-       title: 'SSE Debug', 
-       message: 'NotificationProvider is working! User: ' + (userId || 'undefined') 
-     });
+
      
      if (!user || !token) {
        console.log('[Notifications] Missing user or token, skipping SSE connection');

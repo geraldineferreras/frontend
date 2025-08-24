@@ -167,24 +167,7 @@ const AdminSidebar = (props) => {
                       <i className="ni ni-calendar-grid-58 mr-2" /> Attendance Log
                     </NavLink>
                   </NavItem>
-                  <NavItem>
-                    <NavLink
-                      to="/admin/reports-logs/grades"
-                      tag={NavLinkRRD}
-                      className={location.pathname.startsWith("/admin/reports-logs/grades") ? "active" : ""}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "0.5rem 1rem",
-                        fontSize: "0.93rem",
-                        fontWeight: 400,
-                        color: location.pathname.startsWith("/admin/reports-logs/grades") ? "#fb6340" : "#525f7f"
-                      }}
-                      onClick={closeCollapse}
-                    >
-                      <i className="ni ni-hat-3 mr-2" /> Grades Log
-                    </NavLink>
-                  </NavItem>
+
                   <NavItem>
                     <NavLink
                       to="/admin/reports-logs/audit"

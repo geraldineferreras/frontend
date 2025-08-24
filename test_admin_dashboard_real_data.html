@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard API Test - Real Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .endpoint {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .endpoint h3 {
+            margin: 0 0 10px 0;
+            color: #007bff;
+        }
+        .endpoint-url {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 5px 0;
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .response pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .chart-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #495057;
+        }
+        .distribution-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .distribution-item:last-child {
+            border-bottom: none;
+        }
+        .distribution-label {
+            font-weight: 500;
+        }
+        .distribution-count {
+            background: #007bff;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .refresh-btn {
+            background: #28a745;
+        }
+        .refresh-btn:hover {
+            background: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 Admin Dashboard API Test - Real Data</h1>
+    <p>This page tests the admin dashboard API endpoints to ensure they're returning real data from the database.</p>
+
+    <div class="container">
+        <h2>📊 Dashboard Statistics Endpoint</h2>
+        <div class="endpoint">
+            <h3>GET /api/admin/dashboard/stats</h3>
+            <div class="endpoint-url">http://localhost/scms_new_backup/index.php/api/admin/dashboard/stats</div>
+            <button onclick="testDashboardStats()">Test Dashboard Stats</button>
+            <button class="refresh-btn" onclick="refreshAllData()">🔄 Refresh All Data</button>
+            <div id="dashboard-stats-response" class="response">
+                <div class="loading">Click "Test Dashboard Stats" to fetch data...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>👥 User Count Summary Endpoint</h2>
+        <div class="endpoint">
+            <h3>GET /api/admin/users/count</h3>
+            <div class="endpoint-url">http://localhost/scms_new_backup/index.php/api/admin/users/count</div>
+            <button onclick="testUserCount()">Test User Count</button>
+            <div id="user-count-response" class="response">
+                <div class="loading">Click "Test User Count" to fetch data...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📚 Section Count Summary Endpoint</h2>
+        <div class="endpoint">
+            <h3>GET /api/admin/sections/count</h3>
+            <div class="endpoint-url">http://localhost/scms_new_backup/index.php/api/admin/sections/count</div>
+            <button onclick="testSectionCount()">Test Section Count</button>
+            <div id="section-count-response" class="response">
+                <div class="loading">Click "Test Section Count" to fetch data...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📈 Dashboard Overview</h2>
+        <div id="dashboard-overview">
+            <div class="loading">Fetch data to see dashboard overview...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Distribution Charts Data</h2>
+        <div id="distribution-charts">
+            <div class="loading">Fetch data to see distribution charts...</div>
+        </div>
+    </div>
+
+    <script>
+        let dashboardData = null;
+        let userCountData = null;
+        let sectionCountData = null;
+
+        async function testDashboardStats() {
+            const responseDiv = document.getElementById('dashboard-stats-response');
+            responseDiv.innerHTML = '<div class="loading">Fetching dashboard statistics...</div>';
+            
+            try {
+                const response = await fetch('http://localhost/scms_new_backup/index.php/api/admin/dashboard/stats');
+                const data = await response.json();
+                
+                if (data.status) {
+                    dashboardData = data.data;
+                    responseDiv.innerHTML = `
+                        <div class="success">✅ Success! Dashboard statistics retrieved successfully</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    updateDashboardOverview();
+                    updateDistributionCharts();
+                } else {
+                    responseDiv.innerHTML = `
+                        <div class="error">❌ Error: ${data.message}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+
+        async function testUserCount() {
+            const responseDiv = document.getElementById('user-count-response');
+            responseDiv.innerHTML = '<div class="loading">Fetching user count...</div>';
+            
+            try {
+                const response = await fetch('http://localhost/scms_new_backup/index.php/api/admin/users/count');
+                const data = await response.json();
+                
+                if (data.status) {
+                    userCountData = data.data;
+                    responseDiv.innerHTML = `
+                        <div class="success">✅ Success! User count retrieved successfully</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    responseDiv.innerHTML = `
+                        <div class="error">❌ Error: ${data.message}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+
+        async function testSectionCount() {
+            const responseDiv = document.getElementById('section-count-response');
+            responseDiv.innerHTML = '<div class="loading">Fetching section count...</div>';
+            
+            try {
+                const response = await fetch('http://localhost/scms_new_backup/index.php/api/admin/sections/count');
+                const data = await response.json();
+                
+                if (data.status) {
+                    sectionCountData = data.data;
+                    responseDiv.innerHTML = `
+                        <div class="success">✅ Success! Section count retrieved successfully</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    responseDiv.innerHTML = `
+                        <div class="error">❌ Error: ${data.message}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+
+        function updateDashboardOverview() {
+            if (!dashboardData) return;
+            
+            const overviewDiv = document.getElementById('dashboard-overview');
+            overviewDiv.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.user_statistics.total_users}</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.user_statistics.students}</div>
+                        <div class="stat-label">Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.user_statistics.teachers}</div>
+                        <div class="stat-label">Teachers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.user_statistics.admins}</div>
+                        <div class="stat-label">Admins</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.section_statistics.total_sections}</div>
+                        <div class="stat-label">Total Sections</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.section_statistics.total_enrolled_students}</div>
+                        <div class="stat-label">Enrolled Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.program_distribution.length}</div>
+                        <div class="stat-label">Active Programs</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${dashboardData.academic_year_distribution.length}</div>
+                        <div class="stat-label">Academic Years</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateDistributionCharts() {
+            if (!dashboardData) return;
+            
+            const chartsDiv = document.getElementById('distribution-charts');
+            chartsDiv.innerHTML = `
+                <div class="chart-container">
+                    <h3 class="chart-title">Program Distribution</h3>
+                    ${dashboardData.program_distribution.map(p => `
+                        <div class="distribution-item">
+                            <span class="distribution-label">${p.program}</span>
+                            <span class="distribution-count">${p.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="chart-container">
+                    <h3 class="chart-title">Year Level Distribution</h3>
+                    ${dashboardData.year_level_distribution.map(y => `
+                        <div class="distribution-item">
+                            <span class="distribution-label">Year ${y.year_level}</span>
+                            <span class="distribution-count">${y.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="chart-container">
+                    <h3 class="chart-title">Semester Distribution</h3>
+                    ${dashboardData.semester_distribution.map(s => `
+                        <div class="distribution-item">
+                            <span class="distribution-label">${s.semester} Semester</span>
+                            <span class="distribution-count">${s.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="chart-container">
+                    <h3 class="chart-title">Academic Year Distribution</h3>
+                    ${dashboardData.academic_year_distribution.map(a => `
+                        <div class="distribution-item">
+                            <span class="distribution-label">${a.academic_year}</span>
+                            <span class="distribution-count">${a.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function refreshAllData() {
+            await Promise.all([
+                testDashboardStats(),
+                testUserCount(),
+                testSectionCount()
+            ]);
+        }
+
+        // Auto-load data when page loads
+        window.addEventListener('load', () => {
+            refreshAllData();
+        });
+    </script>
+</body>
+</html>
