@@ -2230,7 +2230,12 @@ const Index = (props) => {
   // Load admin dashboard statistics
   const loadAdminDashboardData = async () => {
     try {
+      // For admin users, don't show loading indicators
+      if (user?.role === "admin") {
+        setAdminDashboardLoading(false);
+      } else {
       setAdminDashboardLoading(true);
+      }
       console.log('Loading admin dashboard statistics...');
 
       // Fetch dashboard stats from the API
@@ -2323,7 +2328,10 @@ const Index = (props) => {
         ]
       });
     } finally {
+      // For admin users, keep loading state as false
+      if (user?.role !== "admin") {
       setAdminDashboardLoading(false);
+      }
     }
   };
 
@@ -2390,7 +2398,7 @@ const Index = (props) => {
                          <div className="text-uppercase text-muted font-weight-bold small mb-1">
                            {stat.label}
                          </div>
-                         {adminDashboardLoading ? (
+                         {adminDashboardLoading && user?.role !== "admin" ? (
                            <div className="d-flex align-items-center">
                              <div className="spinner-border spinner-border-sm text-muted me-2" role="status">
                                <span className="visually-hidden">Loading...</span>
@@ -2462,7 +2470,7 @@ const Index = (props) => {
                          <div className="text-uppercase text-muted font-weight-bold small mb-1">
                            {stat.label}
                          </div>
-                         {adminDashboardLoading ? (
+                         {adminDashboardLoading && user?.role !== "admin" ? (
                            <div className="d-flex align-items-center">
                              <div className="spinner-border spinner-border-sm text-muted me-2" role="status">
                                <span className="visually-hidden">Loading...</span>
@@ -2490,259 +2498,7 @@ const Index = (props) => {
              ))}
            </Row>
 
-          <Row>
 
-            <Col className="mb-5 mb-xl-0" xl="8">
-
-              <Card className="bg-gradient-default shadow">
-
-                <CardHeader className="bg-transparent">
-
-                  <Row className="align-items-center">
-
-                    <div className="col">
-
-                      <h6 className="text-uppercase text-light ls-1 mb-1">
-
-                        Overview
-
-                      </h6>
-
-                      <h2 className="text-white mb-0">User Count</h2>
-
-                    </div>
-
-                    <div className="col">
-
-                      <Nav className="justify-content-end" pills>
-
-                        <NavItem>
-
-                          <NavLink
-
-                            className={classnames("py-2 px-3", {
-
-                              active: activeNav === 1,
-
-                            })}
-
-                            href="#pablo"
-
-                            onClick={(e) => toggleNavs(e, 1)}
-
-                          >
-
-                            <span className="d-none d-md-block">Month</span>
-
-                            <span className="d-md-none">M</span>
-
-                          </NavLink>
-
-                        </NavItem>
-
-                        <NavItem>
-
-                          <NavLink
-
-                            className={classnames("py-2 px-3", {
-
-                              active: activeNav === 2,
-
-                            })}
-
-                            data-toggle="tab"
-
-                            href="#pablo"
-
-                            onClick={(e) => toggleNavs(e, 2)}
-
-                          >
-
-                            <span className="d-none d-md-block">Week</span>
-
-                            <span className="d-md-none">W</span>
-
-                          </NavLink>
-
-                        </NavItem>
-
-                      </Nav>
-
-                    </div>
-
-                  </Row>
-
-                </CardHeader>
-
-                <CardBody>
-
-                  {/* Chart */}
-
-                  <div className="chart">
-
-                    <Line
-
-                      data={adminUserCountData[chartExample1Data]}
-
-                      options={{
-
-                        scales: {
-
-                          yAxes: [
-
-                            {
-
-                              gridLines: {
-
-                                color: "#8898aa",
-
-                                zeroLineColor: "#8898aa",
-
-                              },
-
-                              ticks: {
-
-                                callback: function (value) {
-
-                                  if (!(value % 5) || value === 0) {
-
-                                    return value;
-
-                                  }
-
-                                },
-
-                                fontColor: "#ffffff",
-
-                              },
-
-                            },
-
-                          ],
-
-                          xAxes: [
-
-                            {
-
-                              ticks: {
-
-                                fontColor: "#ffffff",
-
-                              },
-
-                              gridLines: {
-
-                                color: "#8898aa",
-
-                                zeroLineColor: "#8898aa",
-
-                              },
-
-                            },
-
-                          ],
-
-                        },
-
-                        tooltips: {
-
-                          callbacks: {
-
-                            label: function (item, data) {
-
-                              var label = data.datasets[item.datasetIndex].label || "";
-
-                              var yLabel = item.yLabel;
-
-                              var content = "";
-
-                              if (data.datasets.length > 1) {
-
-                                content += label;
-
-                              }
-
-                              content += yLabel + " users";
-
-                              return content;
-
-                            },
-
-                          },
-
-                        },
-
-                        legend: {
-
-                          labels: {
-
-                            fontColor: "#ffffff",
-
-                          },
-
-                        },
-
-                      }}
-
-                      getDatasetAtEvent={(e) => console.log(e)}
-
-                    />
-
-                  </div>
-
-                </CardBody>
-
-              </Card>
-
-            </Col>
-
-            <Col xl="4">
-
-              <Card className="shadow">
-
-                <CardHeader className="bg-transparent">
-
-                  <Row className="align-items-center">
-
-                    <div className="col">
-
-                      <h6 className="text-uppercase text-muted ls-1 mb-1">
-
-                        Section Growth
-
-                      </h6>
-
-                      <h2 className="mb-0">Section Count</h2>
-
-                    </div>
-
-                  </Row>
-
-                </CardHeader>
-
-                <CardBody>
-
-                  {/* Chart */}
-
-                  <div className="chart">
-
-                    <Bar
-
-                      data={chartExample2.data}
-
-                      options={chartExample2.options}
-
-                    />
-
-                  </div>
-
-                </CardBody>
-
-              </Card>
-
-            </Col>
-
-          </Row>
 
           {/* Distribution Charts Row */}
           <Row className="mb-5">
@@ -2754,7 +2510,7 @@ const Index = (props) => {
                   <h2 className="mb-0">Students by Program</h2>
                 </CardHeader>
                 <CardBody>
-                  {adminDashboardLoading ? (
+                  {adminDashboardLoading && user?.role !== "admin" ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -2815,7 +2571,7 @@ const Index = (props) => {
                   <h2 className="mb-0">Students by Year Level</h2>
                 </CardHeader>
                 <CardBody>
-                  {adminDashboardLoading ? (
+                  {adminDashboardLoading && user?.role !== "admin" ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -2879,7 +2635,7 @@ const Index = (props) => {
                   <h2 className="mb-0">Sections by Semester</h2>
                 </CardHeader>
                 <CardBody>
-                  {adminDashboardLoading ? (
+                  {adminDashboardLoading && user?.role !== "admin" ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -2940,7 +2696,7 @@ const Index = (props) => {
                   <h2 className="mb-0">Sections by Academic Year</h2>
                 </CardHeader>
                 <CardBody>
-                  {adminDashboardLoading ? (
+                  {adminDashboardLoading && user?.role !== "admin" ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -3004,7 +2760,7 @@ const Index = (props) => {
                   <h2 className="mb-0">User Registration Summary</h2>
                 </CardHeader>
                 <CardBody>
-                  {adminDashboardLoading ? (
+                  {adminDashboardLoading && user?.role !== "admin" ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>

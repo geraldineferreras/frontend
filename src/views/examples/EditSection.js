@@ -117,32 +117,8 @@ const getInitialsAvatar = (fullName) => {
 const getStudentAvatar = (student) => {
   if (!student) return null;
   
-  // Check for profile picture in various formats
-  if (student.profile_pic) {
-    let imageUrl;
-    
-    // If it's a relative path, construct the full URL
-    if (student.profile_pic.startsWith('uploads/')) {
-      imageUrl = `http://localhost/scms_new_backup/${student.profile_pic}`;
-    }
-    // If it's already a full URL, use as is
-    else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
-      imageUrl = student.profile_pic;
-    }
-    // If it's a base64 data URL, return as is
-    else if (student.profile_pic.startsWith('data:')) {
-      return student.profile_pic;
-    }
-    // For other cases, try to construct the full URL
-    else {
-      imageUrl = `http://localhost/scms_new_backup/uploads/profile/${student.profile_pic}`;
-    }
-    
-    return imageUrl;
-  }
-  
-  // No profile picture available
-  return null;
+  // Use the profile picture utilities to get proper URL
+  return getProfilePictureUrl(student);
 };
 
 const EditSection = () => {

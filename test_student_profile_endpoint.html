@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Student Profile Endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .endpoint-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .response-section {
+            background: #f3e5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #9c27b0;
+        }
+        .test-button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        .test-button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .response-display {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #388e3c;
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .loading {
+            color: #1976d2;
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Student Profile Endpoint</h1>
+        
+        <div class="endpoint-info">
+            <h3>📡 Endpoint Information</h3>
+            <p><strong>URL:</strong> <code>http://localhost/scms_new_backup/index.php/api/student/profile</code></p>
+            <p><strong>Method:</strong> GET</p>
+            <p><strong>Authentication:</strong> Bearer Token Required</p>
+            <p><strong>Purpose:</strong> Fetch real student profile data for the settings page</p>
+        </div>
+
+        <div class="response-section">
+            <h3>📋 Expected Response Format</h3>
+            <pre>{
+    "status": true,
+    "message": "Student profile form data retrieved successfully",
+    "data": {
+        "role": "student",
+        "full_name": "CHRISTINE NOAH G. SINGIAN",
+        "email": "christinenoahsingian@gmail.com",
+        "address": "Guagua, Pampanga",
+        "student_num": "2022311852",
+        "contact_num": "09951568789",
+        "program": "Bachelor of Science in Information Technology",
+        "year_level": "4",
+        "section_id": "1",
+        "section_name": "BSIT 4C",
+        "qr_code": "IDNo: 2022311852\nFull Name: CHRISTINE NOAH G. SINGIAN\nProgram: Bachelor of Science in Information Technology"
+    }
+}</pre>
+        </div>
+
+        <div>
+            <h3>🔑 Authentication Setup</h3>
+            <p>To test this endpoint, you need to:</p>
+            <ol>
+                <li>Login to the SCMS system first</li>
+                <li>Copy your authentication token from localStorage</li>
+                <li>Paste it in the input field below</li>
+            </ol>
+            
+            <div>
+                <label for="tokenInput"><strong>Bearer Token:</strong></label><br>
+                <input type="text" id="tokenInput" placeholder="Paste your Bearer token here" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button class="test-button" onclick="testEndpoint()" id="testBtn">🚀 Test Student Profile Endpoint</button>
+            <button class="test-button" onclick="clearResponse()" style="background: #ff9800;">🗑️ Clear Response</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="response" class="response-display" style="display: none;"></div>
+    </div>
+
+    <script>
+        async function testEndpoint() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const testBtn = document.getElementById('testBtn');
+            const statusDiv = document.getElementById('status');
+            const responseDiv = document.getElementById('response');
+
+            if (!token) {
+                statusDiv.innerHTML = '<div class="error">❌ Please enter a Bearer token first</div>';
+                return;
+            }
+
+            // Disable button and show loading
+            testBtn.disabled = true;
+            testBtn.textContent = '⏳ Testing...';
+            statusDiv.innerHTML = '<div class="loading">🔄 Testing student profile endpoint...</div>';
+            responseDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('http://localhost/scms_new_backup/index.php/api/student/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.innerHTML = '<div class="success">✅ Endpoint test successful!</div>';
+                    
+                    // Display the response
+                    responseDiv.style.display = 'block';
+                    responseDiv.innerHTML = JSON.stringify(data, null, 2);
+                    
+                    // Validate the response structure
+                    validateResponse(data);
+                } else {
+                    statusDiv.innerHTML = `<div class="error">❌ Endpoint test failed: ${response.status} ${response.statusText}</div>`;
+                    responseDiv.style.display = 'block';
+                    responseDiv.innerHTML = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+                responseDiv.style.display = 'block';
+                responseDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                // Re-enable button
+                testBtn.disabled = false;
+                testBtn.textContent = '🚀 Test Student Profile Endpoint';
+            }
+        }
+
+        function validateResponse(data) {
+            const statusDiv = document.getElementById('status');
+            
+            // Check if response has the expected structure
+            if (data.status === true && data.data) {
+                const requiredFields = [
+                    'role', 'full_name', 'email', 'address', 'student_num', 
+                    'contact_num', 'program', 'year_level', 'section_name', 'qr_code'
+                ];
+                
+                const missingFields = requiredFields.filter(field => !data.data[field]);
+                
+                if (missingFields.length === 0) {
+                    statusDiv.innerHTML += '<div class="success">✅ All required fields are present in the response</div>';
+                } else {
+                    statusDiv.innerHTML += `<div class="error">⚠️ Missing fields: ${missingFields.join(', ')}</div>`;
+                }
+                
+                // Check specific values
+                if (data.data.full_name === 'CHRISTINE NOAH G. SINGIAN') {
+                    statusDiv.innerHTML += '<div class="success">✅ Full name matches expected value</div>';
+                }
+                
+                if (data.data.email === 'christinenoahsingian@gmail.com') {
+                    statusDiv.innerHTML += '<div class="success">✅ Email matches expected value</div>';
+                }
+                
+                if (data.data.student_num === '2022311852') {
+                    statusDiv.innerHTML += '<div class="success">✅ Student number matches expected value</div>';
+                }
+            } else {
+                statusDiv.innerHTML += '<div class="error">❌ Response structure is not as expected</div>';
+            }
+        }
+
+        function clearResponse() {
+            document.getElementById('status').innerHTML = '';
+            document.getElementById('response').innerHTML = '';
+            document.getElementById('response').style.display = 'none';
+        }
+
+        // Auto-fill token from localStorage if available
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                document.getElementById('tokenInput').value = token;
+            }
+        });
+    </script>
+</body>
+</html>

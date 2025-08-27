@@ -41,6 +41,10 @@ const EditUser = () => {
   const view = searchParams.get('view') || 'table';
   const role = searchParams.get('role') || 'admin';
 
+  // Add error boundary state
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   // Form state
   const [formRole, setFormRole] = useState("");
   const [fullName, setFullName] = useState("");
@@ -102,26 +106,35 @@ const EditUser = () => {
         setIsLoading(true);
         setError("");
         
-        
+        console.log('EditUser useEffect - Starting to fetch user data');
+        console.log('User ID from params:', id);
+        console.log('Role from search params:', role);
+        console.log('Current location:', location.pathname);
         
         // Check if ID is valid
         if (!id || id === 'undefined') {
+          console.error('Invalid user ID:', id);
           setError("Invalid user ID. Please go back and try again.");
           setIsLoading(false);
           return;
         }
         
         // Use the correct endpoint with role and user_id parameters
+        console.log('Calling ApiService.getUserById with:', { id, role });
         const response = await ApiService.getUserById(id, role);
+        console.log('API response received:', response);
         
         const user = response.data || response.user || response;
         
         if (!user) {
+          console.error('No user data received from API');
           setError("User not found");
           setIsLoading(false);
           return;
         }
 
+        console.log('User data successfully fetched:', user);
+        
         // Pre-fill form with user data
         setFormRole(user.role || role);
         setFullName(user.full_name || user.name || "");
@@ -476,6 +489,23 @@ const EditUser = () => {
       });
     }
   }, [formRole, studentNumber, fullName, department]);
+
+  // Error boundary effect
+  useEffect(() => {
+    const handleError = (error) => {
+      console.error('EditUser component error:', error);
+      setHasError(true);
+      setErrorMessage(error.message || 'An unexpected error occurred');
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleError);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleError);
+    };
+  }, []);
 
   // Image cropping functions (same as CreateUser.js)
   const onCropComplete = (croppedArea, croppedAreaPixels) => {
@@ -1058,6 +1088,24 @@ const EditUser = () => {
       console.error("Error updating user:", error);
     }
   };
+
+  // Error boundary check - must be after all hooks
+  if (hasError) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          <h4>Error Loading Edit User Form</h4>
+          <p>{errorMessage}</p>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (showPageLoader) {

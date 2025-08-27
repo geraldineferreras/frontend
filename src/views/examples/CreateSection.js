@@ -162,32 +162,8 @@ const userManagementStudents = userManagementUsers.filter(u => u.role === "stude
 const getStudentAvatar = (student) => {
   if (!student) return null;
   
-  // Check for profile picture in various formats
-  if (student.profile_pic) {
-    let imageUrl;
-    
-    // If it's a relative path, construct the full URL
-    if (student.profile_pic.startsWith('uploads/')) {
-      imageUrl = `http://localhost/scms_new/${student.profile_pic}`;
-    }
-    // If it's already a full URL, use as is
-    else if (student.profile_pic.startsWith('http://') || student.profile_pic.startsWith('https://')) {
-      imageUrl = student.profile_pic;
-    }
-    // If it's a base64 data URL, return as is
-    else if (student.profile_pic.startsWith('data:')) {
-      return student.profile_pic;
-    }
-    // For other cases, try to construct the full URL
-    else {
-      imageUrl = `http://localhost/scms_new/uploads/profile/${student.profile_pic}`;
-    }
-    
-    return imageUrl;
-  }
-  
-  // No profile picture available
-  return null;
+  // Use the profile picture utilities to get proper URL
+  return getProfilePictureUrl(student);
 };
 
 const CreateSection = () => {
@@ -476,50 +452,63 @@ const CreateSection = () => {
     console.log('Profile pic type:', typeof t.profile_pic);
     console.log('Profile pic length:', t.profile_pic ? t.profile_pic.length : 0);
     
-    // Handle profile picture URL - use same logic as UserManagement
-    let avatarUrl = require("../../assets/img/theme/team-1-800x800.jpg"); // default fallback
-    
-    if (t.profile_pic) {
-      // If it's a relative path, construct the full URL (same logic as UserManagement)
-      if (t.profile_pic.startsWith('uploads/')) {
-        avatarUrl = `http://localhost/scms_new/${t.profile_pic}`;
-        console.log('Constructed uploads URL:', avatarUrl);
-      } else {
-        avatarUrl = t.profile_pic;
-        console.log('Using original profile_pic as URL:', avatarUrl);
-      }
-    } else {
-      console.log('No profile_pic found, using default avatar');
-    }
+    // Use the profile picture utilities to get proper URL
+    const profilePicUrl = getProfilePictureUrl(t);
+    const initials = getUserInitials(t);
+    const avatarColor = getAvatarColor(t);
     
     console.log(`Creating adviser option for ${t.full_name}:`, {
       original_profile_pic: t.profile_pic,
-      final_avatar_url: avatarUrl
+      final_profile_pic_url: profilePicUrl,
+      initials: initials,
+      avatar_color: avatarColor
     });
     console.log('===============================================');
     
     return {
       value: t.id || t.user_id, 
       label: t.full_name + ' (' + t.email + ')', 
-      avatar: avatarUrl, 
+      profile_pic_url: profilePicUrl,
+      initials: initials,
+      avatar_color: avatarColor,
       name: t.full_name, 
       email: t.email 
     };
   });
   const AdviserOption = (props) => (
     <div {...props.innerProps} style={{ display: 'flex', alignItems: 'center', padding: 8, background: props.isFocused ? '#f6f9fc' : 'white' }}>
-      <img 
-        src={props.data.profile_image_url || props.data.avatar} 
-        alt={props.data.label} 
-        style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover' }}
-        onLoad={() => {
-          console.log('Image loaded successfully:', props.data.profile_image_url || props.data.avatar);
+      {props.data.profile_pic_url ? (
+        <img 
+          src={props.data.profile_pic_url} 
+          alt={props.data.name} 
+          style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, objectFit: 'cover' }}
+          onError={(e) => {
+            // Hide the image and show initials when it fails to load
+            e.target.style.display = 'none';
+            const initialsDiv = e.target.nextSibling;
+            if (initialsDiv) {
+              initialsDiv.style.display = 'flex';
+            }
+          }}
+        />
+      ) : null}
+      <div 
+        style={{ 
+          width: 28, 
+          height: 28, 
+          borderRadius: '50%', 
+          marginRight: 10, 
+          background: props.data.avatar_color,
+          color: 'white',
+          display: props.data.profile_pic_url ? 'none' : 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          fontWeight: 'bold'
         }}
-        onError={(e) => {
-          console.log('Image failed to load:', props.data.profile_image_url || props.data.avatar);
-          e.target.src = require("../../assets/img/theme/team-1-800x800.jpg");
-        }}
-      />
+      >
+        {props.data.initials}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <span style={{ fontWeight: 700, color: '#525F7F', fontSize: '0.74rem', lineHeight: 1 }}>{props.data.name}</span>
         <span style={{ color: '#7b8a9b', fontSize: '0.63rem', fontWeight: 400, marginTop: 1 }}>{props.data.email}</span>
@@ -534,18 +523,38 @@ const CreateSection = () => {
       padding: '6px 0',
       margin: '2px 0',
     }}>
-      <img 
-        src={props.data.profile_image_url || props.data.avatar} 
-        alt={props.data.label} 
-        style={{ width: 24, height: 24, borderRadius: '50%', marginRight: 8, objectFit: 'cover' }}
-        onLoad={() => {
-          console.log('Image loaded successfully (single value):', props.data.profile_image_url || props.data.avatar);
+      {props.data.profile_pic_url ? (
+        <img 
+          src={props.data.profile_pic_url} 
+          alt={props.data.name} 
+          style={{ width: 24, height: 24, borderRadius: '50%', marginRight: 8, objectFit: 'cover' }}
+          onError={(e) => {
+            // Hide the image and show initials when it fails to load
+            e.target.style.display = 'none';
+            const initialsDiv = e.target.nextSibling;
+            if (initialsDiv) {
+              initialsDiv.style.display = 'flex';
+            }
+          }}
+        />
+      ) : null}
+      <div 
+        style={{ 
+          width: 24, 
+          height: 24, 
+          borderRadius: '50%', 
+          marginRight: 8, 
+          background: props.data.avatar_color,
+          color: 'white',
+          display: props.data.profile_pic_url ? 'none' : 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '10px',
+          fontWeight: 'bold'
         }}
-        onError={(e) => {
-          console.log('Image failed to load (single value):', props.data.profile_image_url || props.data.avatar);
-          e.target.src = require("../../assets/img/theme/team-1-800x800.jpg");
-        }}
-      />
+      >
+        {props.data.initials}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <span style={{ fontWeight: 700, color: '#525F7F', fontSize: '0.74rem', lineHeight: 1 }}>{props.data.name}</span>
         <span style={{ color: '#7b8a9b', fontSize: '0.63rem', fontWeight: 400, marginTop: 1 }}>{props.data.email}</span>

@@ -211,6 +211,7 @@ const UserManagement = () => {
           ...user,
           id: user.id || user.user_id || user.userId || '', // Add ID normalization
           full_name: user.full_name || user.name || '',
+          role: user.role || user.user_role || user.userRole || activeTab, // Add role normalization
           program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
           course_year_section: user.course_year_section || user.section || '',
           last_login: user.last_login || user.lastLogin || '',
@@ -226,6 +227,15 @@ const UserManagement = () => {
             cover_pic: normalizedUser.cover_pic
           });
         }
+        
+        // Log role normalization for debugging
+        console.log(`User ${normalizedUser.full_name} role normalization:`, {
+          originalRole: user.role,
+          userRole: user.user_role,
+          userRoleAlt: user.userRole,
+          activeTab: activeTab,
+          finalRole: normalizedUser.role
+        });
         
         return normalizedUser;
       });
@@ -726,12 +736,51 @@ const UserManagement = () => {
 
   // Edit user navigation
   const handleEditUser = (user) => {
+    // Debug logging to see what's happening
+    console.log('handleEditUser called with user:', user);
+    console.log('User ID:', user.id);
+    console.log('User role:', user.role);
+    console.log('Current location:', location.pathname);
+    console.log('Current search params:', location.search);
+    
+    // Validate user object has required fields
+    if (!user || !user.id) {
+      console.error('Invalid user object or missing ID:', user);
+      alert('Error: Invalid user data. Please try again.');
+      return;
+    }
+    
+    if (!user.role) {
+      console.error('User missing role:', user);
+      alert('Error: User role not found. Please try again.');
+      return;
+    }
+    
     // Navigate to EditUser page with user ID, role, and preserve current tab and view
     const currentSearchParams = new URLSearchParams(location.search);
     const currentTab = currentSearchParams.get('tab') || activeTab;
     const currentView = currentSearchParams.get('view') || 'table';
     
-    navigate(`/admin/edit-user/${user.id}?role=${user.role}&tab=${currentTab}&view=${currentView}`);
+    const editUrl = `/admin/edit-user/${user.id}?role=${user.role}&tab=${currentTab}&view=${currentView}`;
+    console.log('Navigating to:', editUrl);
+    
+    try {
+      // Try the primary navigation method
+      navigate(editUrl);
+      
+      // Add a fallback check to see if navigation actually happened
+      setTimeout(() => {
+        if (window.location.pathname !== editUrl) {
+          console.warn('Navigation may have failed, trying fallback method');
+          // Fallback: try using window.location
+          window.location.href = editUrl;
+        }
+      }, 100);
+    } catch (navigationError) {
+      console.error('Navigation failed:', navigationError);
+      // Fallback: try using window.location
+      window.location.href = editUrl;
+    }
   };
 
   // Helper to abbreviate course names

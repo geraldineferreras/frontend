@@ -269,13 +269,7 @@ var routes = [
     component: <CreateUser />,
     layout: "/student",
   },
-  {
-    path: "/edit-user/:id",
-    name: "Edit User",
-    icon: "ni ni-single-02 text-primary",
-    component: <EditUser />,
-    layout: "/student",
-  },
+
   {
     path: "/settings",
     name: "Settings",

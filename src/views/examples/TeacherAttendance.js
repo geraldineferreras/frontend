@@ -25,7 +25,7 @@ import {
   Alert,
   Spinner,
 } from "reactstrap";
-import { FaQrcode, FaTable, FaCheckCircle, FaTimesCircle, FaUndo, FaUser, FaDownload, FaCalendarAlt } from "react-icons/fa";
+import { FaQrcode, FaTable, FaCheckCircle, FaTimesCircle, FaUndo, FaUser, FaDownload, FaCalendarAlt, FaClock } from "react-icons/fa";
 import LottieLoader from "components/LottieLoader";
 import { QrReader } from "react-qr-reader";
 import apiService from "../../services/api";
@@ -60,11 +60,125 @@ const TeacherAttendance = () => {
   const [manualTable, setManualTable] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false);
+
+  // State for QR attendance session management
+  const [qrSessionStartTime, setQrSessionStartTime] = useState(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState(null); // ISO string
+  const [isQrSessionActive, setIsQrSessionActive] = useState(false);
+  const gracePeriodMinutes = 15; // 15 minutes grace period
+  const [scanLock, setScanLock] = useState(false);
+  const [lastScan, setLastScan] = useState({ studentId: null, at: 0 });
+  const SCAN_COOLDOWN_MS = 1800; // avoid rapid duplicate requests
+  const [timerTick, setTimerTick] = useState(0); // force re-render for countdown
+  const [lateMode, setLateMode] = useState(false);
+  const [graceExpired, setGraceExpired] = useState(false);
 
   // Clear error and success messages
   const clearMessages = () => {
     setError(null);
     setSuccessMessage(null);
+  };
+
+  // Function to start QR attendance session
+  const startQrAttendanceSession = () => {
+    if (isQrSessionActive) {
+      setError("A QR attendance session is already active. Please end the current session first.");
+      return;
+    }
+    
+    const now = new Date();
+    setQrSessionStartTime(now);
+    setSessionStartedAt(now.toISOString());
+    try {
+      localStorage.setItem('qrSessionStartedAt', now.toISOString());
+    } catch (_) {}
+    setIsQrSessionActive(true);
+    setQrModal(true);
+    setGraceExpired(false);
+    setSuccessMessage("QR attendance session started! Students have 15 minutes to scan.");
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // Function to resume existing QR session (when modal is reopened)
+  const resumeQrSession = () => {
+    if (!isQrSessionActive) {
+      setError("No active QR session to resume. Please start a new session first.");
+      return;
+    }
+    
+    // Check if session has expired
+    if (!isWithinGracePeriod()) {
+      setError("The current QR session has expired. Please start a new session.");
+      // Auto-end expired session
+      endQrAttendanceSession();
+      return;
+    }
+    
+    // hydrate from localStorage if needed
+    try {
+      const stored = localStorage.getItem('qrSessionStartedAt');
+      if (stored) setSessionStartedAt(stored);
+    } catch (_) {}
+    setQrModal(true);
+    setSuccessMessage(`Resumed QR session with ${formatMsToMMSS(getRemainingGraceMs())} remaining.`);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // Function to end QR attendance session
+  const endQrAttendanceSession = () => {
+    setIsQrSessionActive(false);
+    setQrSessionStartTime(null);
+    setQrModal(false);
+    setShowEndSessionConfirm(false);
+    setSessionStartedAt(null);
+    try { localStorage.removeItem('qrSessionStartedAt'); } catch (_) {}
+    setLateMode(false);
+    setGraceExpired(false);
+    setSuccessMessage("QR attendance session ended.");
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // Function to confirm ending session
+  const confirmEndSession = () => {
+    setShowEndSessionConfirm(true);
+  };
+
+  // Function to check if current time is within grace period
+  const isWithinGracePeriod = () => {
+    if (!isQrSessionActive) return false;
+    const baseIso = sessionStartedAt || (typeof localStorage !== 'undefined' && localStorage.getItem('qrSessionStartedAt')) || null;
+    const baseTime = baseIso ? new Date(baseIso) : qrSessionStartTime;
+    if (!baseTime) return false;
+    const now = new Date();
+    const minutesDiff = (now.getTime() - baseTime.getTime()) / (1000 * 60);
+    return minutesDiff <= gracePeriodMinutes;
+  };
+
+  // Function to get remaining grace period time (minutes)
+  const getRemainingGraceTime = () => {
+    if (!isQrSessionActive) return 0;
+    const baseIso = sessionStartedAt || (typeof localStorage !== 'undefined' && localStorage.getItem('qrSessionStartedAt')) || null;
+    const base = baseIso ? new Date(baseIso) : qrSessionStartTime;
+    if (!base) return 0;
+    const remainingMs = Math.max(0, (gracePeriodMinutes * 60 * 1000) - (Date.now() - base.getTime()));
+    return Math.ceil(remainingMs / 60000);
+  };
+
+  // Remaining ms for mm:ss display
+  const getRemainingGraceMs = () => {
+    if (!isQrSessionActive) return 0;
+    const baseIso = sessionStartedAt || (typeof localStorage !== 'undefined' && localStorage.getItem('qrSessionStartedAt')) || null;
+    const base = baseIso ? new Date(baseIso) : qrSessionStartTime;
+    if (!base) return 0;
+    return Math.max(0, (gracePeriodMinutes * 60 * 1000) - (Date.now() - base.getTime()));
+  };
+
+  const formatMsToMMSS = (ms) => {
+    const total = Math.ceil(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
   // Load classes on component mount
@@ -81,6 +195,31 @@ const TeacherAttendance = () => {
       setAttendanceData(null);
     }
   }, [selectedClass, selectedDate]);
+
+  // Timer effect for QR session countdown (update every second)
+  useEffect(() => {
+    let interval;
+    if (isQrSessionActive && qrSessionStartTime) {
+      interval = setInterval(() => {
+        setTimerTick((t) => (t + 1) % 1_000_000);
+        // When grace period ends, fully end timed session and mark graceExpired
+        if (!isWithinGracePeriod()) {
+          setIsQrSessionActive(false);
+          setQrSessionStartTime(null);
+          setSessionStartedAt(null);
+          try { localStorage.removeItem('qrSessionStartedAt'); } catch (_) {}
+          if (qrModal) setQrModal(false);
+          setGraceExpired(true);
+          setLateMode(false);
+          setSuccessMessage("Grace period ended. Enable Late Mode to scan late students.");
+          setTimeout(() => setSuccessMessage(null), 4000);
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isQrSessionActive, qrSessionStartTime, sessionStartedAt]);
 
   const loadClasses = async () => {
     try {
@@ -125,7 +264,9 @@ const TeacherAttendance = () => {
 
   const handleQrScan = async (result) => {
     if (result) {
+      if (scanLock) return;
       try {
+        setScanLock(true);
         setScannedData(result);
         
         // Parse the QR code data - extract ID from the scanned text
@@ -151,6 +292,11 @@ const TeacherAttendance = () => {
           return;
         }
 
+        // Throttle duplicate scan of the same student within 4s
+        if (studentId && lastScan.studentId === studentId && (Date.now() - lastScan.at) < 4000) {
+          return; // ignore duplicate
+        }
+
         // Check if the scanned student is enrolled in this class
         const enrolledStudent = attendanceData?.records?.find(
           record => 
@@ -163,12 +309,32 @@ const TeacherAttendance = () => {
           return;
         }
 
+        // Check if QR session is active
+        if (!isQrSessionActive) {
+          setError("QR attendance session is not active. Please start the session first.");
+          return;
+        }
+
+        // Check if the session is outside grace; allow if Late Mode is enabled
+        if (!isWithinGracePeriod() && !lateMode) {
+          setError("QR attendance grace period ended. Enable Late Mode to continue scanning.");
+          return;
+        }
+
         // Function to get current time in Philippine time
         const getPhilippineTime = () => {
           const now = new Date();
           const philippineTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // Add 8 hours for UTC+8
           return philippineTime.toISOString().split('T')[1].split('.')[0];
         };
+
+        // Determine attendance status based on grace period and Late Mode
+        let attendanceStatus = 'Present';
+        let notes = 'QR Scan Attendance';
+        if (lateMode || !isWithinGracePeriod()) {
+          attendanceStatus = 'Late';
+          notes = lateMode ? 'QR Scan Attendance - Late Mode' : 'QR Scan Attendance - Scanned after grace period';
+        }
 
         // Prepare attendance data for database
         const newAttendanceRecord = {
@@ -177,9 +343,11 @@ const TeacherAttendance = () => {
           section_name: attendanceData.classroom.section_name,
           class_id: selectedClass,
           date: selectedDate,
+          // compute on frontend; Late Mode forces 'Late'
+          status: (lateMode || !isWithinGracePeriod()) ? 'Late' : 'Present',
+          session_started_at: (sessionStartedAt || (typeof localStorage !== 'undefined' && localStorage.getItem('qrSessionStartedAt'))) || new Date().toISOString(),
           time_in: getPhilippineTime(),
-          status: 'Present',
-          notes: 'QR Scan Attendance',
+          notes: notes,
           teacher_id: attendanceData.classroom.teacher_id
         };
 
@@ -189,16 +357,26 @@ const TeacherAttendance = () => {
         if (response.status) {
           // Reload attendance records
           await loadAttendanceRecords();
-          setQrModal(false);
-          setScannedData(null);
-          setSuccessMessage(`Attendance recorded successfully for ${enrolledStudent.student_name}!`);
+          
+          // Show success message with status
+          const statusMessage = attendanceStatus === 'Present' 
+            ? `Attendance recorded successfully for ${enrolledStudent.student_name}! (Present)`
+            : `Attendance recorded for ${enrolledStudent.student_name}! (Late - scanned after grace period)`;
+          
+          setSuccessMessage(statusMessage);
           setTimeout(() => setSuccessMessage(null), 3000);
+          
+          // Don't close modal automatically - let teacher continue scanning
+          setScannedData(null);
+          setLastScan({ studentId, at: Date.now() });
         } else {
           setError("Failed to record attendance");
         }
       } catch (error) {
         console.error("Error recording QR attendance:", error);
         setError(error.message || "Failed to record attendance");
+      } finally {
+        setTimeout(() => setScanLock(false), SCAN_COOLDOWN_MS);
       }
     }
   };
@@ -397,6 +575,37 @@ const TeacherAttendance = () => {
           </Alert>
         )}
 
+        {/* QR Session Status */}
+        {isQrSessionActive && (
+          <Row className="mb-4">
+            <Col xs={12}>
+              <Alert color={qrModal ? "success" : "warning"} className="mb-0">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <i className="fas fa-qrcode mr-2" />
+                    <strong>QR Attendance Session Active</strong>
+                    <span className="ml-3 text-muted">
+                      Started at {qrSessionStartTime?.toLocaleTimeString()}
+                    </span>
+                    {!qrModal && (
+                      <span className="ml-3 text-warning">
+                        <i className="fas fa-exclamation-triangle mr-1" />
+                        Scanner closed - Click 'Resume QR Scan' to continue
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className={`h4 mb-0 ${qrModal ? 'text-success' : 'text-warning'}`}>
+                      {formatMsToMMSS(getRemainingGraceMs())}
+                    </div>
+                    <small className="text-muted">remaining</small>
+                  </div>
+                </div>
+              </Alert>
+            </Col>
+          </Row>
+        )}
+
         {/* Attendance Summary Cards - Always Visible */}
         <Row className="mb-4">
           <Col xs={12} sm={3} className="mb-3">
@@ -555,6 +764,28 @@ const TeacherAttendance = () => {
                   </UncontrolledDropdown>
                 </FormGroup>
               </Col>
+              {/* Late Mode toggle appears after timeout (timed session finished) */}
+              {graceExpired && (
+                <Col xs={12} sm={6} md={2} className="d-flex align-items-center mb-3 mb-sm-0">
+                  <Button
+                    color={lateMode ? "warning" : "secondary"}
+                    className="w-100 font-weight-bold shadow"
+                    style={{ height: "44px", borderRadius: "8px", whiteSpace: "nowrap", fontSize: "0.875rem" }}
+                    onClick={() => {
+                      const next = !lateMode;
+                      setLateMode(next);
+                      if (next) {
+                        setQrModal(true);
+                        setSuccessMessage("Late Mode enabled. Scanner reopened for late students.");
+                        setTimeout(() => setSuccessMessage(null), 2500);
+                      }
+                    }}
+                    disabled={!selectedClass}
+                  >
+                    <FaClock className="mr-2" /> {lateMode ? 'Disable Late Mode' : 'Enable Late Mode'}
+                  </Button>
+                </Col>
+              )}
               <Col xs={12} sm={6} md={3} className="d-flex align-items-center mb-3 mb-sm-0">
                 <FormGroup className="w-100">
                   <label className="form-control-label mb-2">Date</label>
@@ -568,15 +799,31 @@ const TeacherAttendance = () => {
                 </FormGroup>
               </Col>
               <Col xs={12} sm={6} md={2} className="d-flex align-items-center mb-3 mb-sm-0">
-                <Button
-                  color="success"
-                  className="w-100 font-weight-bold shadow"
-                  style={{ height: "44px", borderRadius: "8px", whiteSpace: "nowrap", fontSize: "0.875rem" }}
-                  onClick={() => setQrModal(true)}
-                  disabled={!selectedClass}
-                >
-                  <FaQrcode className="mr-2" /> Start QR Scan
-                </Button>
+                                  <Button
+                    color="success"
+                    className="w-100 font-weight-bold shadow"
+                    style={{ height: "44px", borderRadius: "8px", whiteSpace: "nowrap", fontSize: "0.875rem" }}
+                    onClick={() => {
+                      if (isQrSessionActive) {
+                        if (qrModal) {
+                          confirmEndSession();
+                        } else {
+                          resumeQrSession();
+                        }
+                      } else {
+                        if (graceExpired && lateMode) {
+                          // Late-only scanning: reopen scanner without starting a timed session
+                          setQrModal(true);
+                        } else {
+                          startQrAttendanceSession();
+                        }
+                      }
+                    }}
+                    disabled={!selectedClass || (graceExpired && !lateMode)}
+                  >
+                    <FaQrcode className="mr-2" /> 
+                    {isQrSessionActive ? (qrModal ? 'End QR Scan' : 'Resume QR Scan') : (graceExpired && lateMode ? 'Start QR Scan' : 'Start QR Scan')}
+                  </Button>
               </Col>
               <Col xs={12} sm={6} md={3} className="d-flex align-items-center mb-3 mb-sm-0">
                 <Button
@@ -655,8 +902,8 @@ const TeacherAttendance = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {attendanceData.records.map((record) => (
-                      <tr key={record.attendance_id}>
+                    {attendanceData.records.map((record, idx) => (
+                      <tr key={`${record.attendance_id || record.id || record.student_id || record.student_num || 'row'}_${record.date || idx}`}>
                         <td>
                           <div className="media align-items-center">
                             <div className="media-body">
@@ -715,13 +962,43 @@ const TeacherAttendance = () => {
       </Container>
 
       {/* QR Scanner Modal */}
-      <Modal isOpen={qrModal} toggle={() => setQrModal(false)} size="md">
+      <Modal isOpen={qrModal} toggle={() => {
+        if (isQrSessionActive) {
+          setSuccessMessage("QR modal closed. Session is still active. Click 'Resume QR Scan' to continue scanning.");
+          setTimeout(() => setSuccessMessage(null), 5000);
+        }
+        setQrModal(false);
+      }} size="md">
         <ModalHeader toggle={() => setQrModal(false)}>
           <FaQrcode className="mr-2" />
           QR Code Scanner
         </ModalHeader>
         <ModalBody>
           <div className="text-center">
+            {/* Session Status and Timer */}
+            {isQrSessionActive && (
+              <div className="mb-3">
+                <Alert color="info">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span>
+                      <i className="fas fa-clock mr-2" />
+                      QR Attendance Session Active
+                    </span>
+                    <span className="font-weight-bold">
+                      {formatMsToMMSS(getRemainingGraceMs())} remaining
+                    </span>
+                  </div>
+                  <div className="mt-2 text-muted">
+                    <small>
+                      Students who scan within {gracePeriodMinutes} minutes will be marked as Present.
+                      <br />
+                      Students who scan after {gracePeriodMinutes} minutes will be marked as Late.
+                    </small>
+                  </div>
+                </Alert>
+              </div>
+            )}
+            
             <QrReader
               onResult={handleQrScan}
               constraints={{ facingMode: "environment" }}
@@ -736,8 +1013,40 @@ const TeacherAttendance = () => {
           </div>
         </ModalBody>
         <ModalFooter>
+          {isQrSessionActive && (
+            <Button color="warning" onClick={endQrAttendanceSession} className="mr-auto">
+              <i className="fas fa-stop mr-2" />
+              End Session
+            </Button>
+          )}
           <Button color="secondary" onClick={() => setQrModal(false)}>
             Close
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* End Session Confirmation Modal */}
+      <Modal isOpen={showEndSessionConfirm} toggle={() => setShowEndSessionConfirm(false)} size="sm">
+        <ModalHeader toggle={() => setShowEndSessionConfirm(false)}>
+          <i className="fas fa-exclamation-triangle text-warning mr-2" />
+          Confirm End Session
+        </ModalHeader>
+        <ModalBody>
+          <p>Are you sure you want to end the current QR attendance session?</p>
+          <p className="text-muted mb-0">
+            <small>
+              This will close the session and prevent any further QR scans. 
+              Students who haven't scanned yet will need to be marked manually.
+            </small>
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" onClick={() => setShowEndSessionConfirm(false)}>
+            Cancel
+          </Button>
+          <Button color="warning" onClick={endQrAttendanceSession}>
+            <i className="fas fa-stop mr-2" />
+            End Session
           </Button>
         </ModalFooter>
       </Modal>

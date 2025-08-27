@@ -51,6 +51,48 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [autoDetectedRole, setAutoDetectedRole] = useState("");
+
+  // Function to detect role from email
+  const detectRoleFromEmail = (email) => {
+    if (!email || !email.includes('@pampangastateu.edu.ph')) {
+      return null;
+    }
+    
+    const localPart = email.replace('@pampangastateu.edu.ph', '');
+    
+    // Check if it's a student number (10 digits starting with year)
+    if (/^\d{10}$/.test(localPart)) {
+      return 'student';
+    }
+    
+    // Check if it's initials (e.g., a.ferrer)
+    if (/^[a-z]\.[a-z]+$/i.test(localPart)) {
+      return 'teacher';
+    }
+    
+    return null;
+  };
+
+  // Auto-detect role when email changes
+  const handleEmailChange = (e) => {
+    const { value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      email: value
+    }));
+    
+    const detectedRole = detectRoleFromEmail(value);
+    setAutoDetectedRole(detectedRole);
+    
+    // Auto-select role if detected
+    if (detectedRole && !formData.role) {
+      setFormData(prev => ({
+        ...prev,
+        role: detectedRole
+      }));
+    }
+  };
 
   const handleGoogleSuccess = (userData, variant) => {
     console.log('Google registration successful:', userData);
@@ -74,12 +116,78 @@ const Register = () => {
     setError(errorMessage);
   };
 
+  // Password strength checker
+  const checkPasswordStrength = (password) => {
+    if (!password) return "";
+    
+    let score = 0;
+    let feedback = [];
+    
+    // Length check
+    if (password.length >= 8) {
+      score += 1;
+    } else {
+      feedback.push("At least 8 characters");
+    }
+    
+    // Lowercase check
+    if (/[a-z]/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("One lowercase letter");
+    }
+    
+    // Uppercase check
+    if (/[A-Z]/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("One uppercase letter");
+    }
+    
+    // Number check
+    if (/\d/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("One number");
+    }
+    
+    // Special character check
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("One special character");
+    }
+    
+    if (score === 5) return { strength: "strong", score, feedback: [] };
+    if (score >= 3) return { strength: "medium", score, feedback };
+    return { strength: "weak", score, feedback };
+  };
+
+  const [passwordStrength, setPasswordStrength] = useState({ strength: "", score: 0, feedback: [] });
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (name === "password") {
+      setPasswordStrength(checkPasswordStrength(value));
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+    
+    // If role is manually changed, clear auto-detected role
+    if (name === 'role') {
+      setAutoDetectedRole("");
+    }
   };
 
   const togglePasswordVisibility = (fieldName) => {
@@ -94,6 +202,13 @@ const Register = () => {
       setError("Please select a role");
       return false;
     }
+    
+    // Check if selected role matches email pattern
+    if (autoDetectedRole && formData.role !== autoDetectedRole) {
+      setError(`Email pattern indicates this should be a ${autoDetectedRole} account. Please select the correct role.`);
+      return false;
+    }
+    
     if (!formData.full_name.trim()) {
       setError("Full name is required");
       return false;
@@ -102,12 +217,44 @@ const Register = () => {
       setError("Email is required");
       return false;
     }
+    
+    // Validate email format and domain
+    if (!formData.email.includes('@pampangastateu.edu.ph')) {
+      setError("Please use your Pampanga State University email address (@pampangastateu.edu.ph)");
+      return false;
+    }
+    
     if (formData.role === "student" && !formData.student_num.trim()) {
       setError("Student number is required for students");
       return false;
     }
+    
+    if (formData.role === "student" && !formData.program.trim()) {
+      setError("Program/Course is required for students");
+      return false;
+    }
+    
+    if (formData.role === "teacher" && !formData.program.trim()) {
+      setError("Department/Program is required for teachers");
+      return false;
+    }
+    
+    if (!formData.contact_num.trim()) {
+      setError("Contact number is required");
+      return false;
+    }
+    
+    if (!formData.address.trim()) {
+      setError("Address is required");
+      return false;
+    }
+    
     if (!formData.password) {
       setError("Password is required");
+      return false;
+    }
+    if (passwordStrength.strength === "weak") {
+      setError("Password is too weak. Please ensure your password meets all requirements: at least 8 characters, includes uppercase, lowercase, numbers, and special characters.");
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -182,14 +329,17 @@ const Register = () => {
                 </InputGroupText>
               </InputGroupAddon>
               <Input
-                placeholder="Student Number"
+                placeholder="Student Number (e.g., 2021304995)"
                 type="text"
                 name="student_num"
                 value={formData.student_num}
                 onChange={handleInputChange}
                 required
+                pattern="\d{10}"
+                title="Student number must be exactly 10 digits"
               />
             </InputGroup>
+            <small className="text-muted">Enter your 10-digit student number</small>
           </FormGroup>
           <FormGroup>
             <InputGroup className="input-group-alternative mb-2">
@@ -199,13 +349,18 @@ const Register = () => {
                 </InputGroupText>
               </InputGroupAddon>
               <Input
-                placeholder="Program/Course"
-                type="text"
+                type="select"
                 name="program"
                 value={formData.program}
                 onChange={handleInputChange}
                 required
-              />
+              >
+                <option value="">Select Program/Course</option>
+                <option value="Bachelor of Science in Information Technology">BSIT - Bachelor of Science in Information Technology</option>
+                <option value="Bachelor of Science in Computer Science">BSCS - Bachelor of Science in Computer Science</option>
+                <option value="Bachelor of Science in Information Systems">BSIS - Bachelor of Science in Information Systems</option>
+                <option value="Associate in Computer Technology">ACT - Associate in Computer Technology</option>
+              </Input>
             </InputGroup>
           </FormGroup>
           <FormGroup>
@@ -236,13 +391,19 @@ const Register = () => {
               </InputGroupText>
             </InputGroupAddon>
             <Input
-              placeholder="Department/Subject Area"
-              type="text"
+              type="select"
               name="program"
               value={formData.program}
               onChange={handleInputChange}
               required
-            />
+            >
+              <option value="">Select Department/Program</option>
+              <option value="Computer Studies Department">Computer Studies Department</option>
+              <option value="Information Technology">Information Technology</option>
+              <option value="Computer Science">Computer Science</option>
+              <option value="Information Systems">Information Systems</option>
+              <option value="Computer Technology">Computer Technology</option>
+            </Input>
           </InputGroup>
         </FormGroup>
       );
@@ -299,9 +460,14 @@ const Register = () => {
                     <option value="">Select Role</option>
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
-                    <option value="admin">Administrator</option>
                   </Input>
                 </InputGroup>
+                {autoDetectedRole && (
+                  <small className="text-info">
+                    <i className="ni ni-bell-55"></i> 
+                    Email pattern detected: This appears to be a {autoDetectedRole} account
+                  </small>
+                )}
               </FormGroup>
 
               {/* Full Name */}
@@ -332,15 +498,17 @@ const Register = () => {
                     </InputGroupText>
                   </InputGroupAddon>
                   <Input
-                    placeholder="Email"
+                    placeholder="Email (@pampangastateu.edu.ph)"
                     type="email"
                     name="email"
                     value={formData.email}
-                    onChange={handleInputChange}
-                    autoComplete="new-email"
+                    onChange={handleEmailChange}
                     required
                   />
                 </InputGroup>
+                <small className="text-muted">
+                  Use your Pampanga State University email address
+                </small>
               </FormGroup>
 
               {/* Role-specific fields */}
@@ -360,6 +528,7 @@ const Register = () => {
                     name="contact_num"
                     value={formData.contact_num}
                     onChange={handleInputChange}
+                    required
                   />
                 </InputGroup>
               </FormGroup>
@@ -378,6 +547,7 @@ const Register = () => {
                     name="address"
                     value={formData.address}
                     onChange={handleInputChange}
+                    required
                   />
                 </InputGroup>
               </FormGroup>
@@ -390,50 +560,38 @@ const Register = () => {
                       <i className="ni ni-lock-circle-open" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <div className="position-relative">
-                    <Input
-                      placeholder="Password"
-                      type={passwordVisible.password ? "text" : "password"}
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      autoComplete="new-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-link position-absolute"
-                      style={{
-                        right: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        zIndex: 10,
-                        border: 'none',
-                        background: 'none',
-                        padding: '0',
-                        color: '#6c757d',
-                        cursor: 'pointer',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      onClick={() => togglePasswordVisibility('password')}
-                      disabled={loading}
-                    >
-                      {passwordVisible.password ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+                  <Input
+                    placeholder="Enter your password"
+                    type={passwordVisible.password ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handlePasswordChange}
+                    required
+                  />
+                  <InputGroupAddon addonType="append">
+                    <InputGroupText>
+                      <i
+                        className={`ni ${passwordVisible.password ? "ni-eye" : "ni-eye-slash"}`}
+                        onClick={() => togglePasswordVisibility("password")}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </InputGroupText>
+                  </InputGroupAddon>
                 </InputGroup>
+                {passwordStrength.strength && (
+                  <div className="mt-1">
+                    <small className={`text-${passwordStrength.strength === 'strong' ? 'success' : passwordStrength.strength === 'medium' ? 'warning' : 'danger'}`}>
+                      Password strength: {passwordStrength.strength}
+                    </small>
+                    {passwordStrength.feedback.length > 0 && (
+                      <ul className="mt-1 mb-0">
+                        {passwordStrength.feedback.map((feedback, index) => (
+                          <li key={index} className="text-muted small">{feedback}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </FormGroup>
 
               {/* Confirm Password */}
@@ -444,59 +602,54 @@ const Register = () => {
                       <i className="ni ni-lock-circle-open" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <div className="position-relative">
-                    <Input
-                      placeholder="Confirm Password"
-                      type={passwordVisible.confirmPassword ? "text" : "password"}
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      autoComplete="new-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-link position-absolute"
-                      style={{
-                        right: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        zIndex: 10,
-                        border: 'none',
-                        background: 'none',
-                        padding: '0',
-                        color: '#6c757d',
-                        cursor: 'pointer',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      onClick={() => togglePasswordVisibility('confirmPassword')}
-                      disabled={loading}
-                    >
-                      {passwordVisible.confirmPassword ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+                  <Input
+                    placeholder="Confirm your password"
+                    type={passwordVisible.confirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <InputGroupAddon addonType="append">
+                    <InputGroupText>
+                      <i
+                        className={`ni ${passwordVisible.confirmPassword ? "ni-eye" : "ni-eye-slash"}`}
+                        onClick={() => togglePasswordVisibility("confirmPassword")}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </InputGroupText>
+                  </InputGroupAddon>
                 </InputGroup>
               </FormGroup>
 
-              <div className="text-muted font-italic">
-                <small>
-                  password strength:{" "}
-                  <span className={`font-weight-700 ${formData.password.length >= 8 ? 'text-success' : formData.password.length >= 6 ? 'text-warning' : 'text-danger'}`}>
-                    {formData.password.length >= 8 ? 'strong' : formData.password.length >= 6 ? 'medium' : 'weak'}
-                  </span>
+              {/* Password Requirements Summary */}
+              <div className="mb-4 p-3 bg-light rounded border">
+                <small className="text-muted font-weight-bold d-block mb-2">
+                  <i className="ni ni-info-77 mr-1"></i>
+                  Password Requirements:
                 </small>
+                <div className="row">
+                  <div className="col-6">
+                    <small className="text-muted d-flex align-items-center mb-1">
+                      <i className="ni ni-check-bold text-success mr-2" style={{ fontSize: '0.8rem' }}></i>
+                      At least 8 characters
+                    </small>
+                    <small className="text-muted d-flex align-items-center mb-1">
+                      <i className="ni ni-check-bold text-success mr-2" style={{ fontSize: '0.8rem' }}></i>
+                      One uppercase letter
+                    </small>
+                  </div>
+                  <div className="col-6">
+                    <small className="text-muted d-flex align-items-center mb-1">
+                      <i className="ni ni-check-bold text-success mr-2" style={{ fontSize: '0.8rem' }}></i>
+                      One lowercase letter
+                    </small>
+                    <small className="text-muted d-flex align-items-center mb-1">
+                      <i className="ni ni-check-bold text-success mr-2" style={{ fontSize: '0.8rem' }}></i>
+                      One number & special character
+                    </small>
+                  </div>
+                </div>
               </div>
 
               <Row className="my-4">

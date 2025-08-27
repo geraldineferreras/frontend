@@ -53,6 +53,7 @@ import apiService from "../../services/api.js";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import scmsLogo from '../../assets/img/brand/logo-scms.png';
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 
 // Floating effect for content over header
 const sectionManagementStyles = `
@@ -70,20 +71,10 @@ const sectionManagementStyles = `
 // Mock Data - Replace with your actual data fetching logic
 
 
-// Build full URL for a profile picture path
+// Build full URL for a profile picture path - now using profile picture utilities
 const buildProfileImageUrl = (profilePic) => {
   if (!profilePic) return null;
-  if (profilePic.startsWith('http://') || profilePic.startsWith('https://') || profilePic.startsWith('data:')) {
-    return profilePic;
-  }
-  
-  // Use consistent base URL
-  const base = 'http://localhost/scms_new_backup';
-  
-  if (profilePic.startsWith('uploads/')) {
-    return `${base}/${profilePic}`;
-  }
-  return `${base}/uploads/profile/${profilePic}`;
+  return getProfilePictureUrl({ profile_pic: profilePic });
 };
 
 // Helper function to generate initials avatar URL
@@ -213,6 +204,11 @@ const SectionManagement = () => {
 
   // Add state to track original sections for each course
   const [originalSections, setOriginalSections] = useState({});
+
+  // Automatic section creation state
+  const [isCreatingSections, setIsCreatingSections] = useState(false);
+  const [showAutoCreateModal, setShowAutoCreateModal] = useState(false);
+  const [autoCreateProgress, setAutoCreateProgress] = useState({ current: 0, total: 0, currentSection: '' });
 
   const navigate = useNavigate();
 
@@ -1076,28 +1072,55 @@ const SectionManagement = () => {
                   <span className="font-weight-bold" style={{ color: '#425466' }}>Adviser:</span>
                   <div className="d-flex align-items-center ml-2">
                     <div className="mr-2">
-                      {adviser?.profile_picture ? (
-                        <img 
-                          src={`http://localhost/scms_new/${adviser.profile_picture}`}
-                          alt={adviser?.name || 'No Adviser'} 
-                          className="rounded-circle"
-                          style={{ 
-                            width: '24px', 
-                            height: '24px', 
-                            objectFit: 'cover',
-                            border: '1px solid #fff',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                          }}
-                          onError={(e) => {
-                            // Replace with initials avatar when image fails to load
-                            const parent = e.currentTarget.parentElement;
-                            const initials = getInitials(adviser?.name || 'Unknown');
-                            parent.innerHTML = `<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:24px;height:24px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:9px;font-weight:700;border:1px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,0.1)">${initials}</div>`;
-                          }}
-                        />
-                      ) : (
-                        createInitialsAvatar(adviser?.name || 'Unknown', 24)
-                      )}
+                      {(() => {
+                        const profilePicUrl = getProfilePictureUrl(adviser);
+                        const initials = getUserInitials(adviser);
+                        const avatarColor = getAvatarColor(adviser);
+                        
+                        if (profilePicUrl) {
+                          return (
+                            <img 
+                              src={profilePicUrl}
+                              alt={adviser?.name || 'No Adviser'} 
+                              className="rounded-circle"
+                              style={{ 
+                                width: '24px', 
+                                height: '24px', 
+                                objectFit: 'cover',
+                                border: '1px solid #fff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                              }}
+                              onError={(e) => {
+                                // Hide the image and show initials when it fails to load
+                                e.target.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                const initialsDiv = parent.querySelector('.initials-fallback');
+                                if (initialsDiv) {
+                                  initialsDiv.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          );
+                        } else {
+                          return (
+                            <div 
+                              className="rounded-circle d-flex align-items-center justify-content-center initials-fallback"
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                background: avatarColor,
+                                color: 'white',
+                                fontSize: '9px',
+                                fontWeight: '700',
+                                border: '1px solid #fff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                              }}
+                            >
+                              {initials}
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
                     <span 
                       style={{ 
@@ -1245,6 +1268,95 @@ const SectionManagement = () => {
     );
   };
 
+  // Automatic section creation function
+  const handleAutoCreateSections = async () => {
+    setShowAutoCreateModal(true);
+    setIsCreatingSections(true);
+    
+    try {
+      // Use the existing API service which handles authentication properly
+      const result = await apiService.post('/admin/sections/auto-create', {}, true);
+      console.log('Auto-create response:', result);
+      
+      if (result && result.success) {
+        // Show success message
+        setError(null);
+        alert(`Successfully created ${result.data?.total_created || 0} sections!`);
+        
+        // Refresh the sections data
+        await loadSectionsForCourse(activeCourseTab);
+      } else {
+        throw new Error(result?.message || 'Failed to create sections');
+      }
+      
+    } catch (error) {
+      console.error('Error in automatic section creation:', error);
+      setError(`Failed to create sections: ${error.message}`);
+    } finally {
+      setIsCreatingSections(false);
+      setShowAutoCreateModal(false);
+      setAutoCreateProgress({ current: 0, total: 0, currentSection: '' });
+    }
+  };
+
+  // Auto-create sections modal
+  const renderAutoCreateModal = () => {
+    if (!showAutoCreateModal) return null;
+    
+    return (
+      <Modal isOpen={showAutoCreateModal} toggle={() => setShowAutoCreateModal(false)} centered>
+        <ModalHeader toggle={() => setShowAutoCreateModal(false)}>
+          <i className="ni ni-fat-add mr-2" />
+          Automatic Section Creation
+        </ModalHeader>
+        <ModalBody>
+          <div className="text-center">
+            <p className="mb-4">
+              This will automatically create 176 sections for all programs (BSIT, BSIS, BSCS, ACT) from 1st year to 4th year, 
+              with sections A through K for each year level using the backend auto-create endpoint.
+            </p>
+            <p className="text-muted mb-3">
+              <i className="ni ni-bell-55 mr-1" />
+              <strong>Note:</strong> Sections will be created without advisers initially. You can assign advisers later.
+            </p>
+            <p className="text-muted mb-4">
+              <strong>Total sections to create:</strong> 176 (4 programs × 4 years × 11 sections)
+            </p>
+            
+            {isCreatingSections ? (
+              <div>
+                <div className="text-center">
+                  <Spinner color="primary" size="lg" className="mb-3" />
+                  <p className="text-muted">
+                    Creating 176 sections automatically...
+                    <br />
+                    <small>This may take a few moments.</small>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Button 
+                  color="primary" 
+                  size="lg" 
+                  onClick={handleAutoCreateSections}
+                  disabled={isCreatingSections}
+                  className="mb-3"
+                >
+                  <i className="ni ni-fat-add mr-2" />
+                  Start Creating Sections
+                </Button>
+                <p className="text-muted small">
+                  This process may take a few minutes. Please do not close this window.
+                </p>
+              </div>
+            )}
+          </div>
+        </ModalBody>
+      </Modal>
+    );
+  };
+
   const currentCourseName = courses.find(c => c.id === activeCourseTab)?.name || "Sections";
 
   // Block view for sections
@@ -1326,37 +1438,55 @@ const SectionManagement = () => {
               {/* Card Body */}
               <CardBody className="p-3" style={{ background: '#fff', borderRadius: '0 0 12px 12px' }}>
                 <div className="mb-2 d-flex align-items-center" style={{gap: 10, marginLeft: 6, marginTop: 15}}>
-                  {adviser?.profile_picture ? (
-                    <img 
-                      src={`http://localhost/scms_new/${adviser.profile_picture}`}
-                      alt={adviser?.name || 'No Adviser'} 
-                      className="rounded-circle" 
-                      style={{
-                        width: 32, 
-                        height: 32, 
-                        objectFit: 'cover',
-                        border: '2px solid #fff',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }} 
-                      onError={(e) => {
-                        // Replace with initials avatar when image fails to load
-                        const parent = e.currentTarget.parentElement;
-                        const initials = getInitials(adviser?.name || 'Unknown');
-                        e.currentTarget.style.display = 'none';
-                        
-                        // Create initials div if it doesn't exist
-                        if (!parent.querySelector('.initials-avatar')) {
-                          const initialsDiv = document.createElement('div');
-                          initialsDiv.className = 'initials-avatar rounded-circle d-flex align-items-center justify-content-center';
-                          initialsDiv.style.cssText = 'width:32px;height:32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.1)';
-                          initialsDiv.textContent = initials;
-                          parent.appendChild(initialsDiv);
-                        }
-                      }}
-                    />
-                  ) : (
-                    createInitialsAvatar(adviser?.name || 'Unknown', 32)
-                  )}
+                  {(() => {
+                    const profilePicUrl = getProfilePictureUrl(adviser);
+                    const initials = getUserInitials(adviser);
+                    const avatarColor = getAvatarColor(adviser);
+                    
+                    if (profilePicUrl) {
+                      return (
+                        <img 
+                          src={profilePicUrl}
+                          alt={adviser?.name || 'No Adviser'} 
+                          className="rounded-circle" 
+                          style={{
+                            width: 32, 
+                            height: 32, 
+                            objectFit: 'cover',
+                            border: '2px solid #fff',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }} 
+                          onError={(e) => {
+                            // Hide the image and show initials when it fails to load
+                            e.target.style.display = 'none';
+                            const parent = e.currentTarget.parentElement;
+                            const initialsDiv = parent.querySelector('.initials-fallback');
+                            if (initialsDiv) {
+                              initialsDiv.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      );
+                    } else {
+                      return (
+                        <div 
+                          className="rounded-circle d-flex align-items-center justify-content-center initials-fallback"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            background: avatarColor,
+                            color: 'white',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            border: '2px solid #fff',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          {initials}
+                        </div>
+                      );
+                    }
+                  })()}
                   <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1}}>
                     <span 
                       className="font-weight-bold" 
@@ -1610,8 +1740,11 @@ const SectionManagement = () => {
                           </DropdownItem>
                         </DropdownMenu>
                       </UncontrolledDropdown>
-                      <Button color="primary" size="sm" style={{ padding: '3px 6px', fontSize: '0.75rem' }} onClick={() => navigate('/admin/create-section')}>
+                      <Button color="primary" size="sm" style={{ padding: '3px 6px', fontSize: '0.75rem' }} onClick={() => navigate('/admin/create-section')} className="mr-2">
                         <i className="ni ni-fat-add" /> Add New Section
+                      </Button>
+                      <Button color="success" size="sm" style={{ padding: '3px 6px', fontSize: '0.75rem' }} onClick={() => setShowAutoCreateModal(true)}>
+                        <i className="ni ni-settings-gear-65" /> Auto Create Sections
                       </Button>
                     </div>
                   </div>
@@ -1669,27 +1802,55 @@ const SectionManagement = () => {
                               <td>
                                 <div className="d-flex align-items-center">
                                   <div className="mr-2">
-                                    {adviser?.profile_picture ? (
-                                      <img 
-                                        src={`http://localhost/scms_new/${adviser.profile_picture}`}
-                                        alt={adviser?.name || 'No Adviser'} 
-                                        className="rounded-circle"
-                                        style={{ 
-                                          width: '32px', 
-                                          height: '32px', 
-                                          objectFit: 'cover',
-                                          border: '2px solid #fff',
-                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                        }}
-                                        onError={(e) => {
-                                          // Replace with initials avatar when image fails to load
-                                          const parent = e.currentTarget.parentElement;
-                                          parent.innerHTML = `<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.1)">${getInitials(adviser?.name || 'Unknown')}</div>`;
-                                        }}
-                                      />
-                                    ) : (
-                                      createInitialsAvatar(adviser?.name || 'Unknown', 32)
-                                    )}
+                                                                      {(() => {
+                                    const profilePicUrl = getProfilePictureUrl(adviser);
+                                    const initials = getUserInitials(adviser);
+                                    const avatarColor = getAvatarColor(adviser);
+                                    
+                                    if (profilePicUrl) {
+                                      return (
+                                        <img 
+                                          src={profilePicUrl}
+                                          alt={adviser?.name || 'No Adviser'} 
+                                          className="rounded-circle"
+                                          style={{ 
+                                            width: '32px', 
+                                            height: '32px', 
+                                            objectFit: 'cover',
+                                            border: '2px solid #fff',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                          }}
+                                          onError={(e) => {
+                                            // Hide the image and show initials when it fails to load
+                                            e.target.style.display = 'none';
+                                            const parent = e.currentTarget.parentElement;
+                                            const initialsDiv = parent.querySelector('.initials-fallback');
+                                            if (initialsDiv) {
+                                              initialsDiv.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                      );
+                                    } else {
+                                      return (
+                                        <div 
+                                          className="rounded-circle d-flex align-items-center justify-content-center initials-fallback"
+                                          style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            background: avatarColor,
+                                            color: 'white',
+                                            fontSize: '11px',
+                                            fontWeight: '700',
+                                            border: '2px solid #fff',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                          }}
+                                        >
+                                          {initials}
+                                        </div>
+                                      );
+                                    }
+                                  })()}
                                   </div>
                                   <div style={{ minWidth: 0, flex: 1 }}>
                                     <div 
@@ -1846,6 +2007,7 @@ const SectionManagement = () => {
         </Row>
       </Container>
       {renderStudentsModal()}
+      {renderAutoCreateModal()}
       
       {/* Delete Confirmation Modal */}
       <Modal isOpen={showDeleteModal} toggle={cancelDeleteSection} centered>

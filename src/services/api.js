@@ -211,6 +211,14 @@ class ApiService {
     });
   }
 
+  // Get student profile data specifically
+  async getStudentProfile() {
+    return this.makeRequest('/student/profile', {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   async updateProfile(userData) {
     return this.makeRequest('/user', {
       method: 'PUT',

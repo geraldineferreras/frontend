@@ -37,10 +37,17 @@ const Admin = (props) => {
   }, [location]);
 
   const getRoutes = (routes) => {
+    console.log('Admin layout - Processing routes:', routes);
     return routes.map((prop, key) => {
       if (prop.layout === "/admin") {
+        console.log('Admin layout - Registering route:', {
+          path: prop.path,
+          name: prop.name,
+          layout: prop.layout,
+          fullPath: prop.layout + prop.path
+        });
         return (
-          <Route path={prop.path} element={prop.component} key={key} exact />
+          <Route path={prop.path} element={prop.component} key={key} />
         );
       } else {
         return null;
