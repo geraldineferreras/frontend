@@ -189,6 +189,8 @@ const AssignmentDetailStudent = () => {
           // Fetch submission data using the correct endpoint
           const finalClassCode = classCode || response.data.class_code || (Array.isArray(response.data.class_codes) ? response.data.class_codes[0] : undefined);
           if (finalClassCode) {
+            let submissionFound = false;
+            
             try {
               const submissionResponse = await apiService.getTaskSubmission(assignmentId, finalClassCode);
               console.log('Submission response:', submissionResponse);
@@ -229,6 +231,7 @@ const AssignmentDetailStudent = () => {
 
                 const enrichedSubmission = await enrichSubmission(submissionResponse.data);
                 setSubmission(enrichedSubmission);
+                submissionFound = true;
                 console.log('Submission data loaded:', submissionResponse.data);
               }
             } catch (submissionError) {
@@ -236,52 +239,113 @@ const AssignmentDetailStudent = () => {
               // This is normal if no submission exists yet
             }
 
-            // Fallback: If no submission or no grade yet, try fetching all submissions and pick current student's
-            try {
-              if (!submission || submission?.grade === undefined || submission?.grade === null) {
+            // Fallback: If no submission found, try fetching all submissions and pick current student's
+            if (!submissionFound) {
+              try {
                 const allSubsResp = await apiService.getTaskSubmissions(assignmentId);
                 const allSubs = allSubsResp?.data?.submissions || allSubsResp?.data || [];
+                console.log('All submissions:', allSubs);
+                
                 // Determine current student's identifiers
                 let current = null;
                 try {
                   current = JSON.parse(localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user') || '{}');
                 } catch (_) { current = {}; }
+                
                 const candidateIds = [current.student_num, current.student_id, current.id]
                   .filter((v) => v !== undefined && v !== null)
                   .map((v) => String(v));
+                
+                console.log('Looking for student with IDs:', candidateIds);
+                
+                // Find current student's submission
                 const mine = allSubs.find((s) => {
                   const sidCandidates = [s.student_num, s.student_id, s.id]
                     .filter((v) => v !== undefined && v !== null)
                     .map((v) => String(v));
                   return candidateIds.some((id) => sidCandidates.includes(id));
                 });
+                
                 if (mine) {
+                  console.log('Found submission from all submissions:', mine);
                   setSubmission(mine);
+                  submissionFound = true;
                 }
+              } catch (fallbackErr) {
+                console.warn('Fallback to all submissions failed:', fallbackErr);
               }
-            } catch (fallbackErr) {
-              console.warn('Fallback to all submissions failed:', fallbackErr);
+            }
+
+            // CRITICAL FIX: If submission exists but has no attachments, try to get attachments from all submissions
+            if (submission && (!submission.attachments || submission.attachments.length === 0)) {
+              console.log('Submission exists but has no attachments, trying to get from all submissions...');
+              try {
+                const allSubsResp = await apiService.getTaskSubmissions(assignmentId);
+                const allSubs = allSubsResp?.data?.submissions || allSubsResp?.data || [];
+                
+                // Find current student's submission with attachments
+                let current = null;
+                try {
+                  current = JSON.parse(localStorage.getItem('user') || localStorage.getItem('scms_logged_in_user') || '{}');
+                } catch (_) { current = {}; }
+                
+                const candidateIds = [current.student_num, current.student_id, current.id]
+                  .filter((v) => v !== undefined && v !== null)
+                  .map((v) => String(v));
+                
+                const mineWithAttachments = allSubs.find((s) => {
+                  const sidCandidates = [s.student_num, s.student_id, s.id]
+                    .filter((v) => v !== undefined && v !== null)
+                    .map((v) => String(v));
+                  return candidateIds.some((id) => sidCandidates.includes(id)) && 
+                         s.attachments && s.attachments.length > 0;
+                });
+                
+                if (mineWithAttachments) {
+                  console.log('Found submission with attachments from all submissions:', mineWithAttachments);
+                  // Merge the existing submission data with the attachments
+                  setSubmission({
+                    ...submission,
+                    attachments: mineWithAttachments.attachments
+                  });
+                }
+              } catch (error) {
+                console.warn('Failed to get attachments from all submissions:', error);
+              }
             }
 
             // Final fallback: use student/assigned endpoint (contains grade/status even without file submissions)
-            try {
-              if (!submission || submission?.grade === undefined || submission?.grade === null) {
+            if (!submissionFound) {
+              try {
                 const assignedResp = await apiService.getStudentAssignedTasks(finalClassCode);
                 const list = assignedResp?.data || [];
                 const found = list.find((t) => String(t.task_id || t.id) === String(assignmentId));
                 if (found && (found.grade !== undefined || found.submission_status)) {
+                  console.log('Found submission from assigned tasks:', found);
                   setSubmission({
                     submission_id: found.submission_id,
                     grade: found.grade !== undefined && found.grade !== null ? Number(found.grade) : null,
                     status: found.submission_status || 'graded',
                     submitted_at: found.submitted_at,
                     feedback: found.feedback,
-                    attachments: [],
+                    attachments: found.attachments || [],
                   });
+                  submissionFound = true;
                 }
+              } catch (assignedErr) {
+                console.warn('Fallback to assigned tasks failed:', assignedErr);
               }
-            } catch (assignedErr) {
-              console.warn('Fallback to assigned tasks failed:', assignedErr);
+            }
+            
+            // If still no submission found, set an empty submission object
+            if (!submissionFound) {
+              console.log('No submission found, setting empty submission');
+              setSubmission({
+                status: 'pending',
+                attachments: [],
+                grade: null,
+                feedback: null
+              });
             }
           }
         } else {
@@ -1320,154 +1384,7 @@ const AssignmentDetailStudent = () => {
                  )}
                 </div>
 
-               {/* External Links Section */}
-               <div style={{ marginBottom: '12px' }}>
-                 <Button
-                   color="info"
-                   onClick={() => setShowLinkInput(!showLinkInput)}
-                   style={{
-                     borderRadius: '12px',
-                     fontWeight: 600,
-                     fontSize: '14px',
-                     width: '100%',
-                     padding: '12px',
-                     cursor: 'pointer'
-                   }}
-                    disabled={uploading || isPastDue()}
-                 >
-                   <i className="ni ni-world" style={{ marginRight: '8px' }} />
-                   🔗 Add External Links
-                 </Button>
-               </div>
 
-               {/* External Link Input */}
-               {showLinkInput && (
-                 <div style={{
-                   background: '#f8f9fa',
-                   borderRadius: '12px',
-                   padding: '16px',
-                   marginBottom: '16px',
-                   border: '1px solid #e9ecef'
-                 }}>
-                   <h6 style={{ fontSize: '14px', marginBottom: '12px', color: '#495057' }}>Add External Link:</h6>
-                   
-                   <div style={{ marginBottom: '12px' }}>
-                     <Input
-                       type="text"
-                       placeholder="Link name (e.g., Research Paper)"
-                       value={newLink.name}
-                       onChange={(e) => setNewLink(prev => ({ ...prev, name: e.target.value }))}
-                       style={{ marginBottom: '8px' }}
-                     />
-                     <Input
-                       type="url"
-                       placeholder="URL (Google Drive, YouTube, etc.)"
-                       value={newLink.url}
-                       onChange={(e) => setNewLink(prev => ({ ...prev, url: e.target.value }))}
-                       style={{ marginBottom: '8px' }}
-                     />
-                     
-                     {/* Link Type Selection */}
-                     <div style={{ marginBottom: '12px' }}>
-                       <label style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px', display: 'block' }}>Link Type:</label>
-                       <div style={{ display: 'flex', gap: '8px' }}>
-                         {['link', 'google_drive', 'youtube'].map(type => (
-                           <Button
-                             key={type}
-                             color={newLink.type === type ? 'primary' : 'outline-primary'}
-                             size="sm"
-                             onClick={() => handleLinkTypeChange(type)}
-                             style={{ fontSize: '11px', padding: '4px 8px' }}
-                           >
-                             {type === 'link' ? '🔗 Link' : type === 'google_drive' ? '📁 Drive' : '📺 YouTube'}
-                           </Button>
-                         ))}
-                       </div>
-                     </div>
-                     
-                     <Button
-                       color="success"
-                       size="sm"
-                       onClick={handleAddExternalLink}
-                    disabled={!newLink.name.trim() || !newLink.url.trim() || isPastDue()}
-                       style={{ marginRight: '8px' }}
-                     >
-                       Add Link
-                     </Button>
-                     <Button
-                       color="secondary"
-                       size="sm"
-                       onClick={() => {
-                         setShowLinkInput(false);
-                         setNewLink({ name: '', url: '', type: 'link' });
-                       }}
-                     >
-                       Cancel
-                     </Button>
-                   </div>
-                 </div>
-               )}
-
-               {/* External Links Display */}
-               {externalLinks.length > 0 && (
-                 <div style={{ marginBottom: '20px' }}>
-                   <h6 style={{ fontSize: '14px', marginBottom: '12px', color: '#495057' }}>External Links:</h6>
-                   {externalLinks.map((link, idx) => (
-                     <div key={link.id} style={{
-                       display: 'flex',
-                       alignItems: 'center',
-                       background: '#fff3cd',
-                       borderRadius: '12px',
-                       padding: '12px',
-                       marginBottom: '8px',
-                       border: '1px solid #ffeaa7'
-                     }}>
-                       <div style={{
-                         width: '40px',
-                         height: '40px',
-                         borderRadius: '8px',
-                         background: '#ffffff',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         marginRight: '12px',
-                         border: '1px solid #ffeaa7'
-                       }}>
-                         <i className={`ni ${link.type === 'youtube' ? 'ni-video-camera-2' : link.type === 'google_drive' ? 'ni-folder-17' : 'ni-world'}`} style={{ fontSize: '18px', color: '#856404' }} />
-                       </div>
-                       <div style={{ flex: 1 }}>
-                         <div style={{
-                           fontWeight: 600,
-                           fontSize: '14px',
-                           color: '#856404',
-                           marginBottom: '2px'
-                         }}>
-                           {link.name}
-                         </div>
-                         <div style={{
-                           color: '#856404',
-                           fontSize: '12px',
-                           wordBreak: 'break-all'
-                         }}>
-                           {link.url}
-                         </div>
-                       </div>
-                       <Button
-                         color="link"
-                         onClick={() => handleRemoveExternalLink(idx)}
-                         style={{
-                           padding: 0,
-                           color: '#f44336',
-                           fontSize: '16px'
-                         }}
-                         title="Remove link"
-                       >
-                         <i className="ni ni-fat-remove" />
-                       </Button>
-                     </div>
-                   ))}
-                 </div>
-               )}
 
                {/* Selected Files for Upload */}
                {selectedFiles.length > 0 && (

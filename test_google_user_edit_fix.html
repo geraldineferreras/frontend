@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google User Edit Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Google User Edit Fix</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Test Description</h2>
+        <p>This test verifies that the fix for Google OAuth users' edit button functionality works correctly.</p>
+        <p><strong>Issue:</strong> Google OAuth users had empty user_id fields, causing the edit button to fail with "Invalid user object or missing ID" error.</p>
+        <p><strong>Fix Applied:</strong> Enhanced ID normalization to check for multiple possible ID fields including <code>google_id</code>, <code>student_id</code>, etc.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        <button onclick="testRegularUser()">Test Regular User</button>
+        <button onclick="testGoogleUser()">Test Google OAuth User</button>
+        <button onclick="testMixedUsers()">Test Mixed Users</button>
+        <button onclick="runAllTests()">Run All Tests</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Test Results</h2>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Fix Details</h2>
+        <h3>Enhanced ID Normalization</h3>
+        <p>The fix updates the user data normalization in <code>UserManagement.js</code> to check for multiple possible ID fields:</p>
+        <pre><code>// Before (limited ID fields)
+id: user.id || user.user_id || user.userId || ''
+
+// After (enhanced for Google OAuth)
+id: user.id || user.user_id || user.userId || user.google_id || 
+    user.student_id || user.teacher_id || user.admin_id || ''</code></pre>
+        
+        <h3>Profile Picture Enhancement</h3>
+        <p>Also enhanced profile picture handling for Google OAuth users:</p>
+        <pre><code>// Before
+profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || ''
+
+// After
+profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || 
+            user.profile_image_url || ''</code></pre>
+    </div>
+
+    <script>
+        let testCount = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        function logResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = `<strong>Test ${++testCount}:</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+            
+            if (type === 'success') passedTests++;
+            if (type === 'error') failedTests++;
+            
+            // Update summary
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const resultsDiv = document.getElementById('testResults');
+            const summaryDiv = document.getElementById('summary');
+            if (!summaryDiv) {
+                const summary = document.createElement('div');
+                summary.id = 'summary';
+                summary.className = 'test-result info';
+                resultsDiv.appendChild(summary);
+            }
+            document.getElementById('summary').innerHTML = 
+                `<strong>Summary:</strong> ${passedTests} passed, ${failedTests} failed, ${testCount} total`;
+        }
+
+        function normalizeUser(user) {
+            // This simulates the enhanced normalization logic from UserManagement.js
+            return {
+                ...user,
+                // Enhanced ID normalization for Google OAuth users and regular users
+                id: user.id || user.user_id || user.userId || user.google_id || 
+                    user.student_id || user.teacher_id || user.admin_id || '',
+                full_name: user.full_name || user.name || '',
+                role: user.role || user.user_role || user.userRole || 'student',
+                profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || 
+                             user.profile_image_url || '',
+            };
+        }
+
+        function testRegularUser() {
+            logResult('Testing regular user with standard ID fields...', 'info');
+            
+            const regularUser = {
+                id: 'STU123',
+                user_id: 'STU123',
+                full_name: 'John Doe',
+                role: 'student',
+                email: 'john.doe@example.com'
+            };
+            
+            const normalized = normalizeUser(regularUser);
+            
+            if (normalized.id === 'STU123') {
+                logResult('✅ Regular user ID normalization passed', 'success');
+            } else {
+                logResult(`❌ Regular user ID normalization failed. Expected: STU123, Got: ${normalized.id}`, 'error');
+            }
+        }
+
+        function testGoogleUser() {
+            logResult('Testing Google OAuth user with google_id field...', 'info');
+            
+            const googleUser = {
+                google_id: 'google_123456789',
+                full_name: 'Ferreras, Geraldine P.',
+                role: 'student',
+                email: '2021304995@pampangastateu.edu.ph',
+                profile_image_url: 'https://lh3.googleusercontent.com/a/example'
+            };
+            
+            const normalized = normalizeUser(googleUser);
+            
+            if (normalized.id === 'google_123456789') {
+                logResult('✅ Google user ID normalization passed', 'success');
+            } else {
+                logResult(`❌ Google user ID normalization failed. Expected: google_123456789, Got: ${normalized.id}`, 'error');
+            }
+            
+            if (normalized.profile_pic === 'https://lh3.googleusercontent.com/a/example') {
+                logResult('✅ Google user profile picture normalization passed', 'success');
+            } else {
+                logResult(`❌ Google user profile picture normalization failed. Expected: https://lh3.googleusercontent.com/a/example, Got: ${normalized.profile_pic}`, 'error');
+            }
+        }
+
+        function testMixedUsers() {
+            logResult('Testing mixed user types...', 'info');
+            
+            const users = [
+                { id: 'ADM001', role: 'admin', full_name: 'Admin User' },
+                { google_id: 'google_987654321', role: 'student', full_name: 'Google Student' },
+                { student_id: 'STU456', role: 'student', full_name: 'Regular Student' },
+                { teacher_id: 'TCH789', role: 'teacher', full_name: 'Teacher User' }
+            ];
+            
+            let allPassed = true;
+            
+            users.forEach((user, index) => {
+                const normalized = normalizeUser(user);
+                const expectedId = user.id || user.google_id || user.student_id || user.teacher_id;
+                
+                if (normalized.id === expectedId) {
+                    logResult(`✅ User ${index + 1} (${user.full_name}) ID normalization passed`, 'success');
+                } else {
+                    logResult(`❌ User ${index + 1} (${user.full_name}) ID normalization failed. Expected: ${expectedId}, Got: ${normalized.id}`, 'error');
+                    allPassed = false;
+                }
+            });
+            
+            if (allPassed) {
+                logResult('✅ All mixed user types passed ID normalization', 'success');
+            }
+        }
+
+        function runAllTests() {
+            logResult('🚀 Running all tests...', 'info');
+            testRegularUser();
+            testGoogleUser();
+            testMixedUsers();
+            logResult('🎯 All tests completed!', 'info');
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            logResult('Page loaded, ready for testing', 'info');
+        });
+    </script>
+</body>
+</html>

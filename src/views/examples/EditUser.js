@@ -121,6 +121,17 @@ const EditUser = () => {
         
         // Use the correct endpoint with role and user_id parameters
         console.log('Calling ApiService.getUserById with:', { id, role });
+        console.log('User ID type:', typeof id);
+        console.log('User ID value:', id);
+        console.log('Role type:', typeof role);
+        console.log('Role value:', role);
+        
+        // Enhanced debugging for Google OAuth users
+        if (id && id.toString().startsWith('100') && id.toString().length > 15) {
+          console.log('🔍 Detected Google OAuth user ID:', id);
+          console.log('🔍 This appears to be a Google ID (starts with 100, length > 15)');
+        }
+        
         const response = await ApiService.getUserById(id, role);
         console.log('API response received:', response);
         
@@ -253,6 +264,26 @@ const EditUser = () => {
     fetchUserData();
   }, [id, role]);
 
+  // Helper function to get course abbreviation from full course name
+  const getCourseAbbreviation = (courseName) => {
+    if (!courseName) return '';
+    
+    const course = courseName.toLowerCase();
+    if (course.includes('information technology')) return 'BSIT';
+    if (course.includes('computer science')) return 'BSCS';
+    if (course.includes('information systems')) return 'BSIS';
+    if (course.includes('computer technology')) return 'ACT';
+    
+    // For other courses, try to extract abbreviation from the name
+    const words = courseName.split(' ');
+    if (words.length >= 2) {
+      return words.slice(0, 2).map(word => word.charAt(0).toUpperCase()).join('') + 
+             words.slice(2).map(word => word.charAt(0).toUpperCase()).join('');
+    }
+    
+    return courseName.substring(0, 4).toUpperCase();
+  };
+
   // Function to fetch sections based on year and program
   const fetchSectionsByYearAndProgram = async (selectedYear, selectedProgram) => {
     if (!selectedYear || !selectedProgram || formRole !== 'student') {
@@ -270,13 +301,11 @@ const EditUser = () => {
       
       let sections = [];
       
-      // Try multiple approaches to get sections
-      
-      // Method 1: Try the new correct API endpoint for sections by year level
+      // Method 1: Try to get sections by program and year (most specific)
       try {
-        console.log('Method 1: Trying getSectionsByYearLevel with yearNumber:', yearNumber);
-        const response = await ApiService.getSectionsByYearLevel(yearNumber);
-        console.log('getSectionsByYearLevel response:', response);
+        console.log('Method 1: Trying getSectionsByProgramAndYear...');
+        const response = await ApiService.getSectionsByProgramAndYear(selectedProgram, yearNumber);
+        console.log('getSectionsByProgramAndYear response:', response);
         
         if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
           sections = response.data;
@@ -285,141 +314,101 @@ const EditUser = () => {
           sections = response;
           console.log('Method 1 successful, found sections:', sections);
         } else {
-          throw new Error('No sections returned from year level API');
+          throw new Error('No sections returned from program and year API');
         }
-      } catch (yearLevelError) {
-        console.warn('Method 1 (year level API) failed:', yearLevelError);
+      } catch (specificError) {
+        console.warn('Method 1 failed:', specificError);
         
-        // Method 1b: Try the old program and year method as backup
+        // Method 2: Get all sections and filter by program and year
         try {
-          console.log('Method 1b: Trying getSectionsByProgramAndYear...');
-          const response = await ApiService.getSectionsByProgramAndYear(selectedProgram, yearNumber);
-          console.log('getSectionsByProgramAndYear response:', response);
+          console.log('Method 2: Getting all sections and filtering by program and year...');
+          const allSectionsResponse = await ApiService.getSections();
+          console.log('All sections response:', allSectionsResponse);
           
-          if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
-            sections = response.data;
-            console.log('Method 1b successful, found sections:', sections);
-          } else if (Array.isArray(response) && response.length > 0) {
-            sections = response;
-            console.log('Method 1b successful, found sections:', sections);
-          } else {
-            throw new Error('No sections returned from program and year API');
-          }
-        } catch (specificError) {
-          console.warn('Method 1b failed:', specificError);
-        }
-        
-        // Method 2: Try getting sections by program only
-        try {
-          console.log('Method 2: Trying getSectionsByProgram...');
-          let response;
+          const allSections = allSectionsResponse?.data || allSectionsResponse || [];
+          console.log('All sections array:', allSections);
           
-          // Try different program-based methods
-          const programMethods = [
-            () => ApiService.getSectionsByProgram(selectedProgram),
-            () => ApiService.getSectionsBSIT(),
-            () => ApiService.getSectionsBSCS(),
-            () => ApiService.getSectionsBSIS(),
-            () => ApiService.getSectionsACT()
-          ];
-          
-          for (const method of programMethods) {
-            try {
-              response = await method();
-              if (response && (response.data || Array.isArray(response))) {
-                break;
-              }
-            } catch (methodError) {
-              console.warn('Program method failed:', methodError);
-            }
-          }
-          
-          console.log('getSectionsByProgram response:', response);
-          
-          const allSections = response?.data || response || [];
-          if (Array.isArray(allSections) && allSections.length > 0) {
-            // Filter by year
+          if (Array.isArray(allSections)) {
+            // Enhanced filtering: Match exact course name and year level
             sections = allSections.filter(section => {
+              const sectionProgram = section.program || '';
               const sectionYear = section.year_level || section.year || '';
-              const yearMatch = sectionYear === yearNumber || sectionYear === selectedYear || 
-                               sectionYear.toString() === yearNumber;
-              console.log('Method 2 filtering:', {
-                name: section.section_name || section.name,
-                year: sectionYear,
-                yearMatch: yearMatch
-              });
-              return yearMatch;
-            });
-            console.log('Method 2 filtered sections:', sections);
-          } else {
-            throw new Error('No sections returned from program API');
-          }
-        } catch (programError) {
-          console.warn('Method 2 failed:', programError);
-          
-          // Method 3: Get all sections and filter them
-          try {
-            console.log('Method 3: Trying to get all sections and filter...');
-            const allSectionsResponse = await ApiService.getSections();
-            console.log('All sections response:', allSectionsResponse);
-            
-            const allSections = allSectionsResponse?.data || allSectionsResponse || [];
-            console.log('All sections array:', allSections);
-            
-            if (Array.isArray(allSections)) {
-              // Filter sections by program and year
-              sections = allSections.filter(section => {
-                const sectionProgram = section.program || '';
-                const sectionYear = section.year_level || section.year || '';
-                
-                console.log('Method 3 checking section:', {
-                  name: section.section_name || section.name,
-                  program: sectionProgram,
-                  year: sectionYear,
-                  programMatch: sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase()),
-                  yearMatch: sectionYear === yearNumber || sectionYear === selectedYear
-                });
-                
-                const programMatch = sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase()) ||
-                                    selectedProgram.toLowerCase().includes(sectionProgram.toLowerCase()) ||
-                                    sectionProgram.toLowerCase().includes('information technology') && selectedProgram.toLowerCase().includes('information technology');
-                const yearMatch = sectionYear === yearNumber || sectionYear === selectedYear || 
-                                 sectionYear.toString() === yearNumber;
-                
-                return programMatch && yearMatch;
-              });
               
-              console.log('Method 3 filtered sections:', sections);
+              // Enhanced program matching for exact course names
+              let programMatch = false;
               
-              // If no sections found with filtering, show all sections for debugging
-              if (sections.length === 0) {
-                console.warn('No sections found with filtering, showing all sections for debugging');
-                sections = allSections.slice(0, 10); // Show first 10 sections
+              // Check for exact matches first
+              if (sectionProgram.toLowerCase() === selectedProgram.toLowerCase()) {
+                programMatch = true;
               }
-            } else {
-              console.error('All sections is not an array:', allSections);
+              // Check for course abbreviation matches using helper function
+              else {
+                const expectedAbbr = getCourseAbbreviation(selectedProgram);
+                const sectionAbbr = getCourseAbbreviation(sectionProgram);
+                
+                if (expectedAbbr === sectionAbbr || 
+                    sectionProgram.toLowerCase().includes(expectedAbbr.toLowerCase()) ||
+                    sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase())) {
+                  programMatch = true;
+                }
+              }
+              
+              // Enhanced year matching
+              const yearMatch = sectionYear === yearNumber || 
+                               sectionYear === selectedYear || 
+                               sectionYear.toString() === yearNumber ||
+                               (sectionYear && sectionYear.toString().includes(yearNumber));
+              
+              console.log('Enhanced filtering:', {
+                sectionName: section.section_name || section.name,
+                sectionProgram: sectionProgram,
+                sectionYear: sectionYear,
+                selectedProgram: selectedProgram,
+                selectedYear: selectedYear,
+                yearNumber: yearNumber,
+                programMatch: programMatch,
+                yearMatch: yearMatch,
+                finalMatch: programMatch && yearMatch
+              });
+              
+              return programMatch && yearMatch;
+            });
+            
+            console.log('Method 2 filtered sections:', sections);
+            
+            // If no sections found with filtering, log the issue but don't show all sections
+            if (sections.length === 0) {
+              console.warn('No sections found with enhanced filtering for:', { selectedProgram, selectedYear, yearNumber });
+              console.log('Available sections that did not match:', allSections.map(s => ({
+                name: s.section_name || s.name,
+                program: s.program,
+                year: s.year_level || s.year
+              })));
             }
-          } catch (allSectionsError) {
-            console.error('Method 3 failed:', allSectionsError);
+          } else {
+            console.error('All sections is not an array:', allSections);
           }
+        } catch (allSectionsError) {
+          console.error('Method 2 failed:', allSectionsError);
         }
       }
       
-      // If still no sections found after trying all methods, create some sample sections for testing
+      // If still no sections found, create sample sections based on course and year
       if (sections.length === 0) {
-        console.warn('⚠️ No real sections found from any API method. Creating temporary sample sections for testing.');
-        console.warn('💡 This suggests the API endpoints may not be working or no sections exist in the database.');
-        const courseAbbr = selectedProgram.includes('Information Technology') ? 'BSIT' : 
-                          selectedProgram.includes('Computer Science') ? 'BSCS' :
-                          selectedProgram.includes('Information Systems') ? 'BSIS' : 'ACT';
+        console.warn('⚠️ No sections found from API methods. Creating sample sections for:', { selectedProgram, selectedYear, yearNumber });
         
+        // Use the helper function to get course abbreviation
+        const courseAbbr = getCourseAbbreviation(selectedProgram);
+        
+        // Create sample sections for the specific year and course
         sections = [
-          { id: `temp-1`, section_name: `${courseAbbr} ${yearNumber}A (Sample)`, name: `${courseAbbr} ${yearNumber}A (Sample)` },
-          { id: `temp-2`, section_name: `${courseAbbr} ${yearNumber}B (Sample)`, name: `${courseAbbr} ${yearNumber}B (Sample)` },
-          { id: `temp-3`, section_name: `${courseAbbr} ${yearNumber}C (Sample)`, name: `${courseAbbr} ${yearNumber}C (Sample)` }
+          { id: `temp-1`, section_name: `${courseAbbr} ${yearNumber}A`, name: `${courseAbbr} ${yearNumber}A` },
+          { id: `temp-2`, section_name: `${courseAbbr} ${yearNumber}B`, name: `${courseAbbr} ${yearNumber}B` },
+          { id: `temp-3`, section_name: `${courseAbbr} ${yearNumber}C`, name: `${courseAbbr} ${yearNumber}C` }
         ];
-        console.log('📝 Created temporary sample sections:', sections);
-        console.log('🔧 Please check your database and API endpoints to ensure sections exist.');
+        
+        console.log('📝 Created sample sections:', sections);
+        console.log('🔧 These are temporary sections. Please ensure your database has proper sections for this course and year.');
       }
 
       // Sort sections by name for better UX
@@ -1646,16 +1635,16 @@ const EditUser = () => {
                                   </Button>
                                 )}
                               </div>
-                              {year && department && availableSections.length === 0 && !loadingSections && (
-                                <small className="text-muted">
-                                  No sections available for {year} in {department.split(' ').pop()}. Try clicking the refresh button.
-                                </small>
-                              )}
-                              {year && department && availableSections.length > 0 && (
-                                <small className="text-success">
-                                  Found {availableSections.length} section(s) for {year} in {department.split(' ').pop()}
-                                </small>
-                              )}
+                                                             {year && department && availableSections.length === 0 && !loadingSections && (
+                                 <small className="text-muted">
+                                   No sections available for {year} in {department}. Try clicking the refresh button.
+                                 </small>
+                               )}
+                                                             {year && department && availableSections.length > 0 && (
+                                 <small className="text-success">
+                                   Found {availableSections.length} section(s) for {year} in {department}
+                                 </small>
+                               )}
                             </FormGroup>
                           </Col>
                         </Row>

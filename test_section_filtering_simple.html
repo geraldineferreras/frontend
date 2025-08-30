@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Enhanced Section Filtering</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Enhanced Section Filtering</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Issue Summary</h2>
+        <p><strong>Problem:</strong> The sections dropdown was showing <strong>all 44 sections</strong> instead of filtering by course and year level.</p>
+        <p><strong>Expected:</strong> BSIT + 1st Year should only show BSIT 1A, BSIT 1B, BSIT 1C, etc.</p>
+        <p><strong>Fix Applied:</strong> Enhanced filtering logic with smart course abbreviation detection.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        <button onclick="testBSITFiltering()">Test BSIT + 1st Year</button>
+        <button onclick="testBSCSFiltering()">Test BSCS + 2nd Year</button>
+        <button onclick="testAllCourses()">Test All Courses</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Test Results</div>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Technical Details</h2>
+        <h3>Enhanced Filtering Logic</h3>
+        <pre><code>// Helper function for course abbreviation detection
+const getCourseAbbreviation = (courseName) => {
+  if (courseName.includes('Information Technology')) return 'BSIT';
+  if (courseName.includes('Computer Science')) return 'BSCS';
+  if (courseName.includes('Information Systems')) return 'BSIS';
+  if (courseName.includes('Computer Technology')) return 'ACT';
+  return courseName.substring(0, 4).toUpperCase();
+};
+
+// Enhanced filtering with both program and year matching
+const filteredSections = allSections.filter(section => {
+  const programMatch = section.program === selectedProgram || 
+                      section.program.includes(getCourseAbbreviation(selectedProgram));
+  const yearMatch = section.year_level === yearNumber;
+  return programMatch && yearMatch;
+});</code></pre>
+    </div>
+
+    <script>
+        let testCount = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        function logResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = `<strong>Test ${++testCount}:</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+            
+            if (type === 'success') passedTests++;
+            if (type === 'error') failedTests++;
+            
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const resultsDiv = document.getElementById('testResults');
+            let summaryDiv = document.getElementById('summary');
+            if (!summaryDiv) {
+                summaryDiv = document.createElement('div');
+                summaryDiv.id = 'summary';
+                summaryDiv.className = 'test-result info';
+                resultsDiv.appendChild(summaryDiv);
+            }
+            summaryDiv.innerHTML = 
+                `<strong>Summary:</strong> ${passedTests} passed, ${failedTests} failed, ${testCount} total`;
+        }
+
+        // Helper function to get course abbreviation (same as in component)
+        function getCourseAbbreviation(courseName) {
+            if (!courseName) return '';
+            
+            const course = courseName.toLowerCase();
+            if (course.includes('information technology')) return 'BSIT';
+            if (course.includes('computer science')) return 'BSCS';
+            if (course.includes('information systems')) return 'BSIS';
+            if (course.includes('computer technology')) return 'ACT';
+            
+            return courseName.substring(0, 4).toUpperCase();
+        }
+
+        // Simulate the enhanced section filtering
+        function simulateEnhancedFiltering(courseName, yearLevel) {
+            console.log(`🔍 Testing enhanced filtering for: ${courseName} - ${yearLevel}`);
+            
+            // Mock sections data (simulating what would come from API)
+            const mockSections = [
+                // BSIT sections
+                { id: 1, section_name: 'BSIT 1A', program: 'BSIT', year_level: '1' },
+                { id: 2, section_name: 'BSIT 1B', program: 'BSIT', year_level: '1' },
+                { id: 3, section_name: 'BSIT 1C', program: 'BSIT', year_level: '1' },
+                { id: 4, section_name: 'BSIT 2A', program: 'BSIT', year_level: '2' },
+                { id: 5, section_name: 'BSIT 2B', program: 'BSIT', year_level: '2' },
+                
+                // BSCS sections
+                { id: 6, section_name: 'BSCS 1A', program: 'BSCS', year_level: '1' },
+                { id: 7, section_name: 'BSCS 1B', program: 'BSCS', year_level: '1' },
+                { id: 8, section_name: 'BSCS 2A', program: 'BSCS', year_level: '2' },
+                { id: 9, section_name: 'BSCS 2B', program: 'BSCS', year_level: '2' },
+                
+                // BSIS sections
+                { id: 10, section_name: 'BSIS 1A', program: 'BSIS', year_level: '1' },
+                { id: 11, section_name: 'BSIS 1B', program: 'BSIS', year_level: '1' },
+                { id: 12, section_name: 'BSIS 3A', program: 'BSIS', year_level: '3' },
+                
+                // ACT sections
+                { id: 13, section_name: 'ACT 4A', program: 'ACT', year_level: '4' },
+                { id: 14, section_name: 'ACT 4B', program: 'ACT', year_level: '4' }
+            ];
+            
+            // Extract year number
+            const yearNumber = yearLevel.replace(/[^0-9]/g, '');
+            
+            // Enhanced filtering logic (same as in the component)
+            const filteredSections = mockSections.filter(section => {
+                const sectionProgram = section.program || '';
+                const sectionYear = section.year_level || section.year || '';
+                
+                // Enhanced program matching
+                let programMatch = false;
+                
+                // Check for exact matches first
+                if (sectionProgram.toLowerCase() === courseName.toLowerCase()) {
+                    programMatch = true;
+                }
+                // Check for course abbreviation matches using helper function
+                else {
+                    const expectedAbbr = getCourseAbbreviation(courseName);
+                    const sectionAbbr = getCourseAbbreviation(sectionProgram);
+                    
+                    if (expectedAbbr === sectionAbbr || 
+                        sectionProgram.toLowerCase().includes(expectedAbbr.toLowerCase()) ||
+                        sectionProgram.toLowerCase().includes(courseName.toLowerCase())) {
+                        programMatch = true;
+                    }
+                }
+                
+                // Enhanced year matching
+                const yearMatch = sectionYear === yearNumber || 
+                                 sectionYear === yearLevel || 
+                                 sectionYear.toString() === yearNumber ||
+                                 (sectionYear && sectionYear.toString().includes(yearNumber));
+                
+                return programMatch && yearMatch;
+            });
+            
+            console.log(`📊 Filtered sections for ${courseName} - ${yearLevel}:`, filteredSections);
+            return filteredSections;
+        }
+
+        function testBSITFiltering() {
+            logResult('Testing BSIT + 1st Year filtering...', 'info');
+            
+            const courseName = 'Bachelor of Science in Information Technology';
+            const yearLevel = '1st Year';
+            
+            const filteredSections = simulateEnhancedFiltering(courseName, yearLevel);
+            
+            if (filteredSections.length > 0 && filteredSections.every(s => s.program === 'BSIT' && s.year_level === '1')) {
+                logResult('✅ BSIT filtering test passed - Only BSIT 1st year sections shown', 'success');
+                console.log('✅ BSIT sections found:', filteredSections.map(s => s.section_name));
+            } else {
+                logResult('❌ BSIT filtering test failed - Wrong sections or no sections found', 'error');
+            }
+        }
+
+        function testBSCSFiltering() {
+            logResult('Testing BSCS + 2nd Year filtering...', 'info');
+            
+            const courseName = 'Bachelor of Science in Computer Science';
+            const yearLevel = '2nd Year';
+            
+            const filteredSections = simulateEnhancedFiltering(courseName, yearLevel);
+            
+            if (filteredSections.length > 0 && filteredSections.every(s => s.program === 'BSCS' && s.year_level === '2')) {
+                logResult('✅ BSCS filtering test passed - Only BSCS 2nd year sections shown', 'success');
+                console.log('✅ BSCS sections found:', filteredSections.map(s => s.section_name));
+            } else {
+                logResult('❌ BSCS filtering test failed - Wrong sections or no sections found', 'error');
+            }
+        }
+
+        function testAllCourses() {
+            logResult('Testing all course filtering combinations...', 'info');
+            
+            const testCases = [
+                { course: 'Bachelor of Science in Information Technology', year: '1st Year', expected: 'BSIT 1' },
+                { course: 'Bachelor of Science in Computer Science', year: '2nd Year', expected: 'BSCS 2' },
+                { course: 'Bachelor of Science in Information Systems', year: '3rd Year', expected: 'BSIS 3' },
+                { course: 'Associate in Computer Technology', year: '4th Year', expected: 'ACT 4' }
+            ];
+            
+            let allPassed = true;
+            
+            testCases.forEach((testCase, index) => {
+                const filteredSections = simulateEnhancedFiltering(testCase.course, testCase.year);
+                const expectedAbbr = getCourseAbbreviation(testCase.course);
+                const yearNumber = testCase.year.replace(/[^0-9]/g, '');
+                
+                const isValid = filteredSections.length > 0 && 
+                               filteredSections.every(s => s.program === expectedAbbr && s.year_level === yearNumber);
+                
+                if (!isValid) {
+                    allPassed = false;
+                    logResult(`❌ Test case ${index + 1} failed: ${testCase.course} - ${testCase.year}`, 'error');
+                }
+            });
+            
+            if (allPassed) {
+                logResult('✅ All course filtering tests passed - Enhanced filtering working correctly', 'success');
+            } else {
+                logResult('❌ Some course filtering tests failed - Check filtering logic', 'error');
+            }
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            logResult('Page loaded, ready for testing enhanced section filtering', 'info');
+        });
+    </script>
+</body>
+</html>

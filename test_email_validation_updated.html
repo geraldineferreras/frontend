@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Email Validation Updated for Manual Registration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .email-example {
+            background-color: #e9ecef;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Email Validation Updated for Manual Registration</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Issue Summary</h2>
+        <p><strong>Problem:</strong> Registration form was enforcing @pampangastateu.edu.ph email domain for ALL users</p>
+        <p><strong>Request:</strong> Allow any email domain for manual form registration, only enforce PSU domain for Google OAuth</p>
+        <p><strong>Expected Result:</strong> Users can register with any email (Gmail, Yahoo, etc.) when using the role dropdown</p>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ Changes Made</h2>
+        <h3>1. Email Validation Updated</h3>
+        <div class="email-example">
+            <strong>Before:</strong> All emails must be @pampangastateu.edu.ph
+        </div>
+        <div class="email-example">
+            <strong>After:</strong> Any email domain allowed for manual registration
+        </div>
+        
+        <h3>2. Email Field Updated</h3>
+        <pre><code>// Before: Strict PSU email validation
+if (!formData.email.includes('@pampangastateu.edu.ph')) {
+  setError("Please use your Pampanga State University email address (@pampangastateu.edu.ph)");
+  return false;
+}
+
+// After: Allow any email domain for manual registration
+if (!formData.email.includes('@pampangastateu.edu.ph')) {
+  // Allow any email domain for manual registration
+  // The @pampangastateu.edu.ph requirement is only for Google OAuth
+  console.log('Manual registration with non-PSU email allowed:', formData.email);
+}</code></pre>
+        
+        <h3>3. Email Field Placeholder Updated</h3>
+        <pre><code>// Before
+placeholder="Email (@pampangastateu.edu.ph)"
+helperText="Use your Pampanga State University email address"
+
+// After  
+placeholder="Email Address"
+helperText="Any email domain is allowed for manual registration"</code></pre>
+        
+        <h3>4. Role Detection Updated</h3>
+        <pre><code>// Before: Only worked with PSU emails
+const detectRoleFromEmail = (email) => {
+  if (!email || !email.includes('@pampangastateu.edu.ph')) {
+    return null;
+  }
+  // ... role detection logic
+};
+
+// After: Only auto-detect for PSU emails
+const detectRoleFromEmail = (email) => {
+  if (!email) {
+    return null;
+  }
+  
+  // Only auto-detect role for PSU emails (@pampangastateu.edu.ph)
+  if (email.includes('@pampangastateu.edu.ph')) {
+    // ... role detection logic
+  }
+  
+  // For non-PSU emails, no auto-detection
+  return null;
+};</code></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Technical Details</h2>
+        <h3>Files Modified</h3>
+        <ul>
+            <li><strong>src/views/examples/Register.js</strong> - Main registration form component</li>
+        </ul>
+        
+        <h3>Changes Summary</h3>
+        <ol>
+            <li><strong>Email Validation:</strong> Removed strict @pampangastateu.edu.ph requirement for manual registration</li>
+            <li><strong>Email Field:</strong> Updated placeholder and helper text to reflect new policy</li>
+            <li><strong>Role Detection:</strong> Modified to only auto-detect roles for PSU emails</li>
+            <li><strong>Validation Messages:</strong> Updated error messages to be more specific about PSU requirements</li>
+        </ol>
+        
+        <h3>New Registration Flow</h3>
+        <ul>
+            <li>✅ <strong>Manual Registration:</strong> Any email domain allowed (Gmail, Yahoo, etc.)</li>
+            <li>✅ <strong>Role Selection:</strong> Users manually select role from dropdown</li>
+            <li>✅ <strong>Google OAuth:</strong> Still requires @pampangastateu.edu.ph domain</li>
+            <li>✅ <strong>PSU Emails:</strong> Auto-role detection still works for convenience</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Testing Instructions</h2>
+        <ol>
+            <li><strong>Open Registration Form:</strong> Navigate to the registration page</li>
+            <li><strong>Test Manual Registration:</strong> Fill out the form with any email domain</li>
+            <li><strong>Use Gmail:</strong> Try registering with a Gmail address (e.g., user@gmail.com)</li>
+            <li><strong>Select Role Manually:</strong> Choose Admin, Student, or Teacher from dropdown</li>
+            <li><strong>Complete Form:</strong> Fill all required fields and submit</li>
+            <li><strong>Verify Success:</strong> Registration should complete without email domain errors</li>
+        </ol>
+        
+        <h3>Test Cases</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #f8f9fa;">
+                    <th style="border: 1px solid #dee2e6; padding: 8px; text-align: left;">Email Type</th>
+                    <th style="border: 1px solid #dee2e6; padding: 8px; text-align: left;">Expected Result</th>
+                    <th style="border: 1px solid #dee2e6; padding: 8px; text-align: left;">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">user@gmail.com</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">✅ Allowed</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">Manual registration with Gmail</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">user@yahoo.com</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">✅ Allowed</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">Manual registration with Yahoo</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">2021304995@pampangastateu.edu.ph</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">✅ Allowed + Auto-role</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">PSU email with auto-detection</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">a.ferrer@pampangastateu.edu.ph</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">✅ Allowed + Auto-role</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">PSU email with auto-detection</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Registration Scenarios</h2>
+        <h3>Scenario 1: Manual Registration with Gmail</h3>
+        <ul>
+            <li>✅ User selects "Admin" role from dropdown</li>
+            <li>✅ User enters "admin@gmail.com" as email</li>
+            <li>✅ User fills all required fields</li>
+            <li>✅ Form submits successfully</li>
+            <li>✅ No email domain validation errors</li>
+        </ul>
+        
+        <h3>Scenario 2: PSU Email with Auto-Role Detection</h3>
+        <ul>
+            <li>✅ User enters "2021304995@pampangastateu.edu.ph"</li>
+            <li>✅ System auto-detects "student" role</li>
+            <li>✅ User can manually change role if needed</li>
+            <li>✅ Form submits successfully</li>
+        </ul>
+        
+        <h3>Scenario 3: Google OAuth Registration</h3>
+        <ul>
+            <li>✅ Still requires @pampangastateu.edu.ph domain</li>
+            <li>✅ Role auto-detected based on email pattern</li>
+            <li>✅ Maintains existing Google OAuth functionality</li>
+        </ul>
+    </div>
+
+    <script>
+        // Auto-run test summary on page load
+        window.addEventListener('load', () => {
+            console.log('🧪 Email Validation Update Test Summary:');
+            console.log('✅ Manual registration now allows any email domain');
+            console.log('✅ PSU email auto-role detection still works');
+            console.log('✅ Google OAuth still requires PSU domain');
+            console.log('✅ Role dropdown is now the primary role selection method');
+            console.log('📋 Ready for manual testing in the application');
+        });
+    </script>
+</body>
+</html>

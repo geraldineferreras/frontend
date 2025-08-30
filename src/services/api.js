@@ -60,8 +60,19 @@ class ApiService {
       return response.data;
     } catch (error) {
       // Axios error handling
-      const message = error.response?.data?.message || error.message || 'API Error';
-      console.error(`API Error (${endpoint}):`, message);
+      let message = error.response?.data?.message || error.message || 'API Error';
+      
+      // Log detailed error information for debugging
+      console.error(`API Error (${endpoint}):`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: message,
+        url: url,
+        method: method,
+        body: body
+      });
+      
       // Token/session expiration handling
       if (
         message.toLowerCase().includes('token expired') ||
@@ -76,6 +87,15 @@ class ApiService {
         // Do not redirect here; let the modal handle it
         return;
       }
+      
+      // For 500 errors, try to get more specific error details
+      if (error.response?.status === 500) {
+        const errorData = error.response?.data;
+        if (errorData && typeof errorData === 'object') {
+          message = errorData.message || errorData.error || errorData.detail || message;
+        }
+      }
+      
       throw new Error(message);
     }
   }
@@ -777,32 +797,75 @@ class ApiService {
       }
       
       let response;
-      if (hasFiles) {
-        // Send as multipart/form-data using POST
-        response = await axios.post(`${API_BASE}/student/update`, formData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 30000,
-        });
-      } else {
-        // Convert FormData to JSON and send using PUT
-        const jsonData = {};
-        for (let [key, value] of formData.entries()) {
-          jsonData[key] = value;
+      
+      // First, try the specific student update endpoint
+      try {
+        if (hasFiles) {
+          // Send as multipart/form-data using POST
+          response = await axios.post(`${API_BASE}/student/update`, formData, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 30000,
+          });
+        } else {
+          // Convert FormData to JSON and send using PUT
+          const jsonData = {};
+          for (let [key, value] of formData.entries()) {
+            jsonData[key] = value;
+          }
+          
+          response = await axios.put(`${API_BASE}/student/update`, jsonData, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000,
+          });
         }
         
-        response = await axios.put(`${API_BASE}/student/update`, jsonData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000,
-        });
+        console.log('✅ Student update endpoint succeeded:', response.data);
+        return response.data;
+        
+      } catch (studentUpdateError) {
+        console.log('❌ Student update endpoint failed, trying general user update endpoint...');
+        console.log('Student update error:', studentUpdateError.message);
+        
+        // Fallback to general user update endpoint
+        try {
+          // Convert FormData to JSON for the general endpoint
+          const jsonData = {};
+          for (let [key, value] of formData.entries()) {
+            // Skip file fields for the general endpoint
+            if (!(value instanceof File)) {
+              jsonData[key] = value;
+            }
+          }
+          
+          console.log('🔄 Trying general user update endpoint with data:', jsonData);
+          
+          response = await axios.put(`${API_BASE}/auth/update_user`, jsonData, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000,
+          });
+          
+          console.log('✅ General user update endpoint succeeded:', response.data);
+          return response.data;
+          
+        } catch (generalUpdateError) {
+          console.error('❌ General user update endpoint also failed:', generalUpdateError);
+          console.error('General update error response:', generalUpdateError.response?.data);
+          console.error('General update error status:', generalUpdateError.response?.status);
+          
+          // If both fail, throw the original student update error for better debugging
+          throw studentUpdateError;
+        }
       }
       
-      return response.data;
     } catch (error) {
       console.error('Full student update error:', error);
       console.error('Error response data:', error.response?.data);
@@ -822,32 +885,73 @@ class ApiService {
 
   async getUserById(userId, role) {
     try {
-      // Use makeRequest with requireAuth
+      // First, try the standard approach with user_id parameter
+      console.log(`🔍 Attempting to fetch user with standard endpoint: /user?role=${role}&user_id=${userId}`);
       const response = await this.makeRequest(`/user?role=${role}&user_id=${userId}`, {
         method: 'GET',
         requireAuth: true,
       });
+      console.log('✅ Standard endpoint succeeded:', response);
       return response;
     } catch (error) {
-      // If makeRequest fails, try direct axios call as fallback
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found. Please log in again.');
-      }
+      console.log(`❌ Standard getUserById failed for ${role} user ${userId}:`, error.message);
+      console.log('🔄 Switching to fallback method...');
       
+      // Since the backend doesn't support alternative endpoints, go straight to fallback
       try {
-        const response = await axios.get(`${API_BASE}/user?role=${role}&user_id=${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000, // 10 second timeout
+        console.log('🔄 Fetching all users to find the specific user...');
+        const allUsersResponse = await this.makeRequest(`/users?role=${role}`, {
+          method: 'GET',
+          requireAuth: true,
         });
-
-        return response.data;
-      } catch (axiosError) {
-        console.error("Direct axios call failed:", axiosError);
-        throw axiosError;
+        
+        if (allUsersResponse && allUsersResponse.data) {
+          const users = Array.isArray(allUsersResponse.data) ? allUsersResponse.data : [allUsersResponse.data];
+          console.log(`📊 Found ${users.length} users with role ${role}`);
+          
+          // Try to find user by various ID fields
+          const foundUser = users.find(user => {
+            const userMatches = 
+              user.id === userId || 
+              user.user_id === userId || 
+              user.userId === userId ||
+              user.google_id === userId ||
+              user.student_id === userId ||
+              user.teacher_id === userId ||
+              user.admin_id === userId;
+            
+            if (userMatches) {
+              console.log('🎯 Found matching user:', {
+                foundId: user.id || user.user_id || user.google_id,
+                searchId: userId,
+                fullName: user.full_name || user.name,
+                email: user.email
+              });
+            }
+            
+            return userMatches;
+          });
+          
+          if (foundUser) {
+            console.log('✅ User found via fallback method:', foundUser);
+            return { data: foundUser };
+          } else {
+            console.log('❌ User not found in the users list. Available users:', users.map(u => ({
+              id: u.id,
+              user_id: u.user_id,
+              google_id: u.google_id,
+              full_name: u.full_name || u.name,
+              email: u.email
+            })));
+          }
+        } else {
+          console.log('❌ No users data received from /users endpoint');
+        }
+        
+        throw new Error('User not found in the users list');
+      } catch (fallbackError) {
+        console.error('❌ Fallback method failed:', fallbackError);
+        throw new Error(`User not found. Tried to fetch all ${role} users but failed to locate user with ID: ${userId}. Error: ${fallbackError.message}`);
       }
     }
   }

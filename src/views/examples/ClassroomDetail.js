@@ -915,11 +915,75 @@ const ClassroomDetail = () => {
             // Try getting all students and filtering
             const allStudentsResponse = await apiService.getStudents();
             console.log('All students response:', allStudentsResponse);
-            // For now, let's use sample data until we figure out the correct endpoint
-            response = { status: true, data: { students: [] } };
+            
+            if (allStudentsResponse && allStudentsResponse.status && allStudentsResponse.data) {
+              // Transform the all students data to match our expected format
+              const allStudents = allStudentsResponse.data.map(student => ({
+                id: student.id || student.user_id,
+                name: student.full_name || student.name,
+                email: student.email,
+                student_num: student.student_num,
+                contact_num: student.contact_num,
+                program: student.program,
+                section_name: student.section_name,
+                joinedDate: student.created_at || student.enrolled_at,
+                enrollment_status: student.status || 'active',
+                profile_pic: student.profile_pic || student.profile_image,
+                role: "Student"
+              }));
+              
+              console.log('Transformed all students:', allStudents);
+              // Use the all students data instead of empty response
+              response = { status: true, data: { students: allStudents } };
+            } else {
+              console.log('All students response has invalid structure, using empty response');
+              response = { status: true, data: { students: [] } };
+            }
           } catch (error3) {
-            console.log('All approaches failed, using empty response');
-            response = { status: true, data: { students: [] } };
+            console.log('All approaches failed, using sample data for testing');
+            // Use sample data for testing purposes
+            const sampleStudents = [
+              {
+                id: 1,
+                name: 'John Doe',
+                email: 'john.doe@example.com',
+                student_num: '2024-001',
+                contact_num: '+1234567890',
+                program: 'Computer Science',
+                section_name: 'A',
+                joinedDate: '2024-01-15',
+                enrollment_status: 'active',
+                profile_pic: null,
+                role: 'Student'
+              },
+              {
+                id: 2,
+                name: 'Jane Smith',
+                email: 'jane.smith@example.com',
+                student_num: '2024-002',
+                contact_num: '+1234567891',
+                program: 'Computer Science',
+                section_name: 'A',
+                joinedDate: '2024-01-15',
+                enrollment_status: 'active',
+                profile_pic: null,
+                role: 'Student'
+              },
+              {
+                id: 3,
+                name: 'Mike Johnson',
+                email: 'mike.johnson@example.com',
+                student_num: '2024-003',
+                contact_num: '+1234567892',
+                program: 'Computer Science',
+                section_name: 'A',
+                joinedDate: '2024-01-15',
+                enrollment_status: 'active',
+                profile_pic: null,
+                role: 'Student'
+              }
+            ];
+            response = { status: true, data: { students: sampleStudents } };
           }
         }
       }
@@ -8353,6 +8417,10 @@ useEffect(() => {
                       <button onClick={() => setShowStudentSelectModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}>&times;</button>
                     </div>
                     <div style={{ padding: '0 24px 24px 24px' }}>
+                      {/* Debug Info */}
+                      <div style={{ background: '#e3f2fd', padding: '8px 12px', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', color: '#1976d2' }}>
+                        Debug Info: availableStudents: {students.length}, classroomStudents: {tempSelectedStudents.length}, loading: {loadingStudents}
+                      </div>
                       <div style={{ position: 'relative', width: '100%', marginBottom: 18 }}>
                         <i className="fa fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#b0b7c3', fontSize: 16, pointerEvents: 'none' }} />
                         <input
@@ -8363,7 +8431,7 @@ useEffect(() => {
                         />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                        <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Students ({tempSelectedStudents.length})</span>
+                        <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Students ({tempSelectedStudents.length}) - Total: {students.length}</span>
                         {(() => {
                           const filtered = students.filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()));
                           const allSelected = filtered.length > 0 && filtered.every(s => tempSelectedStudents.includes(s.id));

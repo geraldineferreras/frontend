@@ -200,7 +200,7 @@ const quickActions = [
 
   { icon: "ni ni-single-copy-04 text-pink", label: "Review Excuse Letters" },
 
-  { icon: "ni ni-camera-compact text-purple", label: "Video Conference" }
+
 
 ];
 
@@ -3043,10 +3043,6 @@ const Index = (props) => {
                             } else if (label.includes("review excuse letters")) {
 
                               navigate("/teacher/excuse-management");
-
-                            } else if (label.includes("video conference")) {
-
-                              navigate("/teacher/video-conferencing");
 
                             }
 

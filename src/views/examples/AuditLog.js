@@ -979,7 +979,7 @@ const AuditLog = () => {
                 <Row>
                   <Col xs={12} className="px-3">
                     <div className="w-100 d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center" style={{ marginTop: '20px', marginBottom: '16px', gap: '10px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '1rem', color: '#32325d' }}>
+                      <div style={{ fontWeight: 600, fontSize: '1rem', color: '#32325d', marginLeft: '10px' }}>
                         <span className="d-none d-sm-inline">Audit Log</span>
                         <span className="d-sm-none">Log</span> ({totalItems})
                         {loading && <Spinner size="sm" className="ml-2" />}

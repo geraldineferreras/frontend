@@ -59,15 +59,7 @@ const Footer = () => {
               </NavLink>
             </NavItem>
 
-            <NavItem>
-              <NavLink
-                href="https://github.com/creativetimofficial/argon-dashboard/blob/master/LICENSE.md?ref=adr-admin-footer"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                MIT License
-              </NavLink>
-            </NavItem>
+
           </Nav>
         </Col>
       </Row>

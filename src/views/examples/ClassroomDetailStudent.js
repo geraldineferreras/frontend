@@ -1261,6 +1261,8 @@ const ClassroomDetailStudent = () => {
   
   // People tab state
   const [peopleData, setPeopleData] = useState(null);
+  // Helper: find class member by name (used for fetching real profile pictures)
+  // Note: defined above as well near avatar utilities; keep only the earlier definition to avoid redeclaration.
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [peopleError, setPeopleError] = useState(null);
   
@@ -1269,39 +1271,68 @@ const ClassroomDetailStudent = () => {
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [gradesError, setGradesError] = useState(null);
 
+  // Helper: derive a grade value even if the grades endpoint leaves it null
+  const getDisplayGrade = (item) => {
+    // Prefer explicit fields from grades API
+    let gradeValue = (item && (item.score ?? item.grade));
+    let maxPoints = item && (item.points || item.max_points || item.total_points || 100);
+
+    // Fallback: try to find matching assignment in loaded classwork
+    if ((gradeValue === null || gradeValue === undefined) && Array.isArray(realAssignments)) {
+      const match = realAssignments.find(a =>
+        (item.task_id && (a.id == item.task_id || a.task_id == item.task_id)) ||
+        (item.title && a.title === item.title)
+      );
+      if (match) {
+        const sub = match.submission || {};
+        const inferred = (sub.grade !== undefined && sub.grade !== null)
+          ? sub.grade
+          : (match.grade !== undefined ? match.grade : undefined);
+        if (inferred !== undefined) {
+          gradeValue = inferred;
+          maxPoints = match.points || match.max_points || match.total_points || maxPoints;
+        }
+      }
+    }
+
+    return { gradeValue, maxPoints };
+  };
+
   // Fetch the current class data based on the URL parameter
   useEffect(() => {
     const fetchCurrentClass = async () => {
       setLoadingClass(true);
       try {
         const response = await apiService.getStudentClasses();
-        
-        if (response.status && response.data && Array.isArray(response.data)) {
-          const enrolled = response.data.filter(cls => cls.is_enrolled === true);
-          
+        const raw = (response && response.data) ? response.data : response;
+        if (Array.isArray(raw)) {
+          // Be permissive about enrollment flags
+          const enrolled = raw.filter(cls => {
+            const flagTrue = cls.is_enrolled === true || cls.isEnrolled === true || cls.enrolled === true;
+            const statusEnrolled = (cls.enrollment_status || cls.status || '').toString().toLowerCase() === 'enrolled'
+              || (cls.enrollment_status || cls.status || '').toString().toLowerCase() === 'active';
+            const hasAnyFlag = ('is_enrolled' in cls) || ('isEnrolled' in cls) || ('enrolled' in cls) || ('enrollment_status' in cls) || ('status' in cls);
+            return flagTrue || statusEnrolled || !hasAnyFlag;
+          });
           // Find the class that matches the URL parameter (code)
           let targetClass = null;
-          
-          // First try to find by class_code
-          targetClass = enrolled.find(cls => cls.class_code === code);
-          
+          // Try multiple keys for match
+          targetClass = enrolled.find(cls => (cls.class_code || cls.code) === code);
           // If not found by class_code, try to find by class_id (if code is numeric)
           if (!targetClass && /^\d+$/.test(code)) {
             targetClass = enrolled.find(cls => cls.class_id == code);
           }
-          
           // If still not found, use the first enrolled class
           if (!targetClass && enrolled.length > 0) {
             targetClass = enrolled[0];
           }
-          
           if (targetClass) {
             const classData = {
               id: targetClass.class_id,
               name: `${targetClass.subject_name} (${targetClass.section_name})`,
               section: targetClass.section_name,
               subject: targetClass.subject_name,
-              code: targetClass.class_code || targetClass.class_id,
+              code: targetClass.class_code || targetClass.code || targetClass.class_id,
               semester: targetClass.semester,
               schoolYear: targetClass.school_year,
               teacherName: targetClass.teacher_name
@@ -1460,19 +1491,26 @@ const ClassroomDetailStudent = () => {
       console.log('People tab is active, fetching people data for class:', currentClass.code);
       setLoadingPeople(true);
       setPeopleError(null);
-      
-      apiService.get(`/student/classroom/${currentClass.code}/people`)
+
+      apiService.getClassroomMembers(currentClass.code)
         .then(response => {
           console.log('People API Response:', response);
-          if (response.status && response.data) {
-            setPeopleData(response.data);
+          // Support multiple shapes: {status, data}, array, or object with teacher/students
+          if (Array.isArray(response)) {
+            setPeopleData({ students: response });
+            return;
+          }
+          const ok = response?.status === true || response?.status === 'success' || !!response?.data;
+          if (ok) {
+            setPeopleData(response.data || response);
           } else {
-            setPeopleError('Failed to load people data');
+            setPeopleError(response?.message || 'Failed to load people data');
           }
         })
         .catch(err => {
           console.error('Error fetching people data:', err);
-          setPeopleError('Failed to load people data');
+          const msg = err?.response?.data?.message || err?.message || 'Failed to load people data';
+          setPeopleError(msg);
         })
         .finally(() => setLoadingPeople(false));
     }
@@ -1485,18 +1523,21 @@ const ClassroomDetailStudent = () => {
       setLoadingGrades(true);
       setGradesError(null);
       
+      // Use confirmed endpoint
       apiService.get(`/student/grades?class_code=${currentClass.code}`)
         .then(response => {
           console.log('Grades API Response:', response);
-          if (response.status && response.data) {
-            setGradesData(response.data);
+          const ok = response?.status === true || response?.status === 'success' || !!response?.data;
+          if (ok) {
+            setGradesData(response.data || response);
           } else {
-            setGradesError('Failed to load grades data');
+            setGradesError(response?.message || 'Failed to load grades data');
           }
         })
         .catch(err => {
           console.error('Error fetching grades data:', err);
-          setGradesError('Failed to load grades data');
+          const msg = err?.response?.data?.message || err?.message || 'Failed to load grades data';
+          setGradesError(msg);
         })
         .finally(() => setLoadingGrades(false));
     }
@@ -1926,11 +1967,15 @@ const ClassroomDetailStudent = () => {
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 {(() => {
-                                  const authorUser = {
-                                    profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
-                                    name: announcement.author,
-                                    full_name: announcement.author,
-                                  };
+                                  // Prefer real profile from classroom members (teacher or student)
+                                  let authorUser = findMemberByName(announcement.author);
+                                  if (!authorUser) {
+                                    authorUser = {
+                                      profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
+                                      name: announcement.author,
+                                      full_name: announcement.author,
+                                    };
+                                  }
                                   const avatarUrl = getProfilePictureUrl(authorUser);
                                   const bgColor = getAvatarColor(authorUser);
                                   const initials = getUserInitials(authorUser);
@@ -2026,11 +2071,14 @@ const ClassroomDetailStudent = () => {
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             {(() => {
-                              const authorUser = {
-                                profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
-                                name: announcement.author,
-                                full_name: announcement.author,
-                              };
+                              let authorUser = findMemberByName(announcement.author);
+                              if (!authorUser) {
+                                authorUser = {
+                                  profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
+                                  name: announcement.author,
+                                  full_name: announcement.author,
+                                };
+                              }
                               const avatarUrl = getProfilePictureUrl(authorUser);
                               const bgColor = getAvatarColor(authorUser);
                               const initials = getUserInitials(authorUser);
@@ -3017,14 +3065,14 @@ const ClassroomDetailStudent = () => {
                       Academic Performance
                     </div>
                     <div style={{ fontSize: '32px', fontWeight: 700, color: '#212529' }}>
-                      {gradesData.academic_performance?.student_name || 'Student'}
+                      {(gradesData.student && (gradesData.student.full_name || gradesData.student.name)) || 'Student'}
                     </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '32px' }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
-                      {gradesData.academic_performance?.average_grade || 0}%
+                      {(gradesData.summary && (gradesData.summary.average_percent ?? gradesData.summary.average_grade)) || 0}%
                     </div>
                     <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
                       Average Grade
@@ -3032,7 +3080,7 @@ const ClassroomDetailStudent = () => {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '24px', fontWeight: 700, color: '#495057', marginBottom: '4px' }}>
-                      {gradesData.academic_performance?.total_assignments || 0}
+                      {(gradesData.summary && gradesData.summary.tasks_total) || 0}
                     </div>
                     <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
                       Total Assignments
@@ -3205,12 +3253,12 @@ const ClassroomDetailStudent = () => {
                     borderRadius: '20px',
                     border: 'none'
                   }}>
-                    {gradesData.grades?.length || 0} Items
+                    {(Array.isArray(gradesData.items) ? gradesData.items.length : (gradesData.grades?.length || 0))} Items
                   </div>
                 </div>
 
                 <div>
-                  {gradesData.grades?.map(a => (
+                  {(Array.isArray(gradesData.items) ? gradesData.items : (gradesData.grades || [])).map(a => (
                     <div key={a.id}>
                       {expandedGradeId === a.id ? (
                         <div style={{ 
@@ -3253,7 +3301,13 @@ const ClassroomDetailStudent = () => {
                               fontSize: '20px',
                               color: '#495057'
                             }}>
-                              {a.grade ? `${a.grade}/${a.points}` : a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending'}
+                              {(() => {
+                                const { gradeValue, maxPoints } = getDisplayGrade(a);
+                                if (gradeValue !== undefined && gradeValue !== null) {
+                                  return `${gradeValue}/${maxPoints}`;
+                                }
+                                return a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending';
+                              })()}
                             </div>
                           </div>
                           {/* Expanded content for assignments with attachments */}
@@ -3346,13 +3400,13 @@ const ClassroomDetailStudent = () => {
                                 <i className="ni ni-paper-clip" style={{ fontSize: '12px' }} />
                                 <span>{a.attachment_count || 0} attachments</span>
                                 <span style={{ margin: '0 8px' }}>•</span>
-                                <span>Due {new Date(a.due_date).toLocaleDateString('en-US', { 
+                                <span>Due {a.due_date ? new Date(a.due_date).toLocaleDateString('en-US', { 
                                   year: 'numeric', 
                                   month: 'short', 
                                   day: 'numeric',
                                   hour: '2-digit',
                                   minute: '2-digit'
-                                })}</span>
+                                }) : 'N/A'}</span>
                               </div>
                             </div>
                           </div>
@@ -3361,7 +3415,13 @@ const ClassroomDetailStudent = () => {
                             fontSize: '18px',
                             color: '#495057'
                           }}>
-                            {a.grade ? `${a.grade}/${a.points}` : a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending'}
+                            {(() => {
+                              const { gradeValue, maxPoints } = getDisplayGrade(a);
+                              if (gradeValue !== undefined && gradeValue !== null) {
+                                return `${gradeValue}/${maxPoints}`;
+                              }
+                              return a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending';
+                            })()}
                           </div>
                         </div>
                       )}

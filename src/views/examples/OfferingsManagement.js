@@ -406,7 +406,7 @@ export default function OfferingsManagement() {
                 />
               </Col>
               <Col md={12} className="text-md-right mt-3 mt-md-0">
-                <Button color="primary" onClick={handleAdd} style={{ borderRadius: 8, fontWeight: 600, minWidth: 180 }} disabled={addingOffering}>
+                <Button color="primary" onClick={handleAdd} style={{ borderRadius: 8, fontWeight: 600, minWidth: 180, marginTop: 10 }} disabled={addingOffering}>
                   {addingOffering ? <Spinner size="sm" /> : "Assign Offering"}
                 </Button>
               </Col>

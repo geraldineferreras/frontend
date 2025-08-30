@@ -5,13 +5,16 @@ export const getProfilePictureUrl = (user) => {
   }
 
   // Priority order for profile picture sources (Google OAuth gets highest priority)
-  const profilePic = user.profile_image_url ||  // Google OAuth profile image
-                    user.profileImageUrl ||     // Alternative Google OAuth field
-                    user.imageUrl ||            // Another Google OAuth field  
-                    user.profile_pic ||         // Local profile picture
-                    user.profile_picture ||     // Alternative local field
-                    user.avatar ||              // Avatar field
-                    user.user_avatar;          // User avatar field
+  const profilePic = user.profile_image_url ||   // Google OAuth profile image
+                    user.profileImageUrl ||      // Alternative Google OAuth field
+                    user.imageUrl ||             // Another Google OAuth field  
+                    user.google_avatar ||        // Additional Google field
+                    user.user_avatar ||          // Generic user avatar field
+                    user.avatar ||               // Avatar field
+                    user.profile_pic ||          // Local profile picture
+                    user.profile_picture ||      // Alternative local field
+                    user.user_profile_pic ||     // Other variants from API
+                    user.user_profile_picture;   // Other variants from API
   
   if (!profilePic) {
     // Return null when no profile picture is available
@@ -20,13 +23,18 @@ export const getProfilePictureUrl = (user) => {
 
   let imageUrl = '';
 
+  // Normalize base root (strip /index.php and /api if present)
+  const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+  const baseRoot = rawBase
+    .replace(/\/index\.php\/api$/i, '')
+    .replace(/\/index\.php$/i, '')
+    .replace(/\/api$/i, '')
+    .replace(/\/$/, '');
+
   // Handle different URL formats
   if (profilePic.startsWith('uploads/')) {
     // Relative path - construct full URL using the correct base URL
-    // If API base is like http://host/.../index.php/api → strip to base site root
-    const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
-    const base = rawBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
-    imageUrl = `${base}/${profilePic}`;
+    imageUrl = `${baseRoot}/${profilePic}`;
     console.log('📁 Relative path detected, constructed URL:', imageUrl);
   } else if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
     // Full URL
@@ -38,7 +46,7 @@ export const getProfilePictureUrl = (user) => {
     console.log('📄 Data URL detected (base64)');
   } else {
     // Assume it's a filename in the uploads directory
-    imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/profile/${profilePic}`;
+    imageUrl = `${baseRoot}/uploads/profile/${profilePic}`;
     console.log('📂 Filename detected, constructed URL:', imageUrl);
   }
 

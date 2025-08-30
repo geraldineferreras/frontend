@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Submission Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Student Submission Debug Tool</h1>
+        <p>Use this tool to test the student submission API endpoints and troubleshoot why students can't see their submitted files.</p>
+
+        <!-- Authentication Section -->
+        <div class="section">
+            <h2>🔐 Authentication</h2>
+            <div class="form-group">
+                <label for="token">JWT Token:</label>
+                <input type="text" id="token" placeholder="Enter your JWT token here">
+            </div>
+            <button onclick="testAuth()">Test Authentication</button>
+            <div id="authResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Task Details Section -->
+        <div class="section">
+            <h2>📋 Task Details</h2>
+            <div class="form-group">
+                <label for="taskId">Task ID:</label>
+                <input type="text" id="taskId" placeholder="Enter task ID (e.g., 23)">
+            </div>
+            <div class="form-group">
+                <label for="classCode">Class Code:</label>
+                <input type="text" id="classCode" placeholder="Enter class code (e.g., J56NHD)">
+            </div>
+            <button onclick="getTaskDetails()">Get Task Details</button>
+            <button onclick="getStudentTaskDetails()">Get Student Task Details</button>
+            <button onclick="getTaskSubmission()">Get Student Submission</button>
+            <button onclick="getAllTaskSubmissions()">Get All Task Submissions</button>
+            <div id="taskResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Analysis Section -->
+        <div class="section">
+            <h2>🔍 Analysis</h2>
+            <button onclick="analyzeSubmissionData()">Analyze Submission Data</button>
+            <div id="analysisResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- API Endpoints Info -->
+        <div class="section">
+            <h2>📚 API Endpoints Reference</h2>
+            <div class="info">
+                <strong>Student Endpoints:</strong>
+                • GET /api/tasks/student/{task_id} - Get task details with submission status
+                • GET /api/tasks/{task_id}/submission?class_code={code} - Get student's submission
+                • POST /api/tasks/{task_id}/submit - Submit files and content
+                
+                <strong>Teacher Endpoints:</strong>
+                • GET /api/tasks/{task_id} - Get task with all submissions
+                • GET /api/tasks/{task_id}/submissions - Get all submissions for a task
+                • POST /api/tasks/submissions/{id}/grade - Grade a submission
+                
+                <strong>File Upload:</strong>
+                • Content-Type: multipart/form-data
+                • Fields: submission_content, class_code, attachment (files)
+                • Max file size: 10MB
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost/scms_new_backup/index.php/api';
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function getToken() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                throw new Error('JWT token is required');
+            }
+            return token;
+        }
+
+        function getHeaders() {
+            return {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function testAuth() {
+            try {
+                const response = await fetch(`${BASE_URL}/auth/verify`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('authResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getTaskDetails() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/${taskId}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `Task Details (${response.status}):\n${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getStudentTaskDetails() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/student/${taskId}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `Student Task Details (${response.status}):\n${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getTaskSubmission() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                const classCode = document.getElementById('classCode').value.trim();
+                
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+                if (!classCode) {
+                    throw new Error('Class code is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/${taskId}/submission?class_code=${classCode}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `Student Submission (${response.status}):\n${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getAllTaskSubmissions() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/${taskId}/submissions`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `All Task Submissions (${response.status}):\n${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function analyzeSubmissionData() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                const classCode = document.getElementById('classCode').value.trim();
+                
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                let analysis = '=== SUBMISSION DATA ANALYSIS ===\n\n';
+                
+                // Get all submissions
+                try {
+                    const allSubsResponse = await fetch(`${BASE_URL}/tasks/${taskId}/submissions`, {
+                        method: 'GET',
+                        headers: getHeaders()
+                    });
+                    const allSubsData = await allSubsResponse.json();
+                    
+                    analysis += `1. ALL SUBMISSIONS (${allSubsResponse.status}):\n`;
+                    analysis += `   Status: ${allSubsResponse.ok ? 'Success' : 'Failed'}\n`;
+                    analysis += `   Data: ${JSON.stringify(allSubsData, null, 2)}\n\n`;
+                    
+                    if (allSubsData.status && allSubsData.data && allSubsData.data.submissions) {
+                        analysis += `   Found ${allSubsData.data.submissions.length} submissions\n`;
+                        allSubsData.data.submissions.forEach((sub, idx) => {
+                            analysis += `   Submission ${idx + 1}:\n`;
+                            analysis += `     - Student: ${sub.student_name || sub.student_num || 'Unknown'}\n`;
+                            analysis += `     - Status: ${sub.status || 'Unknown'}\n`;
+                            analysis += `     - Attachments: ${sub.attachments ? sub.attachments.length : 0}\n`;
+                            if (sub.attachments && sub.attachments.length > 0) {
+                                sub.attachments.forEach((att, attIdx) => {
+                                    analysis += `       Attachment ${attIdx + 1}: ${att.original_name || att.file_name || 'Unknown'}\n`;
+                                });
+                            }
+                        });
+                    }
+                } catch (error) {
+                    analysis += `1. ALL SUBMISSIONS: Error - ${error.message}\n\n`;
+                }
+
+                // Get student submission if class code provided
+                if (classCode) {
+                    try {
+                        const studentSubResponse = await fetch(`${BASE_URL}/tasks/${taskId}/submission?class_code=${classCode}`, {
+                            method: 'GET',
+                            headers: getHeaders()
+                        });
+                        const studentSubData = await studentSubResponse.json();
+                        
+                        analysis += `\n2. STUDENT SUBMISSION (${studentSubResponse.status}):\n`;
+                        analysis += `   Status: ${studentSubResponse.ok ? 'Success' : 'Failed'}\n`;
+                        analysis += `   Data: ${JSON.stringify(studentSubData, null, 2)}\n\n`;
+                        
+                        if (studentSubData.status && studentSubData.data) {
+                            analysis += `   Submission found: Yes\n`;
+                            analysis += `   Status: ${studentSubData.data.status || 'Unknown'}\n`;
+                            analysis += `   Attachments: ${studentSubData.data.attachments ? studentSubData.data.attachments.length : 0}\n`;
+                            if (studentSubData.data.attachments && studentSubData.data.attachments.length > 0) {
+                                studentSubData.data.attachments.forEach((att, attIdx) => {
+                                    analysis += `     Attachment ${attIdx + 1}: ${att.original_name || att.file_name || 'Unknown'}\n`;
+                                });
+                            }
+                        } else {
+                            analysis += `   Submission found: No\n`;
+                        }
+                    } catch (error) {
+                        analysis += `\n2. STUDENT SUBMISSION: Error - ${error.message}\n\n`;
+                    }
+                }
+
+                // Get student task details
+                try {
+                    const studentTaskResponse = await fetch(`${BASE_URL}/tasks/student/${taskId}`, {
+                        method: 'GET',
+                        headers: getHeaders()
+                    });
+                    const studentTaskData = await studentTaskResponse.json();
+                    
+                    analysis += `\n3. STUDENT TASK DETAILS (${studentTaskResponse.status}):\n`;
+                    analysis += `   Status: ${studentTaskResponse.ok ? 'Success' : 'Failed'}\n`;
+                    analysis += `   Data: ${JSON.stringify(studentTaskData, null, 2)}\n\n`;
+                } catch (error) {
+                    analysis += `\n3. STUDENT TASK DETAILS: Error - ${error.message}\n\n`;
+                }
+
+                analysis += '\n=== ANALYSIS COMPLETE ===\n';
+                analysis += 'Check the console for detailed logs and compare the data structures.\n';
+                analysis += 'The issue is likely in the frontend logic that processes this data.';
+
+                showResult('analysisResult', analysis, 'info');
+                
+                // Also log to console for detailed inspection
+                console.log('=== SUBMISSION DATA ANALYSIS ===');
+                console.log('Analysis:', analysis);
+                
+            } catch (error) {
+                showResult('analysisResult', `Analysis Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

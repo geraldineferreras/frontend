@@ -22,9 +22,7 @@ const StudentFooter = () => {
               <li className="nav-item">
                 <a href="#" className="nav-link">Blog</a>
               </li>
-              <li className="nav-item">
-                <a href="https://github.com/creativetimofficial/argon-dashboard-react/blob/master/LICENSE.md" className="nav-link" target="_blank" rel="noopener noreferrer">MIT License</a>
-              </li>
+
             </ul>
           </Col>
         </Row>

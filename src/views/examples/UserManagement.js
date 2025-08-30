@@ -209,13 +209,14 @@ const UserManagement = () => {
       usersArr = usersArr.map(user => {
         const normalizedUser = {
           ...user,
-          id: user.id || user.user_id || user.userId || '', // Add ID normalization
+          // Enhanced ID normalization for Google OAuth users and regular users
+          id: user.id || user.user_id || user.userId || user.google_id || user.student_id || user.teacher_id || user.admin_id || '',
           full_name: user.full_name || user.name || '',
           role: user.role || user.user_role || user.userRole || activeTab, // Add role normalization
           program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
           course_year_section: user.course_year_section || user.section || '',
           last_login: user.last_login || user.lastLogin || '',
-          profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+          profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || user.profile_image_url || '',
           cover_pic: user.cover_pic || user.coverPhotoUrl || '',
           student_num: user.student_num || user.studentNumber || '',
         };
@@ -388,12 +389,13 @@ const UserManagement = () => {
       }
       adminUsers = adminUsers.map(user => ({
         ...user,
-        id: user.id || user.user_id || user.userId || '',
+        // Enhanced ID normalization for Google OAuth users and regular users
+        id: user.id || user.user_id || user.userId || user.google_id || user.admin_id || '',
         full_name: user.full_name || user.name || '',
         program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
         course_year_section: user.course_year_section || user.section || '',
         last_login: user.last_login || user.lastLogin || '',
-        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || user.profile_image_url || '',
         cover_pic: user.cover_pic || user.coverPhotoUrl || '',
         student_num: user.student_num || user.studentNumber || '',
       }));
@@ -410,12 +412,13 @@ const UserManagement = () => {
       }
       teacherUsers = teacherUsers.map(user => ({
         ...user,
-        id: user.id || user.user_id || user.userId || '',
+        // Enhanced ID normalization for Google OAuth users and regular users
+        id: user.id || user.user_id || user.userId || user.google_id || user.teacher_id || '',
         full_name: user.full_name || user.name || '',
         program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
         course_year_section: user.course_year_section || user.section || '',
         last_login: user.last_login || user.lastLogin || '',
-        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || user.profile_image_url || '',
         cover_pic: user.cover_pic || user.coverPhotoUrl || '',
         student_num: user.student_num || user.studentNumber || '',
       }));
@@ -432,12 +435,13 @@ const UserManagement = () => {
       }
       studentUsers = studentUsers.map(user => ({
         ...user,
-        id: user.id || user.user_id || user.userId || '',
+        // Enhanced ID normalization for Google OAuth users and regular users
+        id: user.id || user.user_id || user.userId || user.google_id || user.student_id || '',
         full_name: user.full_name || user.name || '',
         program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
         course_year_section: user.course_year_section || user.section || '',
         last_login: user.last_login || user.lastLogin || '',
-        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || user.profile_image_url || '',
         cover_pic: user.cover_pic || user.coverPhotoUrl || '',
         student_num: user.student_num || user.studentNumber || '',
       }));
@@ -597,12 +601,13 @@ const UserManagement = () => {
       }
       usersArr = usersArr.map(user => ({
         ...user,
-        id: user.id || user.user_id || user.userId || '', // Add ID normalization
+        // Enhanced ID normalization for Google OAuth users and regular users
+        id: user.id || user.user_id || user.userId || user.google_id || user.student_id || user.teacher_id || user.admin_id || '',
         full_name: user.full_name || user.name || '',
         program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
         course_year_section: user.course_year_section || user.section || '',
         last_login: user.last_login || user.lastLogin || '',
-        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || user.profile_image_url || '',
         cover_pic: user.cover_pic || user.coverPhotoUrl || '',
         student_num: user.student_num || user.studentNumber || '',
       }));
@@ -743,9 +748,24 @@ const UserManagement = () => {
     console.log('Current location:', location.pathname);
     console.log('Current search params:', location.search);
     
+    // Enhanced debugging for Google OAuth users
+    console.log('User object keys:', Object.keys(user));
+    console.log('All possible ID fields:', {
+      id: user.id,
+      user_id: user.user_id,
+      userId: user.userId,
+      google_id: user.google_id,
+      student_id: user.student_id,
+      teacher_id: user.teacher_id,
+      admin_id: user.admin_id
+    });
+    
     // Validate user object has required fields
     if (!user || !user.id) {
       console.error('Invalid user object or missing ID:', user);
+      console.error('User object type:', typeof user);
+      console.error('User ID value:', user.id);
+      console.error('User ID type:', typeof user.id);
       alert('Error: Invalid user data. Please try again.');
       return;
     }

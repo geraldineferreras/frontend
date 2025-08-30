@@ -991,10 +991,32 @@ const StudentExcuseLetter = () => {
         }
         
         console.log('Processed classes data:', classesData);
+        if (classesData.length > 0) {
+          console.log('First class sample:', classesData[0]);
+          console.log('First class keys:', Object.keys(classesData[0]));
+          console.log('First class enrollment flags:', {
+            is_enrolled: classesData[0].is_enrolled,
+            isEnrolled: classesData[0].isEnrolled,
+            enrolled: classesData[0].enrolled,
+            hasFlags: ('is_enrolled' in classesData[0]) || ('isEnrolled' in classesData[0]) || ('enrolled' in classesData[0])
+          });
+        }
         
-        // Filter only enrolled classes (is_enrolled === true)
-        const enrolledOnly = classesData.filter(cls => cls.is_enrolled === true);
+        // Filter enrolled classes (be permissive). If no explicit flag is present, include by default
+        const enrolledOnly = classesData.filter(cls => {
+          const flagsPresent = ('is_enrolled' in cls) || ('isEnrolled' in cls) || ('enrolled' in cls);
+          const isTrue = cls.is_enrolled === true || cls.isEnrolled === true || cls.enrolled === true;
+          const shouldInclude = isTrue || !flagsPresent;
+          console.log(`Class ${cls.subject_name || cls.name}: flagsPresent=${flagsPresent}, isTrue=${isTrue}, shouldInclude=${shouldInclude}`);
+          return shouldInclude;
+        });
         console.log('Enrolled classes only:', enrolledOnly);
+        
+        // TEMPORARY: Include all classes for debugging
+        if (enrolledOnly.length === 0 && classesData.length > 0) {
+          console.log('No enrolled classes found, including all classes for debugging');
+          enrolledOnly.push(...classesData);
+        }
         
         // Transform API data using the correct class_id from the API response
         const transformedClasses = enrolledOnly.map((cls, index) => {
@@ -1005,21 +1027,42 @@ const StudentExcuseLetter = () => {
           let classId = null;
           
           // Priority order for class_id fields (based on discovery functions)
-          if (cls.id !== undefined && cls.id !== null) {
+          
+          let usedField = null;
+          if (cls.classroom_id !== undefined && cls.classroom_id !== null && cls.classroom_id !== '') {
+            classId = String(cls.classroom_id);
+            usedField = 'classroom_id';
+          } else if (cls.id !== undefined && cls.id !== null && cls.id !== '') {
             classId = String(cls.id);
-          } else if (cls.class_id !== undefined && cls.class_id !== null) {
+            usedField = 'id';
+          } else if (cls.class_id !== undefined && cls.class_id !== null && cls.class_id !== '') {
             classId = String(cls.class_id);
-          } else if (cls.classId !== undefined && cls.classId !== null) {
+            usedField = 'class_id';
+          } else if (cls.classId !== undefined && cls.classId !== null && cls.classId !== '') {
             classId = String(cls.classId);
-          } else if (cls.subject_id !== undefined && cls.subject_id !== null) {
+            usedField = 'classId';
+          } else if (cls.subject_id !== undefined && cls.subject_id !== null && cls.subject_id !== '') {
             classId = String(cls.subject_id);
-          } else if (cls.subjectId !== undefined && cls.subjectId !== null) {
+            usedField = 'subject_id';
+          } else if (cls.subjectId !== undefined && cls.subjectId !== null && cls.subjectId !== '') {
             classId = String(cls.subjectId);
-          } else if (cls.section_id !== undefined && cls.section_id !== null) {
+            usedField = 'subjectId';
+          } else if (cls.section_id !== undefined && cls.section_id !== null && cls.section_id !== '') {
             classId = String(cls.section_id);
-          } else if (cls.sectionId !== undefined && cls.sectionId !== null) {
+            usedField = 'section_id';
+          } else if (cls.sectionId !== undefined && cls.sectionId !== null && cls.sectionId !== '') {
             classId = String(cls.sectionId);
+            usedField = 'sectionId';
           }
+          
+          // If no ID found, try to use class_code as fallback
+          if (!classId && cls.class_code && cls.class_code !== '') {
+            classId = cls.class_code;
+            usedField = 'class_code (fallback)';
+            console.log(`Class ${index} using class_code as fallback:`, classId);
+          }
+          
+          console.log(`Class ${index} using ${usedField}:`, classId);
           
           console.log(`Class ${index} class_id from API:`, classId);
           console.log(`Class ${index} full data:`, cls);
@@ -1043,12 +1086,24 @@ const StudentExcuseLetter = () => {
         });
         
         console.log('Final transformed classes:', transformedClasses);
+        
+        // Filter out classes with invalid IDs
+        const validClasses = transformedClasses.filter(cls => cls.class_id && cls.class_id !== null && cls.class_id !== 'null' && cls.class_id !== '');
+        const invalidClasses = transformedClasses.filter(cls => !cls.class_id || cls.class_id === null || cls.class_id === 'null' || cls.class_id === '');
+        
+        if (invalidClasses.length > 0) {
+          console.warn('Classes with invalid IDs found:', invalidClasses);
+          setError(`${invalidClasses.length} class(es) have invalid IDs and cannot be used for excuse letters.`);
+        }
+        
         setAvailableClasses(transformedClasses);
         
-                  // Show success message if classes were loaded
-          if (transformedClasses.length > 0) {
-            setSuccess(`Successfully loaded ${transformedClasses.length} class(es)`);
-          }
+        // Show success message if classes were loaded
+        if (validClasses.length > 0) {
+          setSuccess(`Successfully loaded ${validClasses.length} valid class(es)`);
+        } else if (transformedClasses.length > 0) {
+          setError('Classes loaded but none have valid IDs for excuse letters.');
+        }
       } else {
         console.log('No classes data received from server');
         setAvailableClasses([]);
@@ -1147,6 +1202,13 @@ const StudentExcuseLetter = () => {
     console.log('Selected class_id:', selectedClass.class_id);
     console.log('Selected class_id type:', typeof selectedClass.class_id);
     
+    // Check if class_id is valid
+    if (!selectedClass.class_id || selectedClass.class_id === null || selectedClass.class_id === 'null' || selectedClass.class_id === '') {
+      console.error('Invalid class_id:', selectedClass.class_id);
+      setError('Selected class has an invalid ID. Please try another class or contact support.');
+      return;
+    }
+    
     // Ensure class_id is a string
     const classId = String(selectedClass.class_id);
     console.log('Formatted class_id:', classId);
@@ -1174,6 +1236,11 @@ const StudentExcuseLetter = () => {
       // Find the selected class object
       const selectedClass = availableClasses.find(cls => cls.class_id === submitForm.class_id);
       console.log('Selected class object:', selectedClass);
+      
+      // Debug: Check what class_id we're actually sending
+      console.log('About to send class_id:', submitForm.class_id);
+      console.log('About to send date_absent:', submitForm.date_absent);
+      console.log('About to send reason:', submitForm.reason);
 
       // Validate required fields with better error messages
       if (!submitForm.class_id || submitForm.class_id === "") {
@@ -1893,11 +1960,11 @@ const StudentExcuseLetter = () => {
                       console.log('Setting exact Postman test data');
                       setSubmitForm(prev => ({
                         ...prev,
-                        class_id: "5",
-                        date_absent: "2025-08-10",
+                        class_id: "17",
+                        date_absent: "2025-08-09",
                         reason: "Aguinaldo Day"
                       }));
-                      setSuccess('Set exact Postman test data');
+                      setSuccess('Set exact working Postman data (class_id: 17)');
                     }}
                     style={{ 
                       background: '#28a745', 
@@ -1910,7 +1977,115 @@ const StudentExcuseLetter = () => {
                       marginLeft: 8
                     }}
                   >
-                    Set Postman Test Data
+                    Set Working Postman Data
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('=== DEBUG: Current API Response ===');
+                      console.log('Available classes:', availableClasses);
+                      console.log('Submit form:', submitForm);
+                      if (availableClasses.length > 0) {
+                        console.log('First class raw data:', availableClasses[0].original);
+                        console.log('First class transformed:', availableClasses[0]);
+                        console.log('All class IDs:', availableClasses.map(cls => ({ 
+                          subject: cls.subject_name, 
+                          class_id: cls.class_id, 
+                          type: typeof cls.class_id 
+                        })));
+                      }
+                    }}
+                    style={{
+                      background: '#6c757d',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Debug Current Data
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('=== RELOAD CLASSES WITH DEBUG ===');
+                      loadStudentClasses();
+                    }}
+                    style={{
+                      background: '#dc3545',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Reload Classes Debug
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      console.log('=== TEST EXACT WORKING PAYLOAD ===');
+                      try {
+                        const testData = {
+                          class_id: "17",
+                          date_absent: "2025-08-09",
+                          reason: "Aguinaldo Day"
+                        };
+                        console.log('Testing with exact working payload:', testData);
+                        const response = await apiService.submitExcuseLetter(testData);
+                        console.log('Test response:', response);
+                        setSuccess('Test with working payload successful!');
+                      } catch (error) {
+                        console.error('Test failed:', error);
+                        setError('Test failed: ' + error.message);
+                      }
+                    }}
+                    style={{
+                      background: '#17a2b8',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Test Working Payload
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('=== SET WORKING DATA IN FORM ===');
+                      setSubmitForm({
+                        class_id: "17",
+                        date_absent: "2025-08-09",
+                        reason: "Aguinaldo Day"
+                      });
+                      setSuccess('Set working data in form (class_id: 17)');
+                    }}
+                    style={{
+                      background: '#ffc107',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      marginLeft: 8
+                    }}
+                  >
+                    Set Working Data
                   </button>
                </div>
              )}
@@ -1939,27 +2114,33 @@ const StudentExcuseLetter = () => {
                        `${selectedClass.subject_name} (${selectedClass.subject_code}) - ${selectedClass.section_name} [ID: ${selectedClass.class_id}]` : 
                        'Invalid class selected';
                    })()
-                   : loadingClasses ? 'Loading classes...' : availableClasses.length > 0 ? 'Select class' : 'No classes available'}
+                   : loadingClasses ? 'Loading classes...' : 
+                     (() => {
+                       const validClasses = availableClasses.filter(cls => cls.class_id && cls.class_id !== null && cls.class_id !== 'null' && cls.class_id !== '');
+                       return validClasses.length > 0 ? 'Select class' : 'No valid classes available';
+                     })()}
                </Dropdown.Toggle>
 
                                                                <Dropdown.Menu style={{ width: '100%', maxWidth: '100%', maxHeight: '200px', overflowY: 'auto' }}>
                   {(() => {
                     console.log('Rendering dropdown with classes:', availableClasses);
                     
-                    return availableClasses.length > 0 ? (
-                      availableClasses.map((cls) => (
-                       <Dropdown.Item 
-                         key={cls.class_id}
-                         href="#" 
-                         onClick={(e) => { 
-                           e.preventDefault(); 
-                           console.log('Selected class:', cls);
-                           handleClassSelection(cls); 
-                         }}
-                       >
-                         {cls.subject_name} ({cls.subject_code}) - {cls.section_name} [ID: {cls.class_id}]
-                       </Dropdown.Item>
-                                           ))
+                                        return availableClasses.length > 0 ? (
+                      availableClasses
+                        .filter(cls => cls.class_id && cls.class_id !== null && cls.class_id !== 'null' && cls.class_id !== '')
+                        .map((cls) => (
+                         <Dropdown.Item 
+                           key={cls.class_id}
+                           href="#" 
+                           onClick={(e) => { 
+                             e.preventDefault(); 
+                             console.log('Selected class:', cls);
+                             handleClassSelection(cls); 
+                           }}
+                         >
+                           {cls.subject_name} ({cls.subject_code}) - {cls.section_name} [ID: {cls.class_id}]
+                         </Dropdown.Item>
+                         ))
                     ) : (
                       <Dropdown.Item disabled>
                         {loadingClasses ? 'Loading...' : 'No classes available'}

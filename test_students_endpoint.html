@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Students Endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Students Endpoint</h1>
+    
+    <div class="test-section">
+        <h2>Test Get All Students</h2>
+        <button onclick="testGetAllStudents()">Test Get All Students</button>
+        <div id="allStudentsResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Get Students by Role</h2>
+        <input type="text" id="roleInput" placeholder="Enter role (e.g., student)" value="student">
+        <button onclick="testGetStudentsByRole()">Test Get Students by Role</button>
+        <div id="roleStudentsResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Classroom Students Endpoint</h2>
+        <input type="text" id="classCodeInput" placeholder="Enter class code (e.g., 2JXPUD)" value="2JXPUD">
+        <button onclick="testClassroomStudents()">Test Classroom Students</button>
+        <div id="classroomStudentsResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        
+        async function testGetAllStudents() {
+            const resultDiv = document.getElementById('allStudentsResult');
+            resultDiv.textContent = 'Testing...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `Success!\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `Error!\nStatus: ${response.status}\nMessage: ${data.message || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Network Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testGetStudentsByRole() {
+            const role = document.getElementById('roleInput').value;
+            const resultDiv = document.getElementById('roleStudentsResult');
+            resultDiv.textContent = 'Testing...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${API_BASE}/users?role=${role}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `Success!\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `Error!\nStatus: ${response.status}\nMessage: ${data.message || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Network Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testClassroomStudents() {
+            const classCode = document.getElementById('classCodeInput').value;
+            const resultDiv = document.getElementById('classroomStudentsResult');
+            resultDiv.textContent = 'Testing...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${API_BASE}/teacher/classroom/${classCode}/students`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `Success!\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `Error!\nStatus: ${response.status}\nMessage: ${data.message || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Network Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html>

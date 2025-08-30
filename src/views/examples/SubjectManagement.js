@@ -230,13 +230,13 @@ export default function SubjectManagement() {
                 />
                 <small className="text-muted">Subject Name</small>
               </Col>
-              <Col md={2} xs={12} className="text-md-right mt-2 mt-md-0">
+              <Col md={2} xs={12} className="text-center">
                 <Button 
                   color="primary" 
                   block 
                   onClick={handleAdd} 
                   disabled={addingSubject}
-                  style={{ borderRadius: 8, fontWeight: 600 }}
+                  style={{ borderRadius: 8, fontWeight: 600, height: '38px', marginBottom: 28 }}
                 >
                   {addingSubject ? (
                     <>

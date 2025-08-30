@@ -41,20 +41,26 @@ const StudentClassroom = () => {
     setError(null);
     try {
       const response = await apiService.getStudentClasses();
-      if (response.status && response.data) {
-        console.log('Student classes fetched:', response.data);
-        
-        // Filter only enrolled classes (is_enrolled === true)
-        const enrolledOnly = response.data.filter(cls => cls.is_enrolled === true);
+      const raw = (response && response.data) ? response.data : response; // support either shape
+      if (Array.isArray(raw)) {
+        console.log('Student classes fetched:', raw);
+        // Determine enrollment inclusively
+        const enrolledOnly = raw.filter(cls => {
+          const flagTrue = cls.is_enrolled === true || cls.isEnrolled === true || cls.enrolled === true;
+          const statusEnrolled = (cls.enrollment_status || cls.status || '').toString().toLowerCase() === 'enrolled'
+            || (cls.enrollment_status || cls.status || '').toString().toLowerCase() === 'active';
+          // If no explicit flag/status is present, include by default (student endpoint should already be scoped)
+          const hasAnyFlag = ('is_enrolled' in cls) || ('isEnrolled' in cls) || ('enrolled' in cls) || ('enrollment_status' in cls) || ('status' in cls);
+          return flagTrue || statusEnrolled || !hasAnyFlag;
+        });
         console.log('Enrolled classes only:', enrolledOnly);
-        
         // Transform API data to match our expected format
         const transformedClasses = enrolledOnly.map((cls, index) => ({
           id: cls.class_id || index + 1,
           name: cls.subject_name,
           section: cls.section_name,
           subject: cls.subject_name,
-          code: cls.class_code || cls.class_id, // Use class_code if available, fallback to class_id
+          code: cls.class_code || cls.code || cls.class_id, // include more fallbacks
           semester: cls.semester,
           schoolYear: cls.school_year,
           teacherName: cls.teacher_name,
