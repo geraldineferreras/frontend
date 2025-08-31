@@ -2332,6 +2332,14 @@ class ApiService {
     });
   }
 
+  async manualGradeTask(taskId, gradeData) {
+    return this.makeRequest(`/tasks/${taskId}/manual-grade`, {
+      method: 'POST',
+      body: JSON.stringify(gradeData),
+      requireAuth: true,
+    });
+  }
+
   async addTaskComment(taskId, commentData) {
     return this.makeRequest(`/tasks/${taskId}/comments`, {
       method: 'POST',

@@ -50,159 +50,160 @@ const TaskDetail = () => {
   const [manualGradingLoading, setManualGradingLoading] = useState(false);
 
   // Load task details, submissions, and assigned students
-  useEffect(() => {
-    const loadTaskDetails = async () => {
-      if (!taskId) return;
+  const loadTaskDetails = async () => {
+    if (!taskId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('Loading task details for taskId:', taskId);
+      const response = await apiService.getTaskDetails(taskId);
       
-      setLoading(true);
-      setError(null);
-      
-      try {
-        console.log('Loading task details for taskId:', taskId);
-        const response = await apiService.getTaskDetails(taskId);
-        
-        if (response.status) {
-          console.log('Task details loaded:', response.data);
+      if (response.status) {
+        console.log('Task details loaded:', response.data);
 
-          // Enrich task with original file names via file-info endpoint
-          const enrichWithOriginalNames = async (data) => {
-            const cloned = { ...data };
-            const tasks = [];
-            const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
-            const extractFilename = (p) => {
-              if (!p) return '';
-              if (p.startsWith('uploads/')) return p.split('/').pop();
-              return p.split('/').pop();
-            };
-            const pickPath = (att) => att?.attachment_url || att?.file_path || att?.url || att?.file_name || '';
+        // Enrich task with original file names via file-info endpoint
+        const enrichWithOriginalNames = async (data) => {
+          const cloned = { ...data };
+          const tasks = [];
+          const isExternal = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
+          const extractFilename = (p) => {
+            if (!p) return '';
+            if (p.startsWith('uploads/')) return p.split('/').pop();
+            return p.split('/').pop();
+          };
+          const pickPath = (att) => att?.attachment_url || att?.file_path || att?.url || att?.file_name || '';
 
-            // Task-level attachment
-            if (cloned.attachment_url && !cloned.original_name && !isExternal(cloned.attachment_url)) {
-              const filename = extractFilename(cloned.attachment_url);
-              if (filename) {
-                tasks.push(
-                  apiService.getTaskFileInfo(filename).then((info) => {
-                    if (info && info.status && info.data) {
-                      cloned.original_name = info.data.original_name || info.data.filename || cloned.original_name;
-                    }
-                  }).catch(() => {})
-                );
-              }
-            }
-
-            // Attachments array
-            if (Array.isArray(cloned.attachments) && cloned.attachments.length > 0) {
-              cloned.attachments = cloned.attachments.map((att) => ({ ...att }));
-              cloned.attachments.forEach((att) => {
-                const path = pickPath(att);
-                if (!att.original_name && path && !isExternal(path)) {
-                  const filename = extractFilename(path);
-                  if (filename) {
-                    tasks.push(
-                      apiService.getTaskFileInfo(filename).then((info) => {
-                        if (info && info.status && info.data) {
-                          att.original_name = info.data.original_name || info.data.filename || att.original_name;
-                          att.mime_type = att.mime_type || info.data.mime_type;
-                        }
-                      }).catch(() => {})
-                    );
+          // Task-level attachment
+          if (cloned.attachment_url && !cloned.original_name && !isExternal(cloned.attachment_url)) {
+            const filename = extractFilename(cloned.attachment_url);
+            if (filename) {
+              tasks.push(
+                apiService.getTaskFileInfo(filename).then((info) => {
+                  if (info && info.status && info.data) {
+                    cloned.original_name = info.data.original_name || info.data.filename || cloned.original_name;
                   }
+                }).catch(() => {})
+              );
+            }
+          }
+
+          // Attachments array
+          if (Array.isArray(cloned.attachments) && cloned.attachments.length > 0) {
+            cloned.attachments = cloned.attachments.map((att) => ({ ...att }));
+            cloned.attachments.forEach((att) => {
+              const path = pickPath(att);
+              if (!att.original_name && path && !isExternal(path)) {
+                const filename = extractFilename(path);
+                if (filename) {
+                  tasks.push(
+                    apiService.getTaskFileInfo(filename).then((info) => {
+                      if (info && info.status && info.data) {
+                        att.original_name = info.data.original_name || info.data.filename || att.original_name;
+                        att.mime_type = att.mime_type || info.data.mime_type;
+                      }
+                    }).catch(() => {})
+                  );
                 }
+              }
+            });
+          }
+
+          if (tasks.length > 0) {
+            await Promise.all(tasks);
+          }
+          return cloned;
+        };
+
+        const enriched = await enrichWithOriginalNames(response.data);
+        
+        // Apply the same attachment normalization logic as ClassroomDetail.js
+        const normalizedTask = await normalizeTaskAttachments(enriched);
+        console.log('TaskDetail: Normalized task with attachments:', normalizedTask);
+        setTask(normalizedTask);
+        
+        // Set the initial accepting submissions status from the task
+        if (normalizedTask.accepting_submissions !== undefined) {
+          setAcceptingSubmissions(normalizedTask.accepting_submissions);
+        }
+      }
+      
+      // Load submissions separately
+      console.log('Loading submissions for taskId:', taskId);
+      const submissionsResponse = await apiService.getTaskSubmissions(taskId);
+      
+      if (submissionsResponse.status) {
+        console.log('Submissions loaded:', submissionsResponse.data);
+        
+        // Set submissions from API response
+        if (submissionsResponse.data.submissions && Array.isArray(submissionsResponse.data.submissions)) {
+          setSubmissionsState(submissionsResponse.data.submissions);
+          
+          // Set first student as selected if available
+          if (submissionsResponse.data.submissions.length > 0 && !selectedStudentId) {
+            setSelectedStudentId(submissionsResponse.data.submissions[0].submission_id);
+          }
+        }
+        
+        // Load assigned students if task has individual assignment type
+        if (response.data.assignment_type === 'individual') {
+          try {
+            console.log('Loading assigned students for taskId:', taskId);
+            const assignedStudentsResponse = await apiService.getAssignedStudents(taskId);
+            
+            if (assignedStudentsResponse.status) {
+              console.log('Assigned students loaded:', assignedStudentsResponse.data);
+              
+              // Transform assigned students to match submissions format
+              const assignedStudents = assignedStudentsResponse.data.map(student => {
+                console.log('Student profile pic data:', {
+                  student_id: student.student_id,
+                  name: student.full_name,
+                  profile_pic: student.profile_pic,
+                  profile_pic_type: typeof student.profile_pic
+                });
+                
+                return {
+                  submission_id: `assigned_${student.student_id}`,
+                  student_id: student.student_id,
+                  student_name: student.full_name,
+                  student_num: student.student_num,
+                  profile_pic: student.profile_pic,
+                  status: 'assigned',
+                  grade: null,
+                  feedback: '',
+                  attachments: [],
+                  submitted_at: null,
+                  dateGraded: null
+                };
+              });
+              
+              // Merge with existing submissions, avoiding duplicates
+              setSubmissionsState(prev => {
+                const existingSubmissionIds = new Set(prev.map(s => s.student_id));
+                const newAssignedStudents = assignedStudents.filter(s => !existingSubmissionIds.has(s.student_id));
+                return [...prev, ...newAssignedStudents];
               });
             }
-
-            if (tasks.length > 0) {
-              await Promise.all(tasks);
-            }
-            return cloned;
-          };
-
-          const enriched = await enrichWithOriginalNames(response.data);
-          
-          // Apply the same attachment normalization logic as ClassroomDetail.js
-          const normalizedTask = await normalizeTaskAttachments(enriched);
-          console.log('TaskDetail: Normalized task with attachments:', normalizedTask);
-          setTask(normalizedTask);
-          
-          // Set the initial accepting submissions status from the task
-          if (normalizedTask.accepting_submissions !== undefined) {
-            setAcceptingSubmissions(normalizedTask.accepting_submissions);
+          } catch (assignedError) {
+            console.error('Error loading assigned students:', assignedError);
+            // Don't fail the entire load if assigned students fail
           }
         }
-        
-        // Load submissions separately
-        console.log('Loading submissions for taskId:', taskId);
-        const submissionsResponse = await apiService.getTaskSubmissions(taskId);
-        
-        if (submissionsResponse.status) {
-          console.log('Submissions loaded:', submissionsResponse.data);
-          
-          // Set submissions from API response
-          if (submissionsResponse.data.submissions && Array.isArray(submissionsResponse.data.submissions)) {
-            setSubmissionsState(submissionsResponse.data.submissions);
-            
-            // Set first student as selected if available
-            if (submissionsResponse.data.submissions.length > 0 && !selectedStudentId) {
-              setSelectedStudentId(submissionsResponse.data.submissions[0].submission_id);
-            }
-          }
-          
-          // Load assigned students if task has individual assignment type
-          if (response.data.assignment_type === 'individual') {
-            try {
-              console.log('Loading assigned students for taskId:', taskId);
-              const assignedStudentsResponse = await apiService.getAssignedStudents(taskId);
-              
-              if (assignedStudentsResponse.status) {
-                console.log('Assigned students loaded:', assignedStudentsResponse.data);
-                
-                // Transform assigned students to match submissions format
-                const assignedStudents = assignedStudentsResponse.data.map(student => {
-                  console.log('Student profile pic data:', {
-                    student_id: student.student_id,
-                    name: student.full_name,
-                    profile_pic: student.profile_pic,
-                    profile_pic_type: typeof student.profile_pic
-                  });
-                  
-                  return {
-                    submission_id: `assigned_${student.student_id}`,
-                    student_id: student.student_id,
-                    student_name: student.full_name,
-                    student_num: student.student_num,
-                    profile_pic: student.profile_pic,
-                    status: 'assigned',
-                    grade: null,
-                    feedback: '',
-                    attachments: [],
-                    submitted_at: null,
-                    dateGraded: null
-                  };
-                });
-                
-                // Merge with existing submissions, avoiding duplicates
-                setSubmissionsState(prev => {
-                  const existingSubmissionIds = new Set(prev.map(s => s.student_id));
-                  const newAssignedStudents = assignedStudents.filter(s => !existingSubmissionIds.has(s.student_id));
-                  return [...prev, ...newAssignedStudents];
-                });
-              }
-            } catch (assignedError) {
-              console.error('Error loading assigned students:', assignedError);
-              // Don't fail the entire load if assigned students fail
-            }
-          }
-        } else {
-          setError('Failed to load task details');
-        }
-      } catch (error) {
-        console.error('Error loading task details:', error);
-        setError('Error loading task details. Please try again.');
-      } finally {
-        setLoading(false);
+      } else {
+        setError('Failed to load task details');
       }
-    };
+    } catch (error) {
+      console.error('Error loading task details:', error);
+      setError('Error loading task details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Load task details on component mount
+  useEffect(() => {
     loadTaskDetails();
   }, [taskId]);
 
@@ -411,7 +412,16 @@ const TaskDetail = () => {
   };
 
   // Get selected student from submissions
-  const selectedStudent = submissionsState.find(s => s.submission_id === selectedStudentId) || submissionsState[0];
+  const selectedStudent = submissionsState.find(s => String(s.submission_id) === String(selectedStudentId)) || submissionsState[0];
+
+  // Helper: safely check if submission_id starts with a prefix
+  const submissionIdStartsWith = (submissionId, prefix) => {
+    if (typeof submissionId === 'string') {
+      return submissionId.startsWith(prefix);
+    }
+    // If submission_id is numeric, it can't start with a string prefix
+    return false;
+  };
 
   // Helper: get file type icon
   const getFileTypeIcon = (att) => {
@@ -746,108 +756,31 @@ const TaskDetail = () => {
     setManualGradingLoading(true);
     
     try {
-      let response;
+      // Use the new manual grading endpoint
+      const gradeData = {
+        student_id: manualGradingStudent.student_id,
+        class_code: task?.class_codes?.[0] || task?.class_code,
+        grade: parseFloat(manualGradeInput),
+        feedback: manualFeedbackInput
+      };
       
-      // Check if this is an assigned student (no actual submission yet)
-      if (manualGradingStudent.submission_id.startsWith('assigned_')) {
-        // For assigned students, we need to create a submission record first
-        // Since we can't use QR grading without actual QR data, we'll create a manual submission
-        try {
-          // Create a manual submission for the assigned student
-          const submissionData = {
-            task_id: taskId,
-            student_id: manualGradingStudent.student_id,
-            class_code: task?.class_codes?.[0] || task?.class_code,
-            attachments: [],
-            submitted_at: new Date().toISOString(),
-            status: 'submitted'
-          };
-          
-          // Try to create a submission first (this might require a different API endpoint)
-          // For now, we'll simulate creating a submission by updating the local state
-          // and then use the regular grading flow
-          
-          // Update the student's submission_id to a real one
-          const newSubmissionId = `manual_${Date.now()}_${manualGradingStudent.student_id}`;
-          
-          // Update local state to reflect the new submission
-          setSubmissionsState(prev => prev.map(s =>
-            s.submission_id === manualGradingStudent.submission_id 
-              ? { 
-                  ...s, 
-                  submission_id: newSubmissionId,
-                  status: 'submitted',
-                  submitted_at: new Date().toISOString()
-                } 
-              : s
-          ));
-          
-          // Update the current student reference
-          const updatedStudent = {
-            ...manualGradingStudent,
-            submission_id: newSubmissionId,
-            status: 'submitted',
-            submitted_at: new Date().toISOString()
-          };
-          
-          // Now try to grade using the regular endpoint
-          response = await apiService.gradeSubmission(newSubmissionId, {
-            grade: parseFloat(manualGradeInput),
-            feedback: manualFeedbackInput
-          });
-          
-          // If the regular grading fails, we'll still update the local state
-          // to show the grade was recorded locally
-          if (!response || !response.status) {
-            console.log('Regular grading failed, updating local state only');
-            response = { status: true, success: true }; // Simulate success for local update
-          }
-          
-        } catch (createError) {
-          console.log('Failed to create submission for assigned student:', createError);
-          
-          // Even if we can't create a real submission, we can still record the grade locally
-          // This provides a fallback for teachers to track grades even without backend support
-          
-          // Update local state to show the grade
-          setSubmissionsState(prev => prev.map(s =>
-            s.submission_id === manualGradingStudent.submission_id 
-              ? { 
-                  ...s, 
-                  grade: parseFloat(manualGradeInput),
-                  feedback: manualFeedbackInput,
-                  status: 'graded',
-                  dateGraded: new Date().toISOString()
-                } 
-              : s
-          ));
-          
-          // Simulate success response for local grading
-          response = { status: true, success: true };
-          
-          // Show a warning that this is local grading only
-          setError('Grade recorded locally. For permanent storage, the student should submit work or use QR grading.');
-          setTimeout(() => setError(null), 5000); // Clear error after 5 seconds
-        }
-      } else {
-        // For regular submissions, use the normal grading endpoint
-        response = await apiService.gradeSubmission(manualGradingStudent.submission_id, {
-          grade: parseFloat(manualGradeInput),
-          feedback: manualFeedbackInput
-        });
-      }
+      console.log('Submitting manual grade:', gradeData);
       
-      if (response && (response.status || response.success)) {
-        // Update local state if not already updated
+      const response = await apiService.manualGradeTask(taskId, gradeData);
+      
+      if (response && response.status) {
+        console.log('Manual grade submitted successfully:', response);
+        
+        // Update local state with the grade information
         setSubmissionsState(prev => prev.map(s =>
-          s.submission_id === manualGradingStudent.submission_id || 
-          s.submission_id === `manual_${Date.now()}_${manualGradingStudent.student_id}`
+          s.student_id === manualGradingStudent.student_id
             ? { 
                 ...s, 
                 grade: parseFloat(manualGradeInput),
                 feedback: manualFeedbackInput,
                 status: 'graded',
-                dateGraded: new Date().toISOString()
+                dateGraded: new Date().toISOString(),
+                submission_id: response.data?.submission_id || s.submission_id
               } 
             : s
         ));
@@ -861,6 +794,11 @@ const TaskDetail = () => {
         // Show success notification
         setGradeSaved(true);
         setTimeout(() => setGradeSaved(false), 1200);
+        
+        // Refresh task details to ensure UI is up to date
+        setTimeout(() => {
+          loadTaskDetails();
+        }, 500);
       } else {
         setError('Failed to save grade');
       }
@@ -869,11 +807,7 @@ const TaskDetail = () => {
       
       // Provide more specific error messages
       if (error.message.includes('404')) {
-        if (manualGradingStudent.submission_id.startsWith('assigned_')) {
-          setError('Unable to grade assigned student. Please ensure the student has been properly enrolled in the task.');
-        } else {
-          setError('Submission not found. The student may have been removed from the task.');
-        }
+        setError('Task not found. Please check the task ID.');
       } else if (error.message.includes('403')) {
         setError('Permission denied. You may not have permission to grade this student.');
       } else if (error.message.includes('500')) {
@@ -1930,7 +1864,7 @@ const TaskDetail = () => {
                                  }}>
                                    {s.status === 'graded' ? 'Graded' : s.status === 'submitted' ? 'Submitted' : 'Assigned'}
                                  </span>
-                                 {s.submission_id.startsWith('manual_') && (
+                                 {submissionIdStartsWith(s.submission_id, 'manual_') && (
                                    <span style={{
                                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                                      color: '#fff',
@@ -2034,7 +1968,7 @@ const TaskDetail = () => {
                                  }}>
                                    Waiting
                                  </span>
-                                                                   {s.submission_id.startsWith('assigned_') && (
+                                                                   {submissionIdStartsWith(s.submission_id, 'assigned_') && (
                                     <span style={{ 
                                       color: '#d69e2e', 
                                       fontSize: 11,
@@ -2043,7 +1977,7 @@ const TaskDetail = () => {
                                       FTF Ready
                                     </span>
                                   )}
-                                  {s.submission_id.startsWith('manual_') && (
+                                  {submissionIdStartsWith(s.submission_id, 'manual_') && (
                                     <span style={{ 
                                       color: '#667eea', 
                                       fontSize: 11,
@@ -2567,7 +2501,7 @@ const TaskDetail = () => {
                        Note: New submissions are currently disabled. You can still grade existing work.
                      </div>
                    )}
-                                     {manualGradingStudent.submission_id.startsWith('assigned_') && (
+                                     {submissionIdStartsWith(manualGradingStudent.submission_id, 'assigned_') && (
                      <div style={{
                        background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
                        color: '#d69e2e',
