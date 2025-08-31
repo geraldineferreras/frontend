@@ -341,7 +341,7 @@ const AssignmentDetailStudent = () => {
             if (!submissionFound) {
               console.log('No submission found, setting empty submission');
               setSubmission({
-                status: 'pending',
+                status: 'not_submitted',
                 attachments: [],
                 grade: null,
                 feedback: null
@@ -404,6 +404,7 @@ const AssignmentDetailStudent = () => {
       case 'graded': return '#28a745';
       case 'submitted': return '#ffc107';
       case 'draft': return '#6c757d';
+      case 'not_submitted': return '#dc3545';
       default: return '#007bff';
     }
   };
@@ -1291,20 +1292,26 @@ const AssignmentDetailStudent = () => {
                        // Handle various status formats
                        const normalizedStatus = status ? status.toLowerCase().trim() : 'pending';
                        
+                       // Check if there are actually submitted files
+                       const hasSubmittedFiles = submission && submission.attachments && submission.attachments.length > 0;
+                       
                        switch(normalizedStatus) {
                          case 'submitted':
                          case 'submit':
-                           return 'SUBMITTED';
+                           return hasSubmittedFiles ? 'SUBMITTED' : 'NOT_SUBMITTED';
                          case 'graded':
                          case 'grade':
-                           return 'GRADED';
+                           return hasSubmittedFiles ? 'GRADED' : 'NOT_SUBMITTED';
                          case 'pending':
                          case 'pending':
-                           return 'PENDING';
+                           return hasSubmittedFiles ? 'PENDING' : 'NOT_SUBMITTED';
                          case 'draft':
-                           return 'DRAFT';
+                           return hasSubmittedFiles ? 'DRAFT' : 'NOT_SUBMITTED';
+                         case 'not_submitted':
+                         case 'not submitted':
+                           return 'NOT_SUBMITTED';
                          default:
-                           return status ? status.toUpperCase() : 'PENDING';
+                           return hasSubmittedFiles ? (status ? status.toUpperCase() : 'PENDING') : 'NOT_SUBMITTED';
                        }
                      })()}
                  </Badge>
@@ -1312,7 +1319,9 @@ const AssignmentDetailStudent = () => {
 
                                 {/* Submitted Files */}
                 <div style={{ marginBottom: '20px' }}>
-                  {(submission && submission.attachments && submission.attachments.length > 0) ? (
+                  {(submission && submission.attachments && submission.attachments.length > 0 && 
+                    (submission.status === 'submitted' || submission.status === 'graded' || 
+                     submission.status === 'SUBMITTED' || submission.status === 'GRADED')) ? (
                    <>
                      {/* Show submitted files from submission.attachments array */}
                       {submission.attachments.map((file, idx) => (

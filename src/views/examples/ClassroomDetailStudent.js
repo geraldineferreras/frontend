@@ -1071,17 +1071,27 @@ const ClassroomDetailStudent = () => {
   const findMemberByName = (name) => {
     if (!name) return null;
     const normalized = String(name).toLowerCase();
-    // Search teacher
+    
+    // First try peopleData (from people tab)
     if (peopleData?.teacher) {
       const t = peopleData.teacher;
       const tName = (t.full_name || t.name || '').toLowerCase();
       if (tName === normalized) return t;
     }
-    // Search students
     if (Array.isArray(peopleData?.students)) {
       const found = peopleData.students.find(s => (s.full_name || s.name || '').toLowerCase() === normalized);
       if (found) return found;
     }
+    
+    // Fallback to classroomMembers (loaded when component mounts)
+    if (Array.isArray(classroomMembers)) {
+      const found = classroomMembers.find(m => {
+        const mName = (m.full_name || m.name || '').toLowerCase();
+        return mName === normalized;
+      });
+      if (found) return found;
+    }
+    
     return null;
   };
 
@@ -1396,6 +1406,17 @@ const ClassroomDetailStudent = () => {
           
           setClassroomMembers(members);
           console.log('Classroom members loaded:', members);
+          console.log('🔍 Classroom members with profile pics:', members.map(m => ({
+            name: m.name,
+            profile_pic: m.profile_pic,
+            profile_image: m.profile_image,
+            google_avatar: m.google_avatar,
+            user_avatar: m.user_avatar,
+            avatar: m.avatar
+          })));
+          
+          // Also set peopleData so profile pictures can be resolved in stream tab
+          setPeopleData(response.data);
         } else {
           console.error('Invalid response format for classroom members');
           setClassroomMembers([]);
@@ -1969,14 +1990,20 @@ const ClassroomDetailStudent = () => {
                                 {(() => {
                                   // Prefer real profile from classroom members (teacher or student)
                                   let authorUser = findMemberByName(announcement.author);
+                                  console.log('🔍 Finding profile for author:', announcement.author);
+                                  console.log('🔍 Found author user:', authorUser);
+                                  
                                   if (!authorUser) {
                                     authorUser = {
                                       profile_pic: announcement.avatar || announcement.user_avatar || announcement.user_profile_pic || announcement.profile_pic,
                                       name: announcement.author,
                                       full_name: announcement.author,
                                     };
+                                    console.log('🔍 Using fallback author data:', authorUser);
                                   }
+                                  
                                   const avatarUrl = getProfilePictureUrl(authorUser);
+                                  console.log('🔍 Profile picture URL:', avatarUrl);
                                   const bgColor = getAvatarColor(authorUser);
                                   const initials = getUserInitials(authorUser);
                                   return (

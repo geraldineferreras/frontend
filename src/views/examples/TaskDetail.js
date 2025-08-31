@@ -6,6 +6,7 @@ import classnames from "classnames";
 import { Document, Page, pdfjs } from 'react-pdf';
 import QRGradingPanel from '../../components/QRGradingPanel';
 import apiService from '../../services/api';
+import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
 
 // Set the worker source to use the local file
 pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.js`;
@@ -649,19 +650,9 @@ const TaskDetail = () => {
   const isImage = (file) => file && file.url && (file.url.endsWith('.jpg') || file.url.endsWith('.jpeg') || file.url.endsWith('.png') || file.url.endsWith('.gif') || file.url.endsWith('.webp'));
   const isPDF = (file) => file && file.url && file.url.endsWith('.pdf');
 
-  // Helper: get profile picture URL
-  const getProfilePicUrl = (profilePic) => {
-    if (!profilePic) return null;
-    
-    if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
-      return profilePic;
-    } else if (profilePic.startsWith('uploads/')) {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${profilePic}`;
-    } else if (profilePic.startsWith('data:')) {
-      return profilePic;
-    } else {
-      return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/profile/${profilePic}`;
-    }
+  // Helper: get profile picture URL using centralized utilities
+  const getProfilePicUrl = (user) => {
+    return getProfilePictureUrl(user);
   };
 
   // Helper: get file URL for attachments
@@ -1025,7 +1016,54 @@ const TaskDetail = () => {
         </div>
         {/* Sidebar */}
         <div style={{ flex: 1, background: '#fff', borderLeft: '1.5px solid #e9ecef', padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 320, height: '90vh' }}>
-                     <img src={getProfilePicUrl(modalStudent.profile_pic) || `https://ui-avatars.com/api/?name=${modalStudent.student_name}&background=random`} alt={modalStudent.student_name} style={{ width: 70, height: 70, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e9ecef', marginBottom: 18 }} />
+                     {(() => {
+                       const profilePictureUrl = getProfilePictureUrl(modalStudent);
+                       const userInitials = getUserInitials(modalStudent);
+                       const avatarColor = getAvatarColor(modalStudent);
+                       
+                       return (
+                         <div style={{
+                           width: '70px',
+                           height: '70px',
+                           borderRadius: '50%',
+                           background: profilePictureUrl ? '#e9ecef' : avatarColor,
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           marginBottom: 18,
+                           overflow: 'hidden',
+                           border: '2px solid #e9ecef'
+                         }}>
+                           {profilePictureUrl ? (
+                             <img
+                               src={profilePictureUrl}
+                               alt={modalStudent.student_name}
+                               style={{
+                                 width: '100%',
+                                 height: '100%',
+                                 objectFit: 'cover'
+                               }}
+                               onError={(e) => {
+                                 e.target.style.display = 'none';
+                                 if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                               }}
+                             />
+                           ) : null}
+                           <span style={{
+                             display: profilePictureUrl ? 'none' : 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             width: '100%',
+                             height: '100%',
+                             color: '#fff',
+                             fontWeight: 'bold',
+                             fontSize: '24px'
+                           }}>
+                             {userInitials}
+                           </span>
+                         </div>
+                       );
+                     })()}
           <div style={{ fontWeight: 700, fontSize: 24, marginBottom: 8 }}>{modalStudent.student_name}</div>
           <div style={{ color: '#888', fontWeight: 500, fontSize: 17, marginBottom: 18 }}>{modalStudent.status}</div>
           {/* Grade input */}
@@ -1827,17 +1865,53 @@ const TaskDetail = () => {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <img 
-                              src={getProfilePicUrl(s.profile_pic) || `https://ui-avatars.com/api/?name=${s.student_name}&background=random`} 
-                              alt="avatar" 
-                              style={{ 
-                                width: 48, 
-                                height: 48, 
-                                borderRadius: '50%', 
-                                objectFit: 'cover',
-                                border: '2px solid #e2e8f0'
-                              }} 
-                            />
+                            {(() => {
+                              const profilePictureUrl = getProfilePictureUrl(s);
+                              const userInitials = getUserInitials(s);
+                              const avatarColor = getAvatarColor(s);
+                              
+                              return (
+                                <div style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  borderRadius: '50%',
+                                  background: profilePictureUrl ? '#e9ecef' : avatarColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                  border: '2px solid #e2e8f0'
+                                }}>
+                                  {profilePictureUrl ? (
+                                    <img
+                                      src={profilePictureUrl}
+                                      alt={s.student_name}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover'
+                                      }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span style={{
+                                    display: profilePictureUrl ? 'none' : 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '100%',
+                                    height: '100%',
+                                    color: '#fff',
+                                    fontWeight: 'bold',
+                                    fontSize: '16px'
+                                  }}>
+                                    {userInitials}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                             <div>
                               <div style={{ fontWeight: 700, fontSize: 16, color: '#2d3748', marginBottom: 4 }}>
                                 {s.student_name}
@@ -2014,18 +2088,54 @@ const TaskDetail = () => {
                 }}>
                   {selectedStudent ? (
                     <div style={{ textAlign: 'center', width: '100%' }}>
-                      <img 
-                        src={getProfilePicUrl(selectedStudent.profile_pic) || `https://ui-avatars.com/api/?name=${selectedStudent.student_name}&background=random`} 
-                        alt={selectedStudent.student_name} 
-                        style={{ 
-                          width: 80, 
-                          height: 80, 
-                          borderRadius: '50%', 
-                          objectFit: 'cover', 
-                          border: '3px solid #e2e8f0',
-                          marginBottom: 20
-                        }} 
-                      />
+                      {(() => {
+                        const profilePictureUrl = getProfilePictureUrl(selectedStudent);
+                        const userInitials = getUserInitials(selectedStudent);
+                        const avatarColor = getAvatarColor(selectedStudent);
+                        
+                        return (
+                          <div style={{
+                            width: '80px',
+                            height: '80px',
+                            borderRadius: '50%',
+                            background: profilePictureUrl ? '#e9ecef' : avatarColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            border: '3px solid #e2e8f0',
+                            margin: '0 auto'
+                          }}>
+                            {profilePictureUrl ? (
+                              <img
+                                src={profilePictureUrl}
+                                alt={selectedStudent.student_name}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <span style={{
+                              display: profilePictureUrl ? 'none' : 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '100%',
+                              height: '100%',
+                              color: '#fff',
+                              fontWeight: 'bold',
+                              fontSize: '28px'
+                            }}>
+                              {userInitials}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       <h3 style={{ 
                         fontWeight: 700, 
                         fontSize: 24, 

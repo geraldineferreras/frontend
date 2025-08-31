@@ -3590,6 +3590,27 @@ class ApiService {
       };
     }
   }
+
+  // ✏️ NEW: Update Classroom Stream Post
+  async updateClassroomStreamPost(classCode, postId, updateData) {
+    try {
+      const response = await this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+        requireAuth: true
+      });
+      
+      console.log('✏️ updateClassroomStreamPost response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error updating classroom stream post:', error);
+      return {
+        status: false,
+        message: error.message || 'Failed to update stream post',
+        data: null
+      };
+    }
+  }
 }
 
 export default new ApiService(); 

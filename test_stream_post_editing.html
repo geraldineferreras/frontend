@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Post Editing Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #f1f5f9;
+        }
+
+        .tab.active {
+            background: white;
+            border-bottom-color: #4f46e5;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .file-upload {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload:hover {
+            border-color: #4f46e5;
+            background: #f8fafc;
+        }
+
+        .file-upload.dragover {
+            border-color: #4f46e5;
+            background: #eff6ff;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 2rem;
+            color: #9ca3af;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+        }
+
+        .btn-success {
+            background: #10b981;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .message.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .attachments-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .attachment-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .attachment-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .file-icon { color: #3b82f6; }
+        .link-icon { color: #10b981; }
+
+        .response-display {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-btn {
+            padding: 8px 16px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+
+        .toggle-btn:hover {
+            border-color: #4f46e5;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Stream Post Editing Test Interface</h1>
+            <p>Test the complete stream post creation and editing functionality with attachments</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('create')">📝 Create Test Post</div>
+            <div class="tab" onclick="switchTab('edit')">✏️ Edit Stream Post</div>
+            <div class="tab" onclick="switchTab('view')">👁️ View Posts</div>
+            <div class="tab" onclick="switchTab('stats')">📊 Statistics</div>
+        </div>
+
+        <!-- Create Test Post Tab -->
+        <div id="create" class="tab-content active">
+            <h2>Create New Stream Post</h2>
+            <p class="message info">Create a new stream post to test the creation functionality. You can add up to 5 file attachments and 3 link attachments.</p>
+            
+            <form id="createForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="createTitle">Post Title *</label>
+                        <input type="text" id="createTitle" class="form-control" placeholder="Enter post title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="createDraft">Draft Status</label>
+                        <select id="createDraft" class="form-control">
+                            <option value="0">Published</option>
+                            <option value="1">Draft</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="createContent">Post Content *</label>
+                    <textarea id="createContent" class="form-control" rows="4" placeholder="Enter post content" required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="createScheduled">Scheduled Post</label>
+                        <select id="createScheduled" class="form-control" onchange="toggleScheduledDate()">
+                            <option value="0">No</option>
+                            <option value="1">Yes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="createScheduledDate">Schedule Date & Time</label>
+                        <input type="datetime-local" id="createScheduledDate" class="form-control" disabled>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>File Attachments (up to 5)</label>
+                    <div class="file-upload" onclick="document.getElementById('createFile0').click()">
+                        <div class="upload-icon">📎</div>
+                        <p>Click to add file attachments</p>
+                        <p style="font-size: 0.9rem; color: #6b7280;">Supports: PDF, DOC, Images, etc.</p>
+                    </div>
+                    <input type="file" id="createFile0" class="file-input" onchange="handleFileSelect(this, 0)">
+                    <input type="file" id="createFile1" class="file-input" onchange="handleFileSelect(this, 1)">
+                    <input type="file" id="createFile2" class="file-input" onchange="handleFileSelect(this, 2)">
+                    <input type="file" id="createFile3" class="file-input" onchange="handleFileSelect(this, 3)">
+                    <input type="file" id="createFile4" class="file-input" onchange="handleFileSelect(this, 4)">
+                </div>
+
+                <div class="form-group">
+                    <label>Link Attachments (up to 3)</label>
+                    <div class="form-row">
+                        <input type="url" id="createLink0" class="form-control" placeholder="https://example.com">
+                        <input type="url" id="createLink1" class="form-control" placeholder="https://youtube.com/watch?v=...">
+                    </div>
+                    <input type="url" id="createLink2" class="form-control" placeholder="https://drive.google.com/file/d/..." style="margin-top: 10px;">
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">🚀 Create Stream Post</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearCreateForm()">🗑️ Clear Form</button>
+                </div>
+            </form>
+
+            <div id="createResponse" class="response-display" style="display: none;"></div>
+        </div>
+
+        <!-- Edit Stream Post Tab -->
+        <div id="edit" class="tab-content">
+            <h2>Edit Existing Stream Post</h2>
+            <p class="message info">Edit an existing stream post. You can update the content and replace all attachments. Use the post ID from the creation tab.</p>
+            
+            <form id="editForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editClassCode">Class Code *</label>
+                        <input type="text" id="editClassCode" class="form-control" placeholder="ABC123" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStreamId">Stream Post ID *</label>
+                        <input type="number" id="editStreamId" class="form-control" placeholder="123" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editTitle">New Title</label>
+                        <input type="text" id="editTitle" class="form-control" placeholder="Updated title">
+                    </div>
+                    <div class="form-group">
+                        <label for="editDraft">New Draft Status</label>
+                        <select id="editDraft" class="form-control">
+                            <option value="">Keep current</option>
+                            <option value="0">Published</option>
+                            <option value="1">Draft</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="editContent">New Content</label>
+                    <textarea id="editContent" class="form-control" rows="4" placeholder="Updated content"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>New File Attachments (will replace existing)</label>
+                    <div class="file-upload" onclick="document.getElementById('editFile0').click()">
+                        <div class="upload-icon">📎</div>
+                        <p>Click to add new file attachments</p>
+                        <p style="font-size: 0.9rem; color: #6b7280;">Leave empty to keep current attachments</p>
+                    </div>
+                    <input type="file" id="editFile0" class="file-input" onchange="handleEditFileSelect(this, 0)">
+                    <input type="file" id="editFile1" class="file-input" onchange="handleEditFileSelect(this, 1)">
+                    <input type="file" id="editFile2" class="file-input" onchange="handleEditFileSelect(this, 2)">
+                    <input type="file" id="editFile3" class="file-input" onchange="handleEditFileSelect(this, 3)">
+                    <input type="file" id="editFile4" class="file-input" onchange="handleEditFileSelect(this, 4)">
+                </div>
+
+                <div class="form-group">
+                    <label>New Link Attachments (will replace existing)</label>
+                    <div class="form-row">
+                        <input type="url" id="editLink0" class="form-control" placeholder="https://example.com">
+                        <input type="url" id="editLink1" class="form-control" placeholder="https://youtube.com/watch?v=...">
+                    </div>
+                    <input type="url" id="editLink2" class="form-control" placeholder="https://drive.google.com/file/d/..." style="margin-top: 10px;">
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-warning">✏️ Update Stream Post</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearEditForm()">🗑️ Clear Form</button>
+                </div>
+            </form>
+
+            <div id="editResponse" class="response-display" style="display: none;"></div>
+        </div>
+
+        <!-- View Posts Tab -->
+        <div id="view" class="tab-content">
+            <h2>View Stream Posts</h2>
+            <p class="message info">View existing stream posts to verify the creation and editing functionality.</p>
+            
+            <form id="viewForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="viewClassCode">Class Code *</label>
+                        <input type="text" id="viewClassCode" class="form-control" placeholder="ABC123" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="viewLimit">Posts Limit</label>
+                        <select id="viewLimit" class="form-control">
+                            <option value="10">10 posts</option>
+                            <option value="25">25 posts</option>
+                            <option value="50">50 posts</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">👁️ View Posts</button>
+                </div>
+            </form>
+
+            <div id="viewResponse" class="response-display" style="display: none;"></div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="stats" class="tab-content">
+            <h2>Test Statistics</h2>
+            <p class="message info">Track your testing progress and see the results of your stream post operations.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="postsCreated">0</div>
+                    <div class="stat-label">Posts Created</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="postsEdited">0</div>
+                    <div class="stat-label">Posts Edited</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="filesUploaded">0</div>
+                    <div class="stat-label">Files Uploaded</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="linksAdded">0</div>
+                    <div class="stat-label">Links Added</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="button" class="btn btn-secondary" onclick="resetStats()">🔄 Reset Statistics</button>
+                <button type="button" class="btn btn-success" onclick="exportStats()">📊 Export Stats</button>
+            </div>
+
+            <div id="statsResponse" class="response-display" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let selectedFiles = {};
+        let selectedEditFiles = {};
+        let testStats = {
+            postsCreated: 0,
+            postsEdited: 0,
+            filesUploaded: 0,
+            linksAdded: 0
+        };
+
+        // Load stats from localStorage
+        function loadStats() {
+            const saved = localStorage.getItem('streamPostTestStats');
+            if (saved) {
+                testStats = JSON.parse(saved);
+                updateStatsDisplay();
+            }
+        }
+
+        // Save stats to localStorage
+        function saveStats() {
+            localStorage.setItem('streamPostTestStats', JSON.stringify(testStats));
+        }
+
+        // Update stats display
+        function updateStatsDisplay() {
+            document.getElementById('postsCreated').textContent = testStats.postsCreated;
+            document.getElementById('postsEdited').textContent = testStats.postsEdited;
+            document.getElementById('filesUploaded').textContent = testStats.filesUploaded;
+            document.getElementById('linksAdded').textContent = testStats.linksAdded;
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to selected tab
+            event.target.classList.add('active');
+        }
+
+        // Toggle scheduled date input
+        function toggleScheduledDate() {
+            const scheduled = document.getElementById('createScheduled').value;
+            const dateInput = document.getElementById('createScheduledDate');
+            dateInput.disabled = scheduled === '0';
+        }
+
+        // Handle file selection for create form
+        function handleFileSelect(input, index) {
+            if (input.files.length > 0) {
+                selectedFiles[index] = input.files[0];
+                updateFilePreview('create');
+            }
+        }
+
+        // Handle file selection for edit form
+        function handleEditFileSelect(input, index) {
+            if (input.files.length > 0) {
+                selectedEditFiles[index] = input.files[0];
+                updateFilePreview('edit');
+            }
+        }
+
+        // Update file preview
+        function updateFilePreview(formType) {
+            const files = formType === 'create' ? selectedFiles : selectedEditFiles;
+            const container = document.getElementById(formType + 'FilePreview');
+            
+            if (!container) {
+                const previewDiv = document.createElement('div');
+                previewDiv.id = formType + 'FilePreview';
+                previewDiv.className = 'attachments-preview';
+                document.getElementById(formType + 'Form').appendChild(previewDiv);
+            }
+            
+            const previewDiv = document.getElementById(formType + 'FilePreview');
+            previewDiv.innerHTML = '';
+            
+            Object.entries(files).forEach(([index, file]) => {
+                const item = document.createElement('div');
+                item.className = 'attachment-item';
+                item.innerHTML = `
+                    <div class="attachment-icon file-icon">📄</div>
+                    <div style="font-weight: 600; margin-bottom: 5px;">${file.name}</div>
+                    <div style="font-size: 0.8rem; color: #6b7280;">${(file.size / 1024).toFixed(1)} KB</div>
+                    <button type="button" class="btn btn-danger" style="margin-top: 10px; padding: 5px 10px; font-size: 12px;" onclick="removeFile(${index}, '${formType}')">Remove</button>
+                `;
+                previewDiv.appendChild(item);
+            });
+        }
+
+        // Remove file
+        function removeFile(index, formType) {
+            if (formType === 'create') {
+                delete selectedFiles[index];
+                document.getElementById('createFile' + index).value = '';
+            } else {
+                delete selectedEditFiles[index];
+                document.getElementById('editFile' + index).value = '';
+            }
+            updateFilePreview(formType);
+        }
+
+        // Clear create form
+        function clearCreateForm() {
+            document.getElementById('createForm').reset();
+            selectedFiles = {};
+            updateFilePreview('create');
+            document.getElementById('createResponse').style.display = 'none';
+        }
+
+        // Clear edit form
+        function clearEditForm() {
+            document.getElementById('editForm').reset();
+            selectedEditFiles = {};
+            updateFilePreview('edit');
+            document.getElementById('editResponse').style.display = 'none';
+        }
+
+        // Reset statistics
+        function resetStats() {
+            testStats = {
+                postsCreated: 0,
+                postsEdited: 0,
+                filesUploaded: 0,
+                linksAdded: 0
+            };
+            saveStats();
+            updateStatsDisplay();
+            showMessage('Statistics reset successfully!', 'success');
+        }
+
+        // Export statistics
+        function exportStats() {
+            const dataStr = JSON.stringify(testStats, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'stream_post_test_stats.json';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Show message
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Handle create form submission
+        document.getElementById('createForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('title', document.getElementById('createTitle').value);
+            formData.append('content', document.getElementById('createContent').value);
+            formData.append('is_draft', document.getElementById('createDraft').value);
+            formData.append('is_scheduled', document.getElementById('createScheduled').value);
+            formData.append('scheduled_at', document.getElementById('createScheduledDate').value);
+            
+            // Add files
+            Object.entries(selectedFiles).forEach(([index, file]) => {
+                formData.append(`attachment_${index}`, file);
+            });
+            
+            // Add links
+            for (let i = 0; i < 3; i++) {
+                const link = document.getElementById(`createLink${i}`).value;
+                if (link) {
+                    formData.append(`link_${i}`, link);
+                }
+            }
+            
+            try {
+                const response = await fetch('/api/teacher/classroom/ABC123/stream', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // Update statistics
+                    testStats.postsCreated++;
+                    testStats.filesUploaded += Object.keys(selectedFiles).length;
+                    testStats.linksAdded += document.querySelectorAll('#createForm input[type="url"]:not([value=""])').length;
+                    saveStats();
+                    updateStatsDisplay();
+                    
+                    showMessage('Post created successfully!', 'success');
+                    document.getElementById('createResponse').style.display = 'block';
+                    document.getElementById('createResponse').textContent = JSON.stringify(result, null, 2);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                showMessage('Error creating post: ' + error.message, 'error');
+                document.getElementById('createResponse').style.display = 'block';
+                document.getElementById('createResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Handle edit form submission
+        document.getElementById('editForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const title = document.getElementById('editTitle').value;
+            const content = document.getElementById('editContent').value;
+            const draft = document.getElementById('editDraft').value;
+            
+            if (title) formData.append('title', title);
+            if (content) formData.append('content', content);
+            if (draft !== '') formData.append('is_draft', draft);
+            
+            // Add files if any
+            Object.entries(selectedEditFiles).forEach(([index, file]) => {
+                formData.append(`attachment_${index}`, file);
+            });
+            
+            // Add links if any
+            for (let i = 0; i < 3; i++) {
+                const link = document.getElementById(`editLink${i}`).value;
+                if (link) {
+                    formData.append(`link_${i}`, link);
+                }
+            }
+            
+            try {
+                const classCode = document.getElementById('editClassCode').value;
+                const streamId = document.getElementById('editStreamId').value;
+                
+                const response = await fetch(`/api/teacher/classroom/${classCode}/stream/${streamId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // Update statistics
+                    testStats.postsEdited++;
+                    if (Object.keys(selectedEditFiles).length > 0) {
+                        testStats.filesUploaded += Object.keys(selectedEditFiles).length;
+                    }
+                    if (document.querySelectorAll('#editForm input[type="url"]:not([value=""])').length > 0) {
+                        testStats.linksAdded += document.querySelectorAll('#editForm input[type="url"]:not([value=""])').length;
+                    }
+                    saveStats();
+                    updateStatsDisplay();
+                    
+                    showMessage('Post updated successfully!', 'success');
+                    document.getElementById('editResponse').style.display = 'block';
+                    document.getElementById('editResponse').textContent = JSON.stringify(result, null, 2);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                showMessage('Error updating post: ' + error.message, 'error');
+                document.getElementById('editResponse').style.display = 'block';
+                document.getElementById('editResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Handle view form submission
+        document.getElementById('viewForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const classCode = document.getElementById('viewClassCode').value;
+                const limit = document.getElementById('viewLimit').value;
+                
+                const response = await fetch(`/api/teacher/classroom/${classCode}/stream?limit=${limit}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer your-jwt-token-here'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                document.getElementById('viewResponse').style.display = 'block';
+                document.getElementById('viewResponse').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                showMessage('Error viewing posts: ' + error.message, 'error');
+                document.getElementById('viewResponse').style.display = 'block';
+                document.getElementById('viewResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            updateStatsDisplay();
+        });
+    </script>
+</body>
+</html>

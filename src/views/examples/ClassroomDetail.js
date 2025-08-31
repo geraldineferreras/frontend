@@ -940,50 +940,9 @@ const ClassroomDetail = () => {
               response = { status: true, data: { students: [] } };
             }
           } catch (error3) {
-            console.log('All approaches failed, using sample data for testing');
-            // Use sample data for testing purposes
-            const sampleStudents = [
-              {
-                id: 1,
-                name: 'John Doe',
-                email: 'john.doe@example.com',
-                student_num: '2024-001',
-                contact_num: '+1234567890',
-                program: 'Computer Science',
-                section_name: 'A',
-                joinedDate: '2024-01-15',
-                enrollment_status: 'active',
-                profile_pic: null,
-                role: 'Student'
-              },
-              {
-                id: 2,
-                name: 'Jane Smith',
-                email: 'jane.smith@example.com',
-                student_num: '2024-002',
-                contact_num: '+1234567891',
-                program: 'Computer Science',
-                section_name: 'A',
-                joinedDate: '2024-01-15',
-                enrollment_status: 'active',
-                profile_pic: null,
-                role: 'Student'
-              },
-              {
-                id: 3,
-                name: 'Mike Johnson',
-                email: 'mike.johnson@example.com',
-                student_num: '2024-003',
-                contact_num: '+1234567892',
-                program: 'Computer Science',
-                section_name: 'A',
-                joinedDate: '2024-01-15',
-                enrollment_status: 'active',
-                profile_pic: null,
-                role: 'Student'
-              }
-            ];
-            response = { status: true, data: { students: sampleStudents } };
+            console.log('All approaches failed, no students available');
+            // No students available - return empty response
+            response = { status: true, data: { students: [] } };
           }
         }
       }
@@ -1264,28 +1223,16 @@ const ClassroomDetail = () => {
         });
       }
       
-      // If no students found, add some sample data
-      if (users.length === 0) {
-        const sampleStudents = [
-          { id: 'sample_student1', name: 'John Doe', email: 'john.doe@example.com', role: 'student', type: 'student' },
-          { id: 'sample_student2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'student', type: 'student' },
-          { id: 'sample_student3', name: 'Mike Johnson', email: 'mike.johnson@example.com', role: 'student', type: 'student' }
-        ];
-        users.push(...sampleStudents);
-      }
+      // No students available - keep users array empty
+      console.log('Available users for Add Users modal (students only):', users);
       
       console.log('Available users for Add Users modal (students only):', users);
       setAvailableUsers(users);
       
     } catch (error) {
       console.error('Error setting up available users:', error);
-      // Fallback to sample student data only
-      setAvailableUsers([
-        { id: 'student1', name: 'John Doe', email: 'john.doe@example.com', role: 'student', type: 'student' },
-        { id: 'student2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'student', type: 'student' },
-        { id: 'student3', name: 'Mike Johnson', email: 'mike.johnson@example.com', role: 'student', type: 'student' },
-        { id: 'student4', name: 'Sarah Wilson', email: 'sarah.wilson@example.com', role: 'student', type: 'student' }
-      ]);
+      // No students available - set empty array
+      setAvailableUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -2111,8 +2058,8 @@ useEffect(() => {
   const editFileInputRef = useRef();
 
   // Add state for edit announcement student selection
-  const [showEditStudentSelectModal, setShowEditStudentSelectModal] = useState(false);
-  const [editSelectedStudents, setEditSelectedStudents] = useState([]);
+  // Removed showEditStudentSelectModal state - no longer needed
+  // Removed editSelectedStudents state - no longer needed
   
   // Track current draft being edited
   const [currentDraftId, setCurrentDraftId] = useState(null);
@@ -3842,8 +3789,7 @@ useEffect(() => {
       attachments: ann.attachments ? [...ann.attachments] : [],
       allowComments: ann.allowComments,
     });
-    // Set the current selected students for editing
-    setEditSelectedStudents(ann.visibleTo || []);
+    // No longer setting selected students - functionality removed
   };
 
   const handleEditAnnouncementChange = (e) => {
@@ -3851,24 +3797,49 @@ useEffect(() => {
     setEditAnnouncementData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveEditAnnouncement = (id) => {
-    setAnnouncements(prev => prev.map(a => a.id === id ? { 
-      ...a, 
-      title: editAnnouncementData.title, 
-      content: editAnnouncementData.content,
-      attachments: editAnnouncementData.attachments || [],
-      allowComments: editAnnouncementData.allowComments !== false,
-      visibleTo: editSelectedStudents
-    } : a));
-    setEditingAnnouncementId(null);
-    setEditAnnouncementData({ title: '', content: '', attachments: [], allowComments: true });
-    setEditSelectedStudents([]);
+  const handleSaveEditAnnouncement = async (id) => {
+    try {
+      // Prepare update data
+      const updateData = {
+        title: editAnnouncementData.title,
+        content: editAnnouncementData.content,
+        allow_comments: editAnnouncementData.allowComments ? 1 : 0
+      };
+
+      // Call the API to update the stream post
+      const response = await apiService.updateClassroomStreamPost(code, id, updateData);
+      
+      if (response && response.status === true) {
+        // Success! Update local state with the response data
+        setAnnouncements(prev => prev.map(a => a.id === id ? { 
+          ...a, 
+          title: response.data.title, 
+          content: response.data.content,
+          allowComments: response.data.allow_comments === 1,
+          updated_at: response.data.updated_at
+        } : a));
+        
+        // Show success message
+        alert('Announcement updated successfully!');
+        
+        // Reset edit state
+        setEditingAnnouncementId(null);
+        setEditAnnouncementData({ title: '', content: '', attachments: [], allowComments: true });
+        // No longer resetting selected students
+      } else {
+        // Show error message
+        alert('Failed to update announcement: ' + (response?.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      alert('Failed to update announcement: ' + error.message);
+    }
   };
 
   const handleCancelEditAnnouncement = () => {
     setEditingAnnouncementId(null);
     setEditAnnouncementData({ title: '', content: '', attachments: [], allowComments: true });
-    setEditSelectedStudents([]);
+    // No longer resetting selected students
   };
 
   const handleDeleteAnnouncement = async (id) => {
@@ -7793,7 +7764,7 @@ useEffect(() => {
                                         attachments: announcement.attachments ? [...announcement.attachments] : [],
                                         allowComments: announcement.allowComments,
                                       });
-                                      setEditSelectedStudents(announcement.visibleTo || []);
+                                      // No longer setting selected students
                                       setAnnouncementDropdowns({});
                                     }}
                                   >Edit</button>
@@ -7949,26 +7920,7 @@ useEffect(() => {
                                   multiple
                                   onChange={handleEditFileChange}
                                 />
-                                <div style={{ marginBottom: 10 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 500, color: '#222', marginBottom: 6 }}>
-                                    <i className="fa fa-user" style={{ fontSize: 18 }} />
-                                    Who can view this announcement?
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <button
-                                      type="button"
-                                      style={{ background: editSelectedStudents.length > 0 ? '#232b3b' : '#bfc0c2', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, fontSize: 15, cursor: 'pointer', marginTop: 4, minWidth: 180, opacity: 1, display: 'flex', alignItems: 'center', gap: 8 }}
-                                      onClick={() => setShowStudentSelectModal(true)}
-                                    >
-                                      + Select students
-                                    </button>
-                                    {editSelectedStudents.length > 0 && (
-                                      <span style={{ background: '#324cdd', color: '#fff', borderRadius: '50%', padding: '2px 10px', fontWeight: 700, fontSize: 15, marginLeft: 2, minWidth: 28, textAlign: 'center', display: 'inline-block' }}>
-                                        {editSelectedStudents.length}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
+                                {/* Removed unnecessary "Select students" button */}
                               </div>
                               <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
                                 <button
@@ -9252,19 +9204,43 @@ useEffect(() => {
                                       marginRight: 6,
                                       overflow: 'hidden'
                                     }}>
-                                      {student.profile_pic ? (
-                                        <img
-                                          src={student.profile_pic}
-                                          alt={student.name}
-                                          style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover'
-                                          }}
-                                        />
-                                      ) : (
-                                        student.name.charAt(0).toUpperCase()
-                                      )}
+                                      {(() => {
+                                        const profilePictureUrl = getProfilePictureUrl(student);
+                                        const userInitials = getUserInitials(student);
+                                        const avatarColor = getAvatarColor(student);
+                                        
+                                        return (
+                                          <>
+                                            {profilePictureUrl ? (
+                                              <img
+                                                src={profilePictureUrl}
+                                                alt={student.name}
+                                                style={{
+                                                  width: '100%',
+                                                  height: '100%',
+                                                  objectFit: 'cover'
+                                                }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                              />
+                                            ) : null}
+                                            <span style={{
+                                              display: profilePictureUrl ? 'none' : 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              width: '100%',
+                                              height: '100%',
+                                              color: '#fff',
+                                              fontWeight: 'bold',
+                                              fontSize: '10px'
+                                            }}>
+                                              {userInitials}
+                                            </span>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                     <span style={{ fontWeight: 500, color: '#333' }}>
                                       {student.name}
@@ -10310,18 +10286,53 @@ useEffect(() => {
                           <tr key={student.student_id}>
                             <td>
                               <div className="d-flex align-items-center">
-                                {student.profile_pic ? (
-                                  <img
-                                    src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${student.profile_pic}`}
-                                    alt={student.student_name}
-                                    className="rounded-circle mr-2"
-                                    style={{ width: '32px', height: '32px', objectFit: 'cover' }}
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                      e.target.nextSibling.style.display = 'block';
-                                    }}
-                                  />
-                                ) : null}
+                                {(() => {
+                                  const profilePictureUrl = getProfilePictureUrl(student);
+                                  const userInitials = getUserInitials(student);
+                                  const avatarColor = getAvatarColor(student);
+                                  
+                                  return (
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '50%',
+                                      background: profilePictureUrl ? '#e9ecef' : avatarColor,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      marginRight: '8px',
+                                      overflow: 'hidden'
+                                    }}>
+                                      {profilePictureUrl ? (
+                                        <img
+                                          src={profilePictureUrl}
+                                          alt={student.student_name}
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                          }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span style={{
+                                        display: profilePictureUrl ? 'none' : 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '100%',
+                                        height: '100%',
+                                        color: '#fff',
+                                        fontWeight: 'bold',
+                                        fontSize: '12px'
+                                      }}>
+                                        {userInitials}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                                 <div>
                                   <div className="font-weight-bold">{student.student_name}</div>
                                   <small className="text-muted">{student.student_num}</small>
@@ -11483,7 +11494,7 @@ useEffect(() => {
                       <div className="text-center text-muted py-5">Loading class members...</div>
                     ) : availableUsers.length === 0 ? (
                       <div className="text-center text-muted py-5">
-                        No students found (Debug: availableUsers.length = {availableUsers.length})
+                        No students available to add to this classroom
                       </div>
                     ) : availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()))).length === 0 ? (
                       <div className="text-center text-muted py-5">No students match your search</div>
