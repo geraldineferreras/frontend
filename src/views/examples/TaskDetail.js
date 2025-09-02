@@ -42,6 +42,22 @@ const TaskDetail = () => {
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [pdfModalFile, setPdfModalFile] = useState(null);
   
+  // Audio player states
+  const [audioPlayer, setAudioPlayer] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Clean up audio player when modal closes
+  useEffect(() => {
+    if (!modalOpen && audioPlayer) {
+      audioPlayer.pause();
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+    }
+  }, [modalOpen, audioPlayer]);
+  
   // Manual grading modal states
   const [manualGradingModalOpen, setManualGradingModalOpen] = useState(false);
   const [manualGradingStudent, setManualGradingStudent] = useState(null);
@@ -659,10 +675,54 @@ const TaskDetail = () => {
   // Helper: check file type
   const isImage = (file) => file && file.url && (file.url.endsWith('.jpg') || file.url.endsWith('.jpeg') || file.url.endsWith('.png') || file.url.endsWith('.gif') || file.url.endsWith('.webp'));
   const isPDF = (file) => file && file.url && file.url.endsWith('.pdf');
+  const isVideo = (file) => file && file.url && /\.(mp4|webm|ogg|mov|mkv|avi|m4v|wmv)$/i.test(file.url);
+  const isAudio = (file) => file && file.url && /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(file.url);
 
   // Helper: get profile picture URL using centralized utilities
   const getProfilePicUrl = (user) => {
     return getProfilePictureUrl(user);
+  };
+
+  // Audio player functions
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handlePlayPause = () => {
+    if (audioPlayer) {
+      if (isPlaying) {
+        audioPlayer.pause();
+        setIsPlaying(false);
+      } else {
+        audioPlayer.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioPlayer) {
+      setCurrentTime(audioPlayer.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioPlayer) {
+      setDuration(audioPlayer.duration);
+    }
+  };
+
+  const handleProgressClick = (e) => {
+    if (audioPlayer && duration) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = clickX / rect.width;
+      const newTime = percentage * duration;
+      audioPlayer.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
   };
 
   // Helper: get file URL for attachments
@@ -944,6 +1004,216 @@ const TaskDetail = () => {
             <img src={modalFile.url} alt={modalFile.name} style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 12, boxShadow: '0 2px 8px #324cdd22' }} />
           ) : isPDF(modalFile) ? (
             <iframe title="PDF Preview" src={modalFile.url} style={{ width: '100%', height: '100%', border: 'none', background: '#fff', borderRadius: 12 }} />
+          ) : isVideo(modalFile) ? (
+            <video 
+              controls 
+              style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 12, boxShadow: '0 2px 8px #324cdd22' }}
+              preload="metadata"
+            >
+              <source src={modalFile.url} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          ) : isAudio(modalFile) ? (
+            <div style={{ 
+              textAlign: 'center', 
+              width: '100%', 
+              maxWidth: '500px',
+              background: '#2d3748',
+              borderRadius: '20px',
+              padding: '40px 30px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            }}>
+              {/* Audio Visualizer */}
+              <div style={{
+                width: '120px',
+                height: '120px',
+                margin: '0 auto 30px',
+                background: 'radial-gradient(circle, #4a5568 0%, #2d3748 70%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+              }}>
+                {/* Concentric circles */}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  border: '2px solid #718096',
+                  borderRadius: '50%',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    border: '1px solid #a0aec0',
+                    borderRadius: '50%',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)'
+                  }}>
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      background: '#ffffff',
+                      borderRadius: '50%',
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)'
+                    }}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Audio Controls */}
+              <div style={{
+                background: '#4a5568',
+                borderRadius: '15px',
+                padding: '20px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '15px'
+              }}>
+                {/* Play Button */}
+                <button 
+                  onClick={handlePlayPause}
+                  style={{
+                    background: '#ffffff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {isPlaying ? (
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      display: 'flex',
+                      gap: '2px'
+                    }}>
+                      <div style={{
+                        width: '6px',
+                        height: '16px',
+                        background: '#2d3748',
+                        borderRadius: '1px'
+                      }}></div>
+                      <div style={{
+                        width: '6px',
+                        height: '16px',
+                        background: '#2d3748',
+                        borderRadius: '1px'
+                      }}></div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: '12px solid #2d3748',
+                      borderTop: '8px solid transparent',
+                      borderBottom: '8px solid transparent',
+                      marginLeft: '3px'
+                    }}></div>
+                  )}
+                </button>
+
+                {/* Time Display */}
+                <div style={{ color: '#ffffff', fontSize: '14px', fontFamily: 'monospace' }}>
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </div>
+
+                {/* Progress Bar */}
+                <div 
+                  onClick={handleProgressClick}
+                  style={{
+                    flex: 1,
+                    height: '4px',
+                    background: '#718096',
+                    borderRadius: '2px',
+                    position: 'relative',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{
+                    width: `${duration ? (currentTime / duration) * 100 : 0}%`,
+                    height: '100%',
+                    background: '#ffffff',
+                    borderRadius: '2px',
+                    transition: 'width 0.1s ease'
+                  }}></div>
+                </div>
+
+                {/* Volume Icon */}
+                <div style={{
+                  color: '#ffffff',
+                  fontSize: '18px',
+                  cursor: 'pointer'
+                }}>🔊</div>
+
+                {/* More Options */}
+                <div style={{
+                  color: '#ffffff',
+                  fontSize: '18px',
+                  cursor: 'pointer'
+                }}>⋯</div>
+              </div>
+
+              {/* File Info Card */}
+              <div style={{
+                background: '#4a5568',
+                borderRadius: '12px',
+                padding: '20px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '24px',
+                  color: '#ffffff',
+                  marginBottom: '8px'
+                }}>♫</div>
+                <div style={{
+                  color: '#ffffff',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  marginBottom: '4px',
+                  wordBreak: 'break-word'
+                }}>
+                  {modalFile.name}
+                </div>
+                <div style={{
+                  color: '#a0aec0',
+                  fontSize: '14px'
+                }}>
+                  MP3 Audio File
+                </div>
+              </div>
+
+              {/* Hidden Audio Element for Functionality */}
+              <audio 
+                ref={(audio) => {
+                  if (audio && audio !== audioPlayer) {
+                    setAudioPlayer(audio);
+                    audio.addEventListener('timeupdate', handleTimeUpdate);
+                    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+                    audio.addEventListener('ended', () => setIsPlaying(false));
+                  }
+                }}
+                preload="metadata"
+                style={{ display: 'none' }}
+              >
+                <source src={modalFile.url} type="audio/mpeg" />
+                Your browser does not support the audio tag.
+              </audio>
+            </div>
           ) : (
             <div style={{ color: '#888', fontSize: 18 }}>No preview available</div>
           )}
@@ -1587,53 +1857,6 @@ const TaskDetail = () => {
                   
                   {/* Toggle Switches */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                       <span style={{ fontSize: 14, color: '#4a5568', fontWeight: 500 }}>Accepting</span>
-                       <button
-                         onClick={handleAcceptingSubmissionsToggle}
-                         disabled={updatingAcceptanceStatus}
-                         style={{
-                           width: 48,
-                           height: 24,
-                           borderRadius: 12,
-                           background: acceptingSubmissions ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' : '#e2e8f0',
-                           border: 'none',
-                           position: 'relative',
-                           cursor: updatingAcceptanceStatus ? 'not-allowed' : 'pointer',
-                           transition: 'all 0.3s ease',
-                           boxShadow: acceptingSubmissions ? '0 2px 8px rgba(72, 187, 120, 0.3)' : 'none',
-                           opacity: updatingAcceptanceStatus ? 0.6 : 1
-                         }}
-                       >
-                         {updatingAcceptanceStatus && (
-                           <div style={{
-                             position: 'absolute',
-                             top: '50%',
-                             left: '50%',
-                             transform: 'translate(-50%, -50%)',
-                             width: 12,
-                             height: 12,
-                             borderRadius: '50%',
-                             border: '2px solid #fff',
-                             borderTop: '2px solid transparent',
-                             animation: 'spin 1s linear infinite'
-                           }} />
-                         )}
-                         <div style={{
-                           position: 'absolute',
-                           left: acceptingSubmissions ? 26 : 2,
-                           top: 2,
-                           width: 20,
-                           height: 20,
-                           borderRadius: '50%',
-                           background: '#fff',
-                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                           transition: 'left 0.3s ease',
-                           opacity: updatingAcceptanceStatus ? 0.3 : 1
-                         }} />
-                       </button>
-                     </div>
-                    
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 14, color: '#4a5568', fontWeight: 500 }}>QR Grading</span>
                       <button
@@ -1668,950 +1891,950 @@ const TaskDetail = () => {
               </div>
             </div>
 
-                         {/* Submission Status Warning */}
-             {!acceptingSubmissions && (
-               <div style={{
-                 background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
-                 border: '2px solid #f59e0b',
-                 borderRadius: 16,
-                 padding: '20px 24px',
-                 marginBottom: 24,
-                 display: 'flex',
-                 alignItems: 'center',
-                 gap: 16,
-                 boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)'
-               }}>
-                 <div style={{
-                   width: 48,
-                   height: 48,
-                   background: '#f59e0b',
-                   borderRadius: '50%',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   color: '#fff',
-                   fontSize: 20
-                 }}>
-                   <i className="ni ni-notification-70" />
-                 </div>
-                 <div>
-                   <div style={{
-                     fontWeight: 700,
-                     fontSize: 16,
-                     color: '#92400e',
-                     marginBottom: 4
-                   }}>
-                     Submissions Currently Disabled
-                   </div>
-                   <div style={{
-                     fontSize: 14,
-                     color: '#a16207'
-                   }}>
-                     Students cannot submit new work while this toggle is off. Existing submissions can still be graded.
-                   </div>
-                 </div>
-               </div>
-             )}
+            {/* Submission Status Warning */}
+            {!acceptingSubmissions && (
+              <div style={{
+                background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
+                border: '2px solid #f59e0b',
+                borderRadius: 16,
+                padding: '20px 24px',
+                marginBottom: 24,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)'
+              }}>
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  background: '#f59e0b',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: 20
+                }}>
+                  <i className="ni ni-notification-70" />
+                </div>
+                <div>
+                  <div style={{
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: '#92400e',
+                    marginBottom: 4
+                  }}>
+                    Submissions Currently Disabled
+                  </div>
+                  <div style={{
+                    fontSize: 14,
+                    color: '#a16207'
+                  }}>
+                    Students cannot submit new work while this toggle is off. Existing submissions can still be graded.
+                  </div>
+                </div>
+              </div>
+            )}
 
-             {/* Main Content Area */}
-             <div style={{ display: 'flex', gap: 32, minHeight: 500 }}>
-               {/* Student List */}
-               <div style={{ 
-                 flex: 2, 
-                 background: '#fff', 
-                 borderRadius: 24, 
-                 boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
-                 border: '1px solid #f0f0f0',
-                 overflow: 'hidden'
-               }}>
-                                 <div style={{ padding: '24px 32px', borderBottom: '1px solid #f0f0f0' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                     <h3 style={{ fontWeight: 700, fontSize: 20, color: '#2d3748', margin: 0 }}>
-                       Student Submissions ({submissionsState.length})
-                     </h3>
-                     {!acceptingSubmissions && (
-                       <div style={{
-                         background: '#fef5e7',
-                         color: '#d69e2e',
-                         padding: '6px 12px',
-                         borderRadius: 20,
-                         fontSize: 12,
-                         fontWeight: 600,
-                         display: 'flex',
-                         alignItems: 'center',
-                         gap: 6
-                       }}>
-                         <i className="ni ni-lock-circle" style={{ fontSize: 14 }} />
-                         Submissions Disabled
-                       </div>
-                     )}
-                   </div>
-                 </div>
-                
-                <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-                  {submissionsState.length === 0 ? (
-                    <div style={{ 
-                      padding: '80px 40px', 
-                      textAlign: 'center', 
-                      color: '#718096' 
-                    }}>
+            {/* Main Content Area */}
+            <div style={{ display: 'flex', gap: 32, minHeight: 500 }}>
+              {/* Student List */}
+              <div style={{ 
+                flex: 2, 
+                background: '#fff', 
+                borderRadius: 24, 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
+                border: '1px solid #f0f0f0',
+                overflow: 'hidden'
+              }}>
+                                <div style={{ padding: '24px 32px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ fontWeight: 700, fontSize: 20, color: '#2d3748', margin: 0 }}>
+                      Student Submissions ({submissionsState.length})
+                    </h3>
+                    {!acceptingSubmissions && (
                       <div style={{
-                        width: 80,
-                        height: 80,
-                        background: '#f7fafc',
-                        borderRadius: '50%',
+                        background: '#fef5e7',
+                        color: '#d69e2e',
+                        padding: '6px 12px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 24px auto'
+                        gap: 6
                       }}>
-                        <i className="ni ni-single-02" style={{ fontSize: 32, color: '#a0aec0' }} />
+                        <i className="ni ni-lock-circle" style={{ fontSize: 14 }} />
+                        Submissions Disabled
                       </div>
-                      <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 12px 0' }}>
-                        {task.assignment_type === 'individual' ? 'No students assigned' : 'No submissions yet'}
-                      </h3>
-                      <p style={{ fontSize: 16, margin: 0 }}>
-                        {task.assignment_type === 'individual' 
-                          ? 'No students have been assigned to this task yet.' 
-                          : 'Students haven\'t submitted their work yet.'
-                        }
-                      </p>
-                    </div>
-                  ) : (
-                    submissionsState.map((s) => (
-                      <div
-                        key={s.submission_id}
-                        onClick={() => {
-                          if (!qrGradingMode) {
-                            setSelectedStudentId(s.submission_id);
-                            // Open manual grading modal for FTF activities
-                            openManualGradingModal(s);
-                          }
-                        }}
-                        style={{
-                          padding: '20px 32px',
-                          borderBottom: '1px solid #f0f0f0',
-                          cursor: !qrGradingMode ? 'pointer' : 'default',
-                          transition: 'all 0.3s ease',
-                          background: !qrGradingMode && selectedStudentId === s.submission_id ? '#f8fafc' : '#fff',
-                          borderLeft: !qrGradingMode && selectedStudentId === s.submission_id ? '4px solid #667eea' : '4px solid transparent'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                            {(() => {
-                              const profilePictureUrl = getProfilePictureUrl(s);
-                              const userInitials = getUserInitials(s);
-                              const avatarColor = getAvatarColor(s);
-                              
-                              return (
-                                <div style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: '50%',
-                                  background: profilePictureUrl ? '#e9ecef' : avatarColor,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  overflow: 'hidden',
-                                  border: '2px solid #e2e8f0'
-                                }}>
-                                  {profilePictureUrl ? (
-                                    <img
-                                      src={profilePictureUrl}
-                                      alt={s.student_name}
-                                      style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover'
-                                      }}
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                                      }}
-                                    />
-                                  ) : null}
-                                  <span style={{
-                                    display: profilePictureUrl ? 'none' : 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: '100%',
-                                    height: '100%',
-                                    color: '#fff',
-                                    fontWeight: 'bold',
-                                    fontSize: '16px'
-                                  }}>
-                                    {userInitials}
-                                  </span>
-                                </div>
-                              );
-                            })()}
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: 16, color: '#2d3748', marginBottom: 4 }}>
-                                {s.student_name}
-                              </div>
-                                                             <div style={{ fontSize: 14, color: '#718096' }}>
-                                 {s.student_num}
+                    )}
+                  </div>
+                </div>
+               
+               <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+                 {submissionsState.length === 0 ? (
+                   <div style={{ 
+                     padding: '80px 40px', 
+                     textAlign: 'center', 
+                     color: '#718096' 
+                   }}>
+                     <div style={{
+                       width: 80,
+                       height: 80,
+                       background: '#f7fafc',
+                       borderRadius: '50%',
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       margin: '0 auto 24px auto'
+                     }}>
+                       <i className="ni ni-single-02" style={{ fontSize: 32, color: '#a0aec0' }} />
+                     </div>
+                     <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 12px 0' }}>
+                       {task.assignment_type === 'individual' ? 'No students assigned' : 'No submissions yet'}
+                     </h3>
+                     <p style={{ fontSize: 16, margin: 0 }}>
+                       {task.assignment_type === 'individual' 
+                         ? 'No students have been assigned to this task yet.' 
+                         : 'Students haven\'t submitted their work yet.'
+                       }
+                     </p>
+                   </div>
+                 ) : (
+                   submissionsState.map((s) => (
+                     <div
+                       key={s.submission_id}
+                       onClick={() => {
+                         if (!qrGradingMode) {
+                           setSelectedStudentId(s.submission_id);
+                           // Open manual grading modal for FTF activities
+                           openManualGradingModal(s);
+                         }
+                       }}
+                       style={{
+                         padding: '20px 32px',
+                         borderBottom: '1px solid #f0f0f0',
+                         cursor: !qrGradingMode ? 'pointer' : 'default',
+                         transition: 'all 0.3s ease',
+                         background: !qrGradingMode && selectedStudentId === s.submission_id ? '#f8fafc' : '#fff',
+                         borderLeft: !qrGradingMode && selectedStudentId === s.submission_id ? '4px solid #667eea' : '4px solid transparent'
+                       }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                           {(() => {
+                             const profilePictureUrl = getProfilePictureUrl(s);
+                             const userInitials = getUserInitials(s);
+                             const avatarColor = getAvatarColor(s);
+                             
+                             return (
+                               <div style={{
+                                 width: '48px',
+                                 height: '48px',
+                                 borderRadius: '50%',
+                                 background: profilePictureUrl ? '#e9ecef' : avatarColor,
+                                 display: 'flex',
+                                 alignItems: 'center',
+                                 justifyContent: 'center',
+                                 overflow: 'hidden',
+                                 border: '2px solid #e2e8f0'
+                               }}>
+                                 {profilePictureUrl ? (
+                                   <img
+                                     src={profilePictureUrl}
+                                     alt={s.student_name}
+                                     style={{
+                                       width: '100%',
+                                       height: '100%',
+                                       objectFit: 'cover'
+                                     }}
+                                     onError={(e) => {
+                                       e.target.style.display = 'none';
+                                       if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                     }}
+                                   />
+                                 ) : null}
                                  <span style={{
-                                   background: s.status === 'graded' ? '#e6fffa' : s.status === 'submitted' ? '#e6f7ff' : '#fef5e7',
-                                   color: s.status === 'graded' ? '#00b894' : s.status === 'submitted' ? '#0099cc' : '#d69e2e',
-                                   padding: '2px 8px',
-                                   borderRadius: 8,
-                                   fontSize: 12,
-                                   fontWeight: 600,
-                                   marginLeft: 8,
-                                   textTransform: 'capitalize'
+                                   display: profilePictureUrl ? 'none' : 'flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   width: '100%',
+                                   height: '100%',
+                                   color: '#fff',
+                                   fontWeight: 'bold',
+                                   fontSize: '16px'
                                  }}>
-                                   {s.status === 'graded' ? 'Graded' : s.status === 'submitted' ? 'Submitted' : 'Assigned'}
+                                   {userInitials}
                                  </span>
-                                 {submissionIdStartsWith(s.submission_id, 'manual_') && (
-                                   <span style={{
-                                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                     color: '#fff',
-                                     padding: '2px 6px',
-                                     borderRadius: 6,
-                                     fontSize: 10,
-                                     fontWeight: '600',
-                                     marginLeft: 6,
-                                     textTransform: 'uppercase'
-                                   }}>
-                                     Manual
-                                   </span>
-                                 )}
                                </div>
+                             );
+                           })()}
+                           <div>
+                             <div style={{ fontWeight: 700, fontSize: 16, color: '#2d3748', marginBottom: 4 }}>
+                               {s.student_name}
+                             </div>
+                                                                 <div style={{ fontSize: 14, color: '#718096' }}>
+                               {s.student_num}
+                               <span style={{
+                                 background: s.status === 'graded' ? '#e6fffa' : s.status === 'submitted' ? '#e6f7ff' : '#fef5e7',
+                                 color: s.status === 'graded' ? '#00b894' : s.status === 'submitted' ? '#0099cc' : '#d69e2e',
+                                 padding: '2px 8px',
+                                 borderRadius: 8,
+                                 fontSize: 12,
+                                 fontWeight: 600,
+                                 marginLeft: 8,
+                                 textTransform: 'capitalize'
+                               }}>
+                                 {s.status === 'graded' ? 'Graded' : s.status === 'submitted' ? 'Submitted' : 'Assigned'}
+                               </span>
+                               {submissionIdStartsWith(s.submission_id, 'manual_') && (
+                                 <span style={{
+                                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                   color: '#fff',
+                                   padding: '2px 6px',
+                                   borderRadius: 6,
+                                   fontSize: 10,
+                                   fontWeight: '600',
+                                   marginLeft: 6,
+                                   textTransform: 'uppercase'
+                                 }}>
+                                   Manual
+                                 </span>
+                               )}
+                             </div>
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ 
+                              fontWeight: 700, 
+                              fontSize: 18, 
+                              color: s.grade !== null ? '#48bb78' : '#a0aec0'
+                            }}>
+                              {s.grade !== null ? `${s.grade}/${task.points}` : `--/${task.points}`}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#718096' }}>
+                              {s.grade !== null ? 'Graded' : 'Not Graded'}
                             </div>
                           </div>
                           
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ 
-                                fontWeight: 700, 
-                                fontSize: 18, 
-                                color: s.grade !== null ? '#48bb78' : '#a0aec0'
-                              }}>
-                                {s.grade !== null ? `${s.grade}/${task.points}` : `--/${task.points}`}
-                              </div>
-                              <div style={{ fontSize: 12, color: '#718096' }}>
-                                {s.grade !== null ? 'Graded' : 'Not Graded'}
-                              </div>
-                            </div>
-                            
-                            {/* Grade Action Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openManualGradingModal(s);
-                              }}
-                              style={{
-                                padding: '8px 16px',
-                                background: s.grade !== null 
-                                  ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' 
-                                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 12,
-                                fontWeight: 600,
-                                fontSize: 14,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                boxShadow: s.grade !== null 
-                                  ? '0 2px 8px rgba(72, 187, 120, 0.3)' 
-                                  : '0 2px 8px rgba(102, 126, 234, 0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6
-                              }}
-                            >
-                              <i className={`ni ${s.grade !== null ? 'ni-check-bold' : 'ni-single-copy-04'}`} />
-                              {s.grade !== null ? 'Edit Grade' : 'Grade Now'}
-                            </button>
-                            
-                                                         {s.attachments && s.attachments.length > 0 ? (
-                               <button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   const firstAttachment = s.attachments[0];
-                                   handleOpenModal(
-                                     { 
-                                       name: firstAttachment.original_name || firstAttachment.file_name, 
-                                       url: getFileUrl(firstAttachment.attachment_url || firstAttachment.file_path)
-                                     },
-                                     s
-                                   );
-                                 }}
-                                 style={{
-                                   padding: '8px 16px',
-                                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                   color: '#fff',
-                                   border: 'none',
-                                   borderRadius: 12,
-                                   fontWeight: 600,
-                                   fontSize: 14,
-                                   cursor: 'pointer',
-                                   transition: 'all 0.3s ease',
-                                   boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
-                                 }}
-                               >
-                                 View ({s.attachments.length})
-                               </button>
-                             ) : s.status === 'assigned' ? (
-                               <div style={{ 
-                                 display: 'flex',
-                                 flexDirection: 'column',
-                                 alignItems: 'center',
-                                 gap: '4px'
-                               }}>
-                                 <span style={{ 
-                                   color: '#a0aec0', 
-                                   fontSize: 14,
-                                   fontStyle: 'italic'
-                                 }}>
-                                   Waiting
-                                 </span>
-                                                                   {submissionIdStartsWith(s.submission_id, 'assigned_') && (
-                                    <span style={{ 
-                                      color: '#d69e2e', 
-                                      fontSize: 11,
-                                      fontWeight: '600'
-                                    }}>
-                                      FTF Ready
-                                    </span>
-                                  )}
-                                  {submissionIdStartsWith(s.submission_id, 'manual_') && (
-                                    <span style={{ 
-                                      color: '#667eea', 
-                                      fontSize: 11,
-                                      fontWeight: '600'
-                                    }}>
-                                      Manual Grade
-                                    </span>
-                                  )}
-                               </div>
-                             ) : (
+                          {/* Grade Action Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openManualGradingModal(s);
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              background: s.grade !== null 
+                                ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' 
+                                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 12,
+                              fontWeight: 600,
+                              fontSize: 14,
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              boxShadow: s.grade !== null 
+                                ? '0 2px 8px rgba(72, 187, 120, 0.3)' 
+                                : '0 2px 8px rgba(102, 126, 234, 0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}
+                          >
+                            <i className={`ni ${s.grade !== null ? 'ni-check-bold' : 'ni-single-copy-04'}`} />
+                            {s.grade !== null ? 'Edit Grade' : 'Grade Now'}
+                          </button>
+                          
+                                                               {s.attachments && s.attachments.length > 0 ? (
+                             <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 const firstAttachment = s.attachments[0];
+                                 handleOpenModal(
+                                   { 
+                                     name: firstAttachment.original_name || firstAttachment.file_name, 
+                                     url: getFileUrl(firstAttachment.attachment_url || firstAttachment.file_path)
+                                   },
+                                   s
+                                 );
+                               }}
+                               style={{
+                                 padding: '8px 16px',
+                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                 color: '#fff',
+                                 border: 'none',
+                                 borderRadius: 12,
+                                 fontWeight: 600,
+                                 fontSize: 14,
+                                 cursor: 'pointer',
+                                 transition: 'all 0.3s ease',
+                                 boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                               }}
+                             >
+                               View ({s.attachments.length})
+                             </button>
+                           ) : s.status === 'assigned' ? (
+                             <div style={{ 
+                               display: 'flex',
+                               flexDirection: 'column',
+                               alignItems: 'center',
+                               gap: '4px'
+                             }}>
                                <span style={{ 
                                  color: '#a0aec0', 
-                                 fontSize: 14
+                                 fontSize: 14,
+                                 fontStyle: 'italic'
                                }}>
-                                 No file
+                                 Waiting
                                </span>
-                             )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              
-              {/* Grading Panel */}
-              {qrGradingMode ? (
-                <QRGradingPanel student={submissionsState} onGradeSubmit={handleQRGradeSubmit} />
-              ) : (
-                <div style={{ 
-                  width: 380, 
-                  background: '#fff', 
-                  borderRadius: 24, 
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
-                  border: '1px solid #f0f0f0',
-                  padding: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: 500
-                }}>
-                  {selectedStudent ? (
-                    <div style={{ textAlign: 'center', width: '100%' }}>
-                      {(() => {
-                        const profilePictureUrl = getProfilePictureUrl(selectedStudent);
-                        const userInitials = getUserInitials(selectedStudent);
-                        const avatarColor = getAvatarColor(selectedStudent);
-                        
-                        return (
-                          <div style={{
-                            width: '80px',
-                            height: '80px',
-                            borderRadius: '50%',
-                            background: profilePictureUrl ? '#e9ecef' : avatarColor,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            border: '3px solid #e2e8f0',
-                            margin: '0 auto'
-                          }}>
-                            {profilePictureUrl ? (
-                              <img
-                                src={profilePictureUrl}
-                                alt={selectedStudent.student_name}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                                }}
-                              />
-                            ) : null}
-                            <span style={{
-                              display: profilePictureUrl ? 'none' : 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '100%',
-                              height: '100%',
-                              color: '#fff',
-                              fontWeight: 'bold',
-                              fontSize: '28px'
-                            }}>
-                              {userInitials}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <h3 style={{ 
-                        fontWeight: 700, 
-                        fontSize: 24, 
-                        color: '#2d3748', 
-                        margin: '0 0 8px 0' 
-                      }}>
-                        {selectedStudent.student_name}
-                      </h3>
-                      <div style={{ 
-                        color: '#718096', 
-                        fontWeight: 500, 
-                        fontSize: 16, 
-                        marginBottom: 20 
-                      }}>
-                        {selectedStudent.status}
-                      </div>
-                      
-                      {selectedStudent.grade !== null && (
-                        <div style={{ 
-                          background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
-                          color: '#fff',
-                          padding: '16px 24px',
-                          borderRadius: 16,
-                          marginBottom: 24,
-                          boxShadow: '0 4px 12px rgba(72, 187, 120, 0.3)'
-                        }}>
-                          <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>Current Score</div>
-                          <div style={{ fontWeight: 700, fontSize: 24 }}>
-                            {selectedStudent.grade}/{task.points}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {selectedStudent.attachments && selectedStudent.attachments.length > 0 ? (
-                        <div style={{ marginBottom: 24 }}>
-                          <div style={{ 
-                            color: '#667eea', 
-                            fontSize: 16, 
-                            fontWeight: 600, 
-                            marginBottom: 8 
-                          }}>
-                            Submitted Files ({selectedStudent.attachments.length})
-                          </div>
-                          {selectedStudent.attachments.map((attachment, index) => (
-                            <button
-                              key={attachment.attachment_id || index}
-                              onClick={() => handleOpenModal(
-                                { 
-                                  name: attachment.original_name || attachment.file_name, 
-                                  url: getFileUrl(attachment.attachment_url || attachment.file_path)
-                                },
-                                selectedStudent
+                                                                         {submissionIdStartsWith(s.submission_id, 'assigned_') && (
+                                <span style={{ 
+                                  color: '#d69e2e', 
+                                  fontSize: 11,
+                                  fontWeight: '600'
+                                }}>
+                                  FTF Ready
+                                </span>
                               )}
-                              style={{
-                                padding: '12px 24px',
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 12,
-                                fontWeight: 600,
-                                fontSize: 14,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                                width: '100%',
-                                marginBottom: index < selectedStudent.attachments.length - 1 ? 8 : 0
-                              }}
-                            >
-                              <i className="ni ni-single-copy-04 mr-2" />
-                              View {attachment.original_name || attachment.file_name}
-                            </button>
-                          ))}
-                          <div style={{ 
-                            color: '#718096', 
-                            fontSize: 14, 
-                            marginTop: 8 
-                          }}>
-                            {selectedStudent.attachments.length} file{selectedStudent.attachments.length > 1 ? 's' : ''} submitted
-                          </div>
+                              {submissionIdStartsWith(s.submission_id, 'manual_') && (
+                                <span style={{ 
+                                  color: '#667eea', 
+                                  fontSize: 11,
+                                  fontWeight: '600'
+                                }}>
+                                  Manual Grade
+                                </span>
+                              )}
+                             </div>
+                           ) : (
+                             <span style={{ 
+                               color: '#a0aec0', 
+                               fontSize: 14
+                             }}>
+                               No file
+                             </span>
+                           )}
                         </div>
-                      ) : (
-                        <div style={{ 
-                          padding: '24px', 
-                          background: '#f8fafc', 
-                          borderRadius: 16, 
-                          border: '2px dashed #cbd5e0',
-                          color: '#718096',
-                          textAlign: 'center'
-                        }}>
-                          <i className="ni ni-folder-17" style={{ fontSize: 32, color: '#a0aec0', marginBottom: 12 }} />
-                          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No file submitted</div>
-                          <div style={{ fontSize: 14 }}>Student hasn't uploaded any files yet</div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', color: '#718096' }}>
-                      <div style={{
-                        width: 80,
-                        height: 80,
-                        background: '#f7fafc',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 24px auto'
-                      }}>
-                        <i className="ni ni-single-02" style={{ fontSize: 32, color: '#a0aec0' }} />
                       </div>
-                      <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 12px 0' }}>No student selected</h3>
-                      <p style={{ fontSize: 16, margin: 0 }}>Click on a student to view their submission</p>
                     </div>
-                  )}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
-            {/* Success Notification */}
-            {gradeSaved && (
-              <div style={{
-                position: 'fixed',
-                top: '20px',
-                right: '20px',
-                background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
-                color: '#fff',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                boxShadow: '0 8px 24px rgba(72, 187, 120, 0.3)',
-                zIndex: 9999,
+            
+            {/* Grading Panel */}
+            {qrGradingMode ? (
+              <QRGradingPanel student={submissionsState} onGradeSubmit={handleQRGradeSubmit} />
+            ) : (
+              <div style={{ 
+                width: 380, 
+                background: '#fff', 
+                borderRadius: 24, 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
+                border: '1px solid #f0f0f0',
+                padding: '32px',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '12px',
-                animation: 'slideInRight 0.3s ease-out'
+                justifyContent: 'center',
+                minHeight: 500
               }}>
-                <i className="ni ni-check-bold" style={{ fontSize: '20px' }} />
-                <span style={{ fontWeight: '600', fontSize: '14px' }}>Grade saved successfully!</span>
-                <style>{`
-                  @keyframes slideInRight {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                  }
-                `}</style>
-              </div>
-            )}
-
-            {/* Error Notification */}
-            {error && (
-              <div style={{
-                position: 'fixed',
-                top: '20px',
-                right: '20px',
-                background: 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)',
-                color: '#fff',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                boxShadow: '0 8px 24px rgba(245, 101, 101, 0.3)',
-                zIndex: 9999,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                animation: 'slideInRight 0.3s ease-out'
-              }}>
-                <i className="ni ni-notification-70" style={{ fontSize: '20px' }} />
-                <span style={{ fontWeight: '600', fontSize: '14px' }}>{error}</span>
-                <button
-                  onClick={() => setError(null)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#fff',
-                    fontSize: '18px',
-                    cursor: 'pointer',
-                    marginLeft: '12px',
-                    opacity: 0.8
-                  }}
-                >
-                  ×
-                </button>
-                <style>{`
-                  @keyframes slideInRight {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                  }
-                `}</style>
-              </div>
-            )}
-
-            {/* Modal for file preview */}
-            <Modal isOpen={modalOpen} toggle={() => setModalOpen(false)} size="xl" centered style={{ maxWidth: '98vw', width: '98vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
-              <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100vw', maxWidth: '100vw' }}>
-                <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
-                  {renderModalContent()}
-                  <Button color="secondary" onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 18, right: 24, zIndex: 10, borderRadius: 20, fontWeight: 700, fontSize: 24, padding: '2px 20px', background: '#fff', color: '#222', border: 'none', boxShadow: '0 2px 8px #324cdd22' }}>×</Button>
-                </div>
-              </ModalBody>
-                         </Modal>
-           </TabPane>
-         </TabContent>
-         
-         {/* PDF Preview Modal */}
-          <Modal isOpen={pdfModalOpen} toggle={() => setPdfModalOpen(false)} size="xl" centered style={{ maxWidth: '95vw', width: '95vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
-            <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100%' }}>
-             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-               {/* Header */}
-               <div style={{ 
-                 background: '#fff', 
-                 padding: '16px 24px', 
-                 borderBottom: '1px solid #e9ecef',
-                 display: 'flex',
-                 alignItems: 'center',
-                 justifyContent: 'space-between'
-               }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                   {getFileTypeIcon({ name: pdfModalFile?.name, type: 'file' })}
-                   <div>
-                     <div style={{ fontWeight: 600, color: '#333', fontSize: 16 }}>
-                       {pdfModalFile?.name || 'Document'}
-                     </div>
-                     <div style={{ color: '#666', fontSize: 12 }}>
-                       {(pdfModalFile?.name || '').split('.').pop().toUpperCase() || 'FILE'} Document
-                     </div>
-                   </div>
-                 </div>
-                  {/* Zoom controls are hidden when using iframe preview */}
-               </div>
-               
-                {/* File Content */}
-                <div style={{ flex: 1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
-                  {pdfModalFile && (() => {
-                    const rawUrl = (pdfModalFile.url || '');
-                    const url = rawUrl.toLowerCase();
-                    const isPdf = url.endsWith('.pdf');
-                    const isImage = /\.(png|jpg|jpeg|gif|webp)$/.test(url);
-                    const isVideo = /\.(mp4|webm|ogg|mov|mkv|avi)$/.test(url);
-                    const isAudio = /\.(mp3|wav|ogg|aac|flac|m4a)$/.test(url);
-                    if (isPdf) {
-                      return (
-                        <iframe title="PDF Preview" src={pdfModalFile.url} style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }} />
-                      );
-                    }
-                    if (isImage) {
-                      return (
-                        <img alt={pdfModalFile.name} src={pdfModalFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />
-                      );
-                    }
-                    if (isVideo) {
-                      return (
-                        <video controls style={{ width: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022', background: '#000' }}>
-                          <source src={pdfModalFile.url} type="video/mp4" />
-                          Your browser does not support the video tag.
-                        </video>
-                      );
-                    }
-                    if (isAudio) {
+                {selectedStudent ? (
+                  <div style={{ textAlign: 'center', width: '100%' }}>
+                    {(() => {
+                      const profilePictureUrl = getProfilePictureUrl(selectedStudent);
+                      const userInitials = getUserInitials(selectedStudent);
+                      const avatarColor = getAvatarColor(selectedStudent);
+                      
                       return (
                         <div style={{
-                          width: '100%',
-                          maxWidth: 900,
-                          background: 'linear-gradient(135deg, #232526 0%, #414345 100%)',
-                          borderRadius: 24,
-                          padding: 28,
-                          boxShadow: '0 16px 32px rgba(0,0,0,0.35)',
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          background: profilePictureUrl ? '#e9ecef' : avatarColor,
                           display: 'flex',
-                          flexDirection: 'column',
                           alignItems: 'center',
-                          position: 'relative',
-                          overflow: 'hidden'
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          border: '3px solid #e2e8f0',
+                          margin: '0 auto'
                         }}>
-                          {/* Animated Disk */}
-                          <div style={{
-                            width: 110,
-                            height: 110,
-                            borderRadius: '50%',
-                            background: 'radial-gradient(circle at 30% 30%, #d9d9d9 0%, #bdbdbd 45%, #9e9e9e 60%, #757575 100%)',
-                            boxShadow: audioPlaying ? '0 12px 28px rgba(0,0,0,0.45)' : '0 6px 14px rgba(0,0,0,0.25)',
-                            marginBottom: 20,
-                            animation: audioPlaying ? 'spin 6s linear infinite' : 'none'
-                          }} />
-
-                          {/* Visualizer bars */}
-                          <div style={{ display: 'flex', gap: 4, height: 40, marginBottom: 16 }}>
-                            {[...Array(24)].map((_, i) => (
-                              <div key={i} style={{
-                                width: 6,
-                                borderRadius: 3,
-                                background: 'rgba(255,255,255,0.35)',
-                                height: audioPlaying ? (12 + Math.abs(Math.sin((Date.now()/150)+(i*0.7))) * 28) : 14,
-                                transition: 'height 120ms linear'
-                              }} />
-                            ))}
-                          </div>
-
-                          {/* Audio element */}
-                          <audio
-                            controls
-                            style={{ width: '100%', maxWidth: 640, borderRadius: 12, background: '#fff', zIndex: 2 }}
-                            src={pdfModalFile.url}
-                            onPlay={() => setAudioPlaying(true)}
-                            onPause={() => setAudioPlaying(false)}
-                            onEnded={() => setAudioPlaying(false)}
-                          />
-
-                          {/* File info */}
-                          <div style={{
-                            marginTop: 14,
-                            color: '#e0e0e0',
-                            fontWeight: 700,
-                            letterSpacing: 0.3
-                          }}>{pdfModalFile.name || 'Audio'}</div>
-
-                          {/* Floating particles */}
-                          {[...Array(18)].map((_, i) => (
-                            <div key={i} style={{
-                              position: 'absolute',
-                              top: `${Math.random()*100}%`,
-                              left: `${Math.random()*100}%`,
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: 'rgba(255,255,255,0.08)',
-                              filter: 'blur(1px)',
-                              animation: `floatY ${6 + Math.random()*6}s ease-in-out ${Math.random()*2}s infinite`
-                            }} />
-                          ))}
-
-                          {/* bottom wave */}
-                          <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, opacity: 0.12 }}>
-                            <svg height="60" width="100%" preserveAspectRatio="none" viewBox="0 0 1440 80">
-                              <path d="M0,40 Q360,80 720,40 T1440,40 V80 H0 Z" fill="#ffffff" />
-                            </svg>
-                          </div>
-
-                          <style>{`
-                            @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
-                            @keyframes floatY { 0% { transform: translateY(0);} 50% { transform: translateY(-12px);} 100% { transform: translateY(0);} }
-                          `}</style>
+                          {profilePictureUrl ? (
+                            <img
+                              src={profilePictureUrl}
+                              alt={selectedStudent.student_name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <span style={{
+                            display: profilePictureUrl ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                            color: '#fff',
+                            fontWeight: 'bold',
+                            fontSize: '28px'
+                          }}>
+                            {userInitials}
+                          </span>
                         </div>
                       );
-                    }
+                    })()}
+                    <h3 style={{ 
+                      fontWeight: 700, 
+                      fontSize: 24, 
+                      color: '#2d3748', 
+                      margin: '0 0 8px 0' 
+                    }}>
+                      {selectedStudent.student_name}
+                    </h3>
+                    <div style={{ 
+                      color: '#718096', 
+                      fontWeight: 500, 
+                      fontSize: 16, 
+                      marginBottom: 20 
+                    }}>
+                      {selectedStudent.status}
+                    </div>
+                    
+                    {selectedStudent.grade !== null && (
+                      <div style={{ 
+                        background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
+                        color: '#fff',
+                        padding: '16px 24px',
+                        borderRadius: 16,
+                        marginBottom: 24,
+                        boxShadow: '0 4px 12px rgba(72, 187, 120, 0.3)'
+                      }}>
+                        <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>Current Score</div>
+                        <div style={{ fontWeight: 700, fontSize: 24 }}>
+                          {selectedStudent.grade}/{task.points}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedStudent.attachments && selectedStudent.attachments.length > 0 ? (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{ 
+                          color: '#667eea', 
+                          fontSize: 16, 
+                          fontWeight: 600, 
+                          marginBottom: 8 
+                        }}>
+                          Submitted Files ({selectedStudent.attachments.length})
+                        </div>
+                        {selectedStudent.attachments.map((attachment, index) => (
+                          <button
+                            key={attachment.attachment_id || index}
+                            onClick={() => handleOpenModal(
+                              { 
+                                name: attachment.original_name || attachment.file_name, 
+                                url: getFileUrl(attachment.attachment_url || attachment.file_path)
+                              },
+                              selectedStudent
+                            )}
+                            style={{
+                              padding: '12px 24px',
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 12,
+                              fontWeight: 600,
+                              fontSize: 14,
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                              width: '100%',
+                              marginBottom: index < selectedStudent.attachments.length - 1 ? 8 : 0
+                            }}
+                          >
+                            <i className="ni ni-single-copy-04 mr-2" />
+                            View {attachment.original_name || attachment.file_name}
+                          </button>
+                        ))}
+                        <div style={{ 
+                          color: '#718096', 
+                          fontSize: 14, 
+                          marginTop: 8 
+                        }}>
+                          {selectedStudent.attachments.length} file{selectedStudent.attachments.length > 1 ? 's' : ''} submitted
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ 
+                        padding: '24px', 
+                        background: '#f8fafc', 
+                        borderRadius: 16, 
+                        border: '2px dashed #cbd5e0',
+                        color: '#718096',
+                        textAlign: 'center'
+                      }}>
+                        <i className="ni ni-folder-17" style={{ fontSize: 32, color: '#a0aec0', marginBottom: 12 }} />
+                        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No file submitted</div>
+                        <div style={{ fontSize: 14 }}>Student hasn't uploaded any files yet</div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#718096' }}>
+                    <div style={{
+                      width: 80,
+                      height: 80,
+                      background: '#f7fafc',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 24px auto'
+                    }}>
+                      <i className="ni ni-single-02" style={{ fontSize: 32, color: '#a0aec0' }} />
+                    </div>
+                    <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 12px 0' }}>No student selected</h3>
+                    <p style={{ fontSize: 16, margin: 0 }}>Click on a student to view their submission</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </TabPane>
+        </TabContent>
+        {/* Success Notification */}
+        {gradeSaved && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(72, 187, 120, 0.3)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            animation: 'slideInRight 0.3s ease-out'
+          }}>
+            <i className="ni ni-check-bold" style={{ fontSize: '20px' }} />
+            <span style={{ fontWeight: '600', fontSize: '14px' }}>Grade saved successfully!</span>
+            <style>{`
+              @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Error Notification */}
+        {error && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(245, 101, 101, 0.3)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            animation: 'slideInRight 0.3s ease-out'
+          }}>
+            <i className="ni ni-notification-70" style={{ fontSize: '20px' }} />
+            <span style={{ fontWeight: '600', fontSize: '14px' }}>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                fontSize: '18px',
+                cursor: 'pointer',
+                marginLeft: '12px',
+                opacity: 0.8
+              }}
+            >
+              ×
+            </button>
+            <style>{`
+              @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Modal for file preview */}
+        <Modal isOpen={modalOpen} toggle={() => setModalOpen(false)} size="xl" centered style={{ maxWidth: '98vw', width: '98vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
+          <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100vw', maxWidth: '100vw' }}>
+            <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+              {renderModalContent()}
+              <Button color="secondary" onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 18, right: 24, zIndex: 10, borderRadius: 20, fontWeight: 700, fontSize: 24, padding: '2px 20px', background: '#fff', color: '#222', border: 'none', boxShadow: '0 2px 8px #324cdd22' }}>×</Button>
+            </div>
+          </ModalBody>
+                     </Modal>
+        
+       {/* PDF Preview Modal */}
+        <Modal isOpen={pdfModalOpen} toggle={() => setPdfModalOpen(false)} size="xl" centered style={{ maxWidth: '95vw', width: '95vw' }} contentClassName="p-0" backdropClassName="modal-backdrop-blur">
+          <ModalBody style={{ padding: 0, borderRadius: 16, overflow: 'hidden', minHeight: '90vh', height: '90vh', maxHeight: '95vh', width: '100%' }}>
+           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+             {/* Header */}
+             <div style={{ 
+               background: '#fff', 
+               padding: '16px 24px', 
+               borderBottom: '1px solid #e9ecef',
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'space-between'
+             }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                 {getFileTypeIcon({ name: pdfModalFile?.name, type: 'file' })}
+                 <div>
+                   <div style={{ fontWeight: 600, color: '#333', fontSize: 16 }}>
+                     {pdfModalFile?.name || 'Document'}
+                   </div>
+                   <div style={{ color: '#666', fontSize: 12 }}>
+                     {(pdfModalFile?.name || '').split('.').pop().toUpperCase() || 'FILE'} Document
+                   </div>
+                 </div>
+               </div>
+                {/* Zoom controls are hidden when using iframe preview */}
+             </div>
+             
+              {/* File Content */}
+              <div style={{ flex: 1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
+                {pdfModalFile && (() => {
+                  const rawUrl = (pdfModalFile.url || '');
+                  const url = rawUrl.toLowerCase();
+                  const isPdf = url.endsWith('.pdf');
+                  const isImage = /\.(png|jpg|jpeg|gif|webp)$/.test(url);
+                  const isVideo = /\.(mp4|webm|ogg|mov|mkv|avi)$/.test(url);
+                  const isAudio = /\.(mp3|wav|ogg|aac|flac|m4a)$/.test(url);
+                  if (isPdf) {
                     return (
-                      <div style={{ textAlign: 'center', color: '#666' }}>
-                        <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
-                        <Button color="primary" onClick={() => window.open(pdfModalFile.url, '_blank', 'noopener,noreferrer')}>Open in new tab</Button>
+                      <iframe title="PDF Preview" src={pdfModalFile.url} style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }} />
+                    );
+                  }
+                  if (isImage) {
+                    return (
+                      <img alt={pdfModalFile.name} src={pdfModalFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />
+                    );
+                  }
+                  if (isVideo) {
+                    return (
+                      <video controls style={{ width: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022', background: '#000' }}>
+                        <source src={pdfModalFile.url} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    );
+                  }
+                  if (isAudio) {
+                    return (
+                      <div style={{
+                        width: '100%',
+                        maxWidth: 900,
+                        background: 'linear-gradient(135deg, #232526 0%, #414345 100%)',
+                        borderRadius: 24,
+                        padding: 28,
+                        boxShadow: '0 16px 32px rgba(0,0,0,0.35)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        {/* Animated Disk */}
+                        <div style={{
+                          width: 110,
+                          height: 110,
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle at 30% 30%, #d9d9d9 0%, #bdbdbd 45%, #9e9e9e 60%, #757575 100%)',
+                          boxShadow: audioPlaying ? '0 12px 28px rgba(0,0,0,0.45)' : '0 6px 14px rgba(0,0,0,0.25)',
+                          marginBottom: 20,
+                          animation: audioPlaying ? 'spin 6s linear infinite' : 'none'
+                        }} />
+
+                        {/* Visualizer bars */}
+                        <div style={{ display: 'flex', gap: 4, height: 40, marginBottom: 16 }}>
+                          {[...Array(24)].map((_, i) => (
+                            <div key={i} style={{
+                              width: 6,
+                              borderRadius: 3,
+                              background: 'rgba(255,255,255,0.35)',
+                              height: audioPlaying ? (12 + Math.abs(Math.sin((Date.now()/150)+(i*0.7))) * 28) : 14,
+                              transition: 'height 120ms linear'
+                            }} />
+                          ))}
+                        </div>
+
+                        {/* Audio element */}
+                        <audio
+                          controls
+                          style={{ width: '100%', maxWidth: 640, borderRadius: 12, background: '#fff', zIndex: 2 }}
+                          src={pdfModalFile.url}
+                          onPlay={() => setAudioPlaying(true)}
+                          onPause={() => setAudioPlaying(false)}
+                          onEnded={() => setAudioPlaying(false)}
+                        />
+
+                        {/* File info */}
+                        <div style={{
+                          marginTop: 14,
+                          color: '#e0e0e0',
+                          fontWeight: 700,
+                          letterSpacing: 0.3
+                        }}>{pdfModalFile.name || 'Audio'}</div>
+
+                        {/* Floating particles */}
+                        {[...Array(18)].map((_, i) => (
+                          <div key={i} style={{
+                            position: 'absolute',
+                            top: `${Math.random()*100}%`,
+                            left: `${Math.random()*100}%`,
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.08)',
+                            filter: 'blur(1px)',
+                            animation: `floatY ${6 + Math.random()*6}s ease-in-out ${Math.random()*2}s infinite`
+                          }} />
+                        ))}
+
+                        {/* bottom wave */}
+                        <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, opacity: 0.12 }}>
+                          <svg height="60" width="100%" preserveAspectRatio="none" viewBox="0 0 1440 80">
+                            <path d="M0,40 Q360,80 720,40 T1440,40 V80 H0 Z" fill="#ffffff" />
+                          </svg>
+                        </div>
+
+                        <style>{`
+                          @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+                          @keyframes floatY { 0% { transform: translateY(0);} 50% { transform: translateY(-12px);} 100% { transform: translateY(0);} }
+                        `}</style>
                       </div>
                     );
-                  })()}
-                </div>
+                  }
+                  return (
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                      <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
+                      <Button color="primary" onClick={() => window.open(pdfModalFile.url, '_blank', 'noopener,noreferrer')}>Open in new tab</Button>
+                    </div>
+                  );
+                })()}
+              </div>
+             
+             {/* Close button */}
+             <Button 
+               color="secondary" 
+               onClick={() => setPdfModalOpen(false)} 
+               style={{ 
+                 position: 'absolute', 
+                 top: 20, 
+                 right: 20, 
+                 zIndex: 10, 
+                 borderRadius: 20, 
+                 fontWeight: 700, 
+                 fontSize: 20, 
+                 padding: '2px 16px', 
+                 background: '#fff', 
+                 color: '#222', 
+                 border: 'none', 
+                 boxShadow: '0 2px 8px #324cdd22' 
+               }}
+             >
+               ×
+             </Button>
+           </div>
+         </ModalBody>
+       </Modal>
+       
+                {/* Manual Grading Modal */}
+       {manualGradingStudent && (
+         <Modal isOpen={manualGradingModalOpen} toggle={() => setManualGradingModalOpen(false)} size="lg" centered>
+           <ModalBody style={{ padding: '32px', borderRadius: '16px' }}>
+             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+               <div style={{
+                 width: '80px',
+                 height: '80px',
+                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                 borderRadius: '50%',
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 margin: '0 auto 16px auto',
+                 boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+               }}>
+                 <i className="ni ni-single-copy-04" style={{ fontSize: '32px', color: '#fff' }} />
+               </div>
+               <h3 style={{ fontWeight: '700', fontSize: '24px', color: '#2d3748', margin: '0 0 8px 0' }}>
+                 {manualGradingStudent.grade !== null ? 'Edit Grade' : 'Manual Grading'}
+               </h3>
+               <p style={{ color: '#718096', fontSize: '16px', margin: '0' }}>
+                 Grade student: <strong>{manualGradingStudent.student_name}</strong>
+               </p>
+               {manualGradingStudent.grade !== null && (
+                 <div style={{
+                   background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
+                   color: '#fff',
+                   padding: '8px 16px',
+                   borderRadius: '12px',
+                   margin: '8px 0',
+                   boxShadow: '0 4px 12px rgba(72, 187, 120, 0.3)',
+                   display: 'inline-block'
+                 }}>
+                   <span style={{ fontSize: '14px', fontWeight: '600' }}>
+                     Current Grade: {manualGradingStudent.grade}/{task?.points || 100}
+                   </span>
+                 </div>
+               )}
+                                                    <p style={{ color: '#667eea', fontSize: '14px', margin: '8px 0 0 0', fontStyle: 'italic' }}>
+                   Perfect for face-to-face activities and manual assessment
+                 </p>
+                 {!acceptingSubmissions && (
+                   <div style={{
+                     background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
+                     color: '#d69e2e',
+                     padding: '8px 16px',
+                     borderRadius: '12px',
+                     margin: '8px 0',
+                     fontSize: '12px',
+                     fontWeight: '600',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: 8
+                   }}>
+                     <i className="ni ni-lock-circle" />
+                     Note: New submissions are currently disabled. You can still grade existing work.
+                   </div>
+                 )}
+                                   {submissionIdStartsWith(manualGradingStudent.submission_id, 'assigned_') && (
+                   <div style={{
+                     background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
+                     color: '#d69e2e',
+                     padding: '8px 16px',
+                     borderRadius: '12px',
+                     margin: '8px 0',
+                     fontSize: '12px',
+                     fontWeight: '600'
+                   }}>
+                     📝 Face-to-Face Activity: Student assigned but no submission yet. Grading will create a manual submission record.
+                   </div>
+                 )}
+             </div>
+             
+             <div style={{ marginBottom: '24px' }}>
+               <div style={{ marginBottom: '16px' }}>
+                 <label style={{ fontWeight: '600', fontSize: '14px', color: '#4a5568', marginBottom: '8px', display: 'block' }}>
+                   Score (out of {task?.points || 100})
+                 </label>
+                 <Input
+                   type="number"
+                   value={manualGradeInput}
+                   onChange={(e) => setManualGradeInput(e.target.value)}
+                   placeholder="Enter score"
+                   min="0"
+                   max={task?.points || 100}
+                   style={{
+                     borderRadius: '12px',
+                     border: '2px solid #e2e8f0',
+                     padding: '12px 16px',
+                     fontSize: '16px',
+                     fontWeight: '500'
+                   }}
+                 />
+               </div>
                
-               {/* Close button */}
-               <Button 
-                 color="secondary" 
-                 onClick={() => setPdfModalOpen(false)} 
-                 style={{ 
-                   position: 'absolute', 
-                   top: 20, 
-                   right: 20, 
-                   zIndex: 10, 
-                   borderRadius: 20, 
-                   fontWeight: 700, 
-                   fontSize: 20, 
-                   padding: '2px 16px', 
-                   background: '#fff', 
-                   color: '#222', 
-                   border: 'none', 
-                   boxShadow: '0 2px 8px #324cdd22' 
+               <div style={{ marginBottom: '16px' }}>
+                 <label style={{ fontWeight: '600', fontSize: '14px', color: '#4a5568', marginBottom: '8px', display: 'block' }}>
+                   Feedback (Optional)
+                 </label>
+                 <Input
+                   type="textarea"
+                   value={manualFeedbackInput}
+                   onChange={(e) => setManualFeedbackInput(e.target.value)}
+                   placeholder="Enter feedback for the student..."
+                   style={{
+                     borderRadius: '12px',
+                     border: '2px solid #e2e8f0',
+                     padding: '12px 16px',
+                     fontSize: '16px',
+                     fontWeight: '500',
+                     minHeight: '100px',
+                     resize: 'vertical'
+                   }}
+                 />
+               </div>
+             </div>
+             
+             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+               <Button
+                 color="secondary"
+                 onClick={() => {
+                   setManualGradingModalOpen(false);
+                   setManualGradingStudent(null);
+                   setManualGradeInput("");
+                   setManualFeedbackInput("");
+                 }}
+                 style={{
+                   borderRadius: '12px',
+                   padding: '12px 24px',
+                   fontWeight: '600',
+                   fontSize: '14px',
+                   border: 'none',
+                   background: '#e2e8f0',
+                   color: '#4a5568'
                  }}
                >
-                 ×
+                 Cancel
+               </Button>
+               <Button
+                 color="primary"
+                 onClick={handleManualGradeSubmit}
+                 disabled={!manualGradeInput || manualGradingLoading}
+                 style={{
+                   borderRadius: '12px',
+                   padding: '12px 24px',
+                   fontWeight: '600',
+                   fontSize: '14px',
+                   border: 'none',
+                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                   color: '#fff',
+                   boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                 }}
+               >
+                 {manualGradingLoading ? (
+                   <>
+                     <Spinner size="sm" className="mr-2" />
+                     Saving...
+                   </>
+                 ) : (
+                   manualGradingStudent.grade !== null ? 'Update Grade' : 'Save Grade'
+                 )}
                </Button>
              </div>
            </ModalBody>
          </Modal>
-         
-                  {/* Manual Grading Modal */}
-         {manualGradingStudent && (
-           <Modal isOpen={manualGradingModalOpen} toggle={() => setManualGradingModalOpen(false)} size="lg" centered>
-             <ModalBody style={{ padding: '32px', borderRadius: '16px' }}>
-               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                 <div style={{
-                   width: '80px',
-                   height: '80px',
-                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                   borderRadius: '50%',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   margin: '0 auto 16px auto',
-                   boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
-                 }}>
-                   <i className="ni ni-single-copy-04" style={{ fontSize: '32px', color: '#fff' }} />
-                 </div>
-                 <h3 style={{ fontWeight: '700', fontSize: '24px', color: '#2d3748', margin: '0 0 8px 0' }}>
-                   {manualGradingStudent.grade !== null ? 'Edit Grade' : 'Manual Grading'}
-                 </h3>
-                 <p style={{ color: '#718096', fontSize: '16px', margin: '0' }}>
-                   Grade student: <strong>{manualGradingStudent.student_name}</strong>
-                 </p>
-                 {manualGradingStudent.grade !== null && (
-                   <div style={{
-                     background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
-                     color: '#fff',
-                     padding: '8px 16px',
-                     borderRadius: '12px',
-                     margin: '8px 0',
-                     boxShadow: '0 4px 12px rgba(72, 187, 120, 0.3)',
-                     display: 'inline-block'
-                   }}>
-                     <span style={{ fontSize: '14px', fontWeight: '600' }}>
-                       Current Grade: {manualGradingStudent.grade}/{task?.points || 100}
-                     </span>
-                   </div>
-                 )}
-                                                      <p style={{ color: '#667eea', fontSize: '14px', margin: '8px 0 0 0', fontStyle: 'italic' }}>
-                     Perfect for face-to-face activities and manual assessment
-                   </p>
-                   {!acceptingSubmissions && (
-                     <div style={{
-                       background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
-                       color: '#d69e2e',
-                       padding: '8px 16px',
-                       borderRadius: '12px',
-                       margin: '8px 0',
-                       fontSize: '12px',
-                       fontWeight: '600',
-                       display: 'flex',
-                       alignItems: 'center',
-                       gap: 8
-                     }}>
-                       <i className="ni ni-lock-circle" />
-                       Note: New submissions are currently disabled. You can still grade existing work.
-                     </div>
-                   )}
-                                     {submissionIdStartsWith(manualGradingStudent.submission_id, 'assigned_') && (
-                     <div style={{
-                       background: 'linear-gradient(135deg, #fef5e7 0%, #fed7aa 100%)',
-                       color: '#d69e2e',
-                       padding: '8px 16px',
-                       borderRadius: '12px',
-                       margin: '8px 0',
-                       fontSize: '12px',
-                       fontWeight: '600'
-                     }}>
-                       📝 Face-to-Face Activity: Student assigned but no submission yet. Grading will create a manual submission record.
-                     </div>
-                   )}
-               </div>
-               
-               <div style={{ marginBottom: '24px' }}>
-                 <div style={{ marginBottom: '16px' }}>
-                   <label style={{ fontWeight: '600', fontSize: '14px', color: '#4a5568', marginBottom: '8px', display: 'block' }}>
-                     Score (out of {task?.points || 100})
-                   </label>
-                   <Input
-                     type="number"
-                     value={manualGradeInput}
-                     onChange={(e) => setManualGradeInput(e.target.value)}
-                     placeholder="Enter score"
-                     min="0"
-                     max={task?.points || 100}
-                     style={{
-                       borderRadius: '12px',
-                       border: '2px solid #e2e8f0',
-                       padding: '12px 16px',
-                       fontSize: '16px',
-                       fontWeight: '500'
-                     }}
-                   />
-                 </div>
-                 
-                 <div style={{ marginBottom: '16px' }}>
-                   <label style={{ fontWeight: '600', fontSize: '14px', color: '#4a5568', marginBottom: '8px', display: 'block' }}>
-                     Feedback (Optional)
-                   </label>
-                   <Input
-                     type="textarea"
-                     value={manualFeedbackInput}
-                     onChange={(e) => setManualFeedbackInput(e.target.value)}
-                     placeholder="Enter feedback for the student..."
-                     style={{
-                       borderRadius: '12px',
-                       border: '2px solid #e2e8f0',
-                       padding: '12px 16px',
-                       fontSize: '16px',
-                       fontWeight: '500',
-                       minHeight: '100px',
-                       resize: 'vertical'
-                     }}
-                   />
-                 </div>
-               </div>
-               
-               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                 <Button
-                   color="secondary"
-                   onClick={() => {
-                     setManualGradingModalOpen(false);
-                     setManualGradingStudent(null);
-                     setManualGradeInput("");
-                     setManualFeedbackInput("");
-                   }}
-                   style={{
-                     borderRadius: '12px',
-                     padding: '12px 24px',
-                     fontWeight: '600',
-                     fontSize: '14px',
-                     border: 'none',
-                     background: '#e2e8f0',
-                     color: '#4a5568'
-                   }}
-                 >
-                   Cancel
-                 </Button>
-                 <Button
-                   color="primary"
-                   onClick={handleManualGradeSubmit}
-                   disabled={!manualGradeInput || manualGradingLoading}
-                   style={{
-                     borderRadius: '12px',
-                     padding: '12px 24px',
-                     fontWeight: '600',
-                     fontSize: '14px',
-                     border: 'none',
-                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                     color: '#fff',
-                     boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
-                   }}
-                 >
-                   {manualGradingLoading ? (
-                     <>
-                       <Spinner size="sm" className="mr-2" />
-                       Saving...
-                     </>
-                   ) : (
-                     manualGradingStudent.grade !== null ? 'Update Grade' : 'Save Grade'
-                   )}
-                 </Button>
-               </div>
-             </ModalBody>
-           </Modal>
-         )}
-       </div>
+       )}
      </div>
-   );
- };
+   </div>
+ );
+};
 
 export default TaskDetail; 

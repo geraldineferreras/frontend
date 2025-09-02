@@ -281,7 +281,7 @@ const ClassroomDetailStudent = () => {
   const [studentAnnouncement, setStudentAnnouncement] = useState("");
   const [studentAnnouncements, setStudentAnnouncements] = useState([]);
   const [formExpanded, setFormExpanded] = useState(false);
-  const [allowComments, setAllowComments] = useState(true);
+
   const [announcementTitle, setAnnouncementTitle] = useState("");
   // Likes disabled on student stream
   // const [likedAnnouncements, setLikedAnnouncements] = useState({});
@@ -686,7 +686,7 @@ const ClassroomDetailStudent = () => {
         is_draft: 0,
         is_scheduled: 0,
         scheduled_at: "",
-        allow_comments: allowComments ? 1 : 0,
+
         attachment_type: attachments.length > 0 ? "file" : null,
         attachment_url: attachments.length > 0 ? attachments[0].url : "",
         // Smart notification logic: if selected students are specified, use them
@@ -713,7 +713,7 @@ const ClassroomDetailStudent = () => {
           isPinned: false,
           reactions: { like: 0, likedBy: [] },
           comments: [],
-          allowComments: allowComments,
+
           attachments: attachments
         };
 
@@ -727,7 +727,7 @@ const ClassroomDetailStudent = () => {
         // Reset form
         setStudentAnnouncement("");
         setAnnouncementTitle("");
-        setAllowComments(true);
+
         setFormExpanded(false);
         setAttachments([]);
         setEditingDraftId(null);
@@ -972,7 +972,7 @@ const ClassroomDetailStudent = () => {
               reactions: { like: item.like_count || 0, likedBy: [] },
               comments: [],
               attachments,
-              allowComments: true,
+
             };
           });
           console.log("Mapped announcements:", mapped);
@@ -1723,22 +1723,23 @@ const ClassroomDetailStudent = () => {
                 />
               </div>
             ) : (
-              <form onSubmit={handleStudentPostAnnouncement} style={{ marginBottom: 24, background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', padding: '1.5rem 1.5rem 1rem', border: '1.5px solid #e9ecef', maxWidth: '100%', position: 'relative' }}>
-                <button
-                  type="button"
-                  style={{ position: 'absolute', top: 18, right: 18, background: '#f7fafd', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 22, cursor: 'pointer', boxShadow: '0 1px 4px #e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                  title="Add people"
-                  onClick={() => { setTempSelectedStudents(selectedAnnouncementStudents); setShowStudentSelectModal(true); }}
-                >
-                  {selectedAnnouncementStudents.length > 0 && (
-                    <span style={{ background: '#e3eafe', color: '#324cdd', borderRadius: '50%', padding: '2px 8px', fontWeight: 700, fontSize: 13, minWidth: 18, minHeight: 18, textAlign: 'center', boxShadow: '0 2px 8px #324cdd11', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{selectedAnnouncementStudents.length}</span>
-                  )}
-                  <i className="fa fa-user-plus" />
-                </button>
-                <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-                  <input type="checkbox" id="allowComments" checked={allowComments} onChange={e => setAllowComments(e.target.checked)} style={{ marginRight: 8 }} />
-                  <label htmlFor="allowComments" style={{ fontWeight: 500, fontSize: 16, color: '#222', margin: 0 }}>Allow comments</label>
+              <form onSubmit={handleStudentPostAnnouncement} style={{ marginBottom: 24, background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd11', padding: '1.5rem 1.5rem 1rem', border: '1.5px solid #e9ecef', maxWidth: '100%' }}>
+                {/* Create announcement header */}
+                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontWeight: 600, fontSize: 16, color: '#222', margin: 0 }}>Create announcement</label>
+                  <button
+                    type="button"
+                    style={{ background: '#f7fafd', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 22, cursor: 'pointer', boxShadow: '0 1px 4px #e9ecef', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                    title="Add people"
+                    onClick={() => { setTempSelectedStudents(selectedAnnouncementStudents); setShowStudentSelectModal(true); }}
+                  >
+                    {selectedAnnouncementStudents.length > 0 && (
+                      <span style={{ background: '#e3eafe', color: '#324cdd', borderRadius: '50%', padding: '2px 8px', fontWeight: 700, fontSize: 13, minWidth: 18, minHeight: 18, textAlign: 'center', boxShadow: '0 2px 8px #324cdd11', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{selectedAnnouncementStudents.length}</span>
+                    )}
+                    <i className="fa fa-user-plus" />
+                  </button>
                 </div>
+
                 <input
                   type="text"
                   value={announcementTitle}
@@ -1909,7 +1910,7 @@ const ClassroomDetailStudent = () => {
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                  <button type="button" style={{ fontWeight: 500, borderRadius: 8, minWidth: 80, fontSize: 14, background: '#f7fafd', color: '#222', border: 'none', padding: '8px 14px', cursor: 'pointer', height: 32 }} onClick={() => { setFormExpanded(false); setStudentAnnouncement(""); setAnnouncementTitle(""); setAllowComments(true); setAttachments([]); }}>
+                  <button type="button" style={{ fontWeight: 500, borderRadius: 8, minWidth: 80, fontSize: 14, background: '#f7fafd', color: '#222', border: 'none', padding: '8px 14px', cursor: 'pointer', height: 32 }} onClick={() => { setFormExpanded(false); setStudentAnnouncement(""); setAnnouncementTitle(""); setAttachments([]); }}>
                     Cancel
                   </button>
                   
@@ -2047,46 +2048,9 @@ const ClassroomDetailStudent = () => {
                             onChange={e => setEditAnnouncementContent(e.target.value)}
                             style={{ width: '100%', fontSize: 15, borderRadius: 8, border: '1px solid #e0e0e0', padding: '12px', minHeight: 60, marginBottom: 12 }}
                           />
-                          {/* Add Attachment button */}
-                          <div style={{ marginBottom: 12, position: 'relative', display: 'inline-block' }}>
-                            <button
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: 'none', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '10px 18px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}
-                              onClick={() => setAttachmentDropdownOpenId(announcement.id)}
-                              type="button"
-                            >
-                              <i className="fa fa-paperclip" style={{ fontSize: 18 }} /> Add Attachment
-                            </button>
-                            {attachmentDropdownOpenId === announcement.id && (
-                              <div ref={attachmentMenuRef} style={{ position: 'absolute', top: 48, left: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '10px 0', minWidth: 180, zIndex: 20 }}>
-                                <div style={{ padding: '10px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => handleAttachmentOption('file')}>
-                                  <i className="fa fa-file" style={{ fontSize: 18 }} /> File
-                                </div>
-                                <div style={{ padding: '10px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => handleAttachmentOption('link')}>
-                                  <i className="fa fa-globe" style={{ fontSize: 18 }} /> Link
-                                </div>
-                                <div style={{ padding: '10px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => handleAttachmentOption('youtube')}>
-                                  <i className="fa fa-youtube-play" style={{ fontSize: 18, color: '#f00' }} /> YouTube
-                                </div>
-                                <div style={{ padding: '10px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => handleAttachmentOption('drive')}>
-                                  <i className="fa fa-cloud-upload" style={{ fontSize: 18 }} /> Google Drive
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          {/* Allow comments checkbox */}
-                          <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
-                            <input type="checkbox" id={`allowComments-edit-${announcement.id}`} checked={allowComments} onChange={e => setAllowComments(e.target.checked)} style={{ marginRight: 8 }} />
-                            <label htmlFor={`allowComments-edit-${announcement.id}`} style={{ fontWeight: 500, color: '#222', margin: 0 }}>Allow comments</label>
-                          </div>
-                          {/* Who can view this announcement */}
-                          <div style={{ marginBottom: 18 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#222', marginBottom: 6 }}>
-                              <i className="fa fa-user" style={{ fontSize: 18 }} /> Who can view this announcement?
-                            </div>
-                            <button style={{ background: '#bfc5cc', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 18px', fontWeight: 600, fontSize: 15, cursor: 'pointer', opacity: 0.8 }}>
-                              + Select students
-                            </button>
-                          </div>
+
+
+
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                             <button onClick={handleEditCancel} style={{ background: '#f7fafd', color: '#222', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
                             <button onClick={() => handleEditSave(announcement)} style={{ background: '#2ecc71', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 600, cursor: 'pointer' }}>Save</button>
@@ -2226,7 +2190,7 @@ const ClassroomDetailStudent = () => {
                           </div>
                         )}
                         {/* Comments Section */}
-                        {announcement.allowComments !== false ? (
+
                           <div style={{ background: '#f7fafd', borderRadius: 10, padding: '12px 18px', marginTop: 10 }}>
                             <div
                               style={{ fontWeight: 600, fontSize: 15, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
@@ -2408,11 +2372,7 @@ const ClassroomDetailStudent = () => {
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <div style={{ background: '#f7fafd', borderRadius: 10, padding: '12px 18px', marginTop: 10, color: '#888', fontWeight: 500 }}>
-                            Comments are disabled for this post.
-                          </div>
-                        )}
+
                       </>
                     )}
                   </div>
@@ -3574,19 +3534,33 @@ const ClassroomDetailStudent = () => {
                             const bgColor = getAvatarColor(s);
                             const initials = getUserInitials(s);
                             return (
-                              <div style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #e9ecef' }}>
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', marginRight: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #e9ecef', position: 'relative' }}>
                                 {avatarUrl ? (
                                   <img
                                     src={avatarUrl}
                                     alt={s.name}
-                                    style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                     onError={(e) => {
                                       e.target.style.display = 'none';
-                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      const fallback = e.target.nextSibling;
+                                      if (fallback) {
+                                        fallback.style.display = 'flex';
+                                        fallback.style.background = bgColor;
+                                      }
                                     }}
                                   />
                                 ) : null}
-                                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                <span style={{ 
+                                  display: avatarUrl ? 'none' : 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  width: '100%', 
+                                  height: '100%',
+                                  background: bgColor,
+                                  color: '#fff',
+                                  fontSize: 12,
+                                  fontWeight: 700
+                                }}>{initials}</span>
                               </div>
                             );
                           })()}
@@ -3616,9 +3590,9 @@ const ClassroomDetailStudent = () => {
                   )}
                 </div>
                 {/* Selected students pills in modal */}
-                <div style={{ minHeight: 50, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, alignItems: tempSelectedStudents.length === 0 ? 'center' : 'flex-start', justifyContent: 'center', background: '#f7f8fa', borderRadius: 8, padding: 8, border: '1px solid #e9ecef', marginTop: 12 }}>
+                <div style={{ minHeight: 50, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: tempSelectedStudents.length === 0 ? 'center' : 'flex-start', justifyContent: 'flex-start', background: '#f7f8fa', borderRadius: 8, padding: 8, border: '1px solid #e9ecef', marginTop: 12 }}>
                   {tempSelectedStudents.length === 0 ? (
-                    <div style={{ width: '100%', height: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#b0b7c3', fontSize: 11, minHeight: 30, textAlign: 'center', gridColumn: '1 / -1', margin: '0 auto' }}>
+                    <div style={{ width: '100%', height: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#b0b7c3', fontSize: 11, minHeight: 30, textAlign: 'center', margin: '0 auto' }}>
                       <i className="fa fa-user-plus" style={{ marginBottom: 2 }} />
                       <div style={{ fontSize: 11, fontWeight: 500 }}>No students selected</div>
                     </div>
@@ -3626,40 +3600,55 @@ const ClassroomDetailStudent = () => {
                     tempSelectedStudents.map(name => {
                       const s = classroomMembers.find(stu => stu.name === name);
                       return s ? (
-                        <span key={name} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 9, padding: '1px 6px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 22 }}>
+                        <span key={name} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 12, padding: '4px 8px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 28, maxWidth: '100%', flexShrink: 0 }}>
                           {(() => {
                             const avatarUrl = getAvatarForUser(s);
                             const bgColor = getAvatarColor(s);
                             const initials = getUserInitials(s);
                             return (
-                              <div style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 8 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: '50%', marginRight: 6, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 9, position: 'relative', flexShrink: 0 }}>
                                 {avatarUrl ? (
                                   <img
                                     src={avatarUrl}
                                     alt={s.name}
-                                    style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                     onError={(e) => {
                                       e.target.style.display = 'none';
-                                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                      const fallback = e.target.nextSibling;
+                                      if (fallback) {
+                                        fallback.style.display = 'flex';
+                                        fallback.style.background = bgColor;
+                                      }
                                     }}
                                   />
                                 ) : null}
-                                <span style={{ display: avatarUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{initials}</span>
+                                <span style={{ 
+                                  display: avatarUrl ? 'none' : 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  width: '100%', 
+                                  height: '100%',
+                                  background: bgColor,
+                                  color: '#fff',
+                                  fontSize: 9,
+                                  fontWeight: 700
+                                }}>{initials}</span>
                               </div>
                             );
                           })()}
-                          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 5, lineHeight: 1.1 }}>
-                            <span style={{ fontWeight: 600, fontSize: 10, color: '#2d3748', textTransform: 'none' }}>{s.name}</span>
-                            <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9 }}>
+                          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 6, lineHeight: 1.1, minWidth: 0, flex: 1 }}>
+                            <span style={{ fontWeight: 600, fontSize: 11, color: '#2d3748', textTransform: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{s.name}</span>
+                            <span style={{ color: '#7b8a9b', fontWeight: 400, fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                               {s.email || ''} {s.role === 'teacher' && <span style={{ color: '#6366f1', fontWeight: 600, fontSize: 8 }}>(Teacher)</span>}
                             </span>
                           </span>
-                          <span style={{ flex: 1 }} />
-                          <i
-                            className="fa fa-times-circle"
-                            style={{ marginLeft: 2, cursor: 'pointer', color: '#7b8a9b', fontSize: 11 }}
+                          <button
+                            type="button"
                             onClick={e => { e.stopPropagation(); setTempSelectedStudents(prev => prev.filter(n => n !== name)); }}
-                          />
+                            style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 0, marginLeft: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', fontSize: 12, flexShrink: 0 }}
+                          >
+                            ×
+                          </button>
                         </span>
                       ) : null;
                     })
@@ -3697,13 +3686,13 @@ const ClassroomDetailStudent = () => {
                     isPinned: false,
                     reactions: { like: 0, likedBy: [] },
                     comments: [],
-                    allowComments: allowComments,
+          
                     attachments: attachments
                   };
                   setScheduledAnnouncements([newAnn, ...scheduledAnnouncements]);
                   setStudentAnnouncement("");
                   setAnnouncementTitle("");
-                  setAllowComments(true);
+          
                   setFormExpanded(false);
                   setAttachments([]);
                   setShowScheduleModal(false);

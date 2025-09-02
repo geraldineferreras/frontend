@@ -48,8 +48,7 @@ import "./Classroom.css";
 import apiService from "../../services/api";
 import { FaEllipsisV, FaClipboardList, FaQuestionCircle, FaBook, FaRedo, FaFolder, FaPlus, FaPaperclip, FaSmile, FaRegThumbsUp, FaThumbsUp, FaUserPlus, FaRegFileAlt, FaCheck, FaTimes, FaSearch, FaRegCalendarAlt, FaTrash, FaCamera } from 'react-icons/fa';
 import userDefault from '../../assets/img/theme/user-default.svg';
-import Cropper from 'react-easy-crop';
-import getCroppedImg from './utils/cropImage'; // We'll add this helper next
+
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from '../../utils/profilePictureUtils';
@@ -1109,8 +1108,7 @@ const ClassroomDetail = () => {
   // 1. Add state for the new announcement title
   const [newAnnouncementTitle, setNewAnnouncementTitle] = useState("");
 
-  // 1. Add state for allowComments in the creation form
-  const [allowComments, setAllowComments] = useState(true);
+
 
   // 2. Add state for modal and selected students
   const [showStudentSelectModal, setShowStudentSelectModal] = useState(false);
@@ -1462,7 +1460,7 @@ const ClassroomDetail = () => {
     text: '',
     dueDate: '',
     points: '',
-    allowComments: true,
+
     attachments: [],
     visibleTo: [],
     postToClassrooms: ['current'],
@@ -2076,7 +2074,7 @@ useEffect(() => {
       is_draft: 0,
       is_scheduled: 0,
       scheduled_at: '',
-      allow_comments: allowComments ? 1 : 0,
+      allow_comments: 1,
       // TODO: student_ids support will be added when new backend endpoints are ready
       // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
       //   ? selectedAnnouncementStudents
@@ -2183,7 +2181,7 @@ useEffect(() => {
       is_draft: 1,
       is_scheduled: 0,
       scheduled_at: '',
-      allow_comments: allowComments ? 1 : 0,
+      allow_comments: 1,
       // TODO: student_ids support will be added when new backend endpoints are ready
       // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
       //   ? selectedAnnouncementStudents
@@ -2258,7 +2256,7 @@ useEffect(() => {
       is_draft: 0,
       is_scheduled: 1,
       scheduled_at: scheduledDateTime,
-      allow_comments: allowComments ? 1 : 0,
+      allow_comments: 1,
       // TODO: student_ids support will be added when new backend endpoints are ready
       // student_ids: (selectedAnnouncementStudents && selectedAnnouncementStudents.length > 0)
       //   ? selectedAnnouncementStudents
@@ -2382,7 +2380,7 @@ useEffect(() => {
       // Populate the form with draft data
       setNewAnnouncementTitle(draft.title || '');
       setNewAnnouncement(draft.content || draft.text || '');
-      setAllowComments(draft.allowComments || false);
+
       setAttachments(draft.attachments || []);
       
       // TODO: Student targeting - will be re-enabled when backend supports student_ids
@@ -2411,7 +2409,7 @@ useEffect(() => {
       // Populate the form with draft data
       setNewAnnouncementTitle(draft.title || '');
       setNewAnnouncement(draft.content || draft.text || '');
-      setAllowComments(draft.allowComments || false);
+
       setAttachments(draft.attachments || []);
       
       // TODO: Student targeting - will be re-enabled when backend supports student_ids
@@ -2740,7 +2738,7 @@ useEffect(() => {
           content: draft.content || draft.text || '',
           lastEdited: draft.created_at || draft.updated_at || new Date().toISOString(),
           attachments: draft.attachments || [],
-          allowComments: draft.allow_comments === 1,
+
           studentIds: draft.student_ids ? JSON.parse(draft.student_ids) : [],
           api_response: draft
         }));
@@ -2761,7 +2759,7 @@ useEffect(() => {
           },
           lastEdited: scheduled.created_at || scheduled.updated_at || new Date().toISOString(),
           attachments: scheduled.attachments || [],
-          allowComments: scheduled.allow_comments === 1,
+
           studentIds: scheduled.student_ids ? JSON.parse(scheduled.student_ids) : [],
           api_response: scheduled
         }));
@@ -3080,7 +3078,7 @@ useEffect(() => {
               type: draft.type,
               points: draft.points,
               dueDate: draft.due_date,
-              allowComments: draft.allow_comments,
+
               lastEdited: draft.created_at,
               attachments: draft.attachment_url ? [{ 
                 url: draft.attachment_url, 
@@ -3114,7 +3112,7 @@ useEffect(() => {
               type: task.type,
               points: task.points,
               dueDate: task.due_date,
-              allowComments: task.allow_comments,
+
               scheduledFor: task.scheduled_at,
               lastEdited: task.created_at,
               attachments: task.attachment_url ? [{ 
@@ -3168,61 +3166,9 @@ useEffect(() => {
     setShowThemeModal(false);
   };
 
-  const handleUploadPhoto = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new window.Image();
-        img.onload = () => {
-          // Resize if too large
-          const maxDim = 2000;
-          let { width, height } = img;
-          if (width > maxDim || height > maxDim) {
-            const scale = Math.min(maxDim / width, maxDim / height);
-            width = Math.round(width * scale);
-            height = Math.round(height * scale);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const safeDataUrl = canvas.toDataURL('image/png');
-          setCropImage(safeDataUrl);
-          setCropModalOpen(true);
-        };
-        img.onerror = () => {
-          alert('Failed to load image for re-encoding.');
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const onCropComplete = (croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  };
 
-  const handleCropSave = async () => {
-    if (!croppedAreaPixels) {
-      alert('Crop area not set. Please move or resize the crop box.');
-      return;
-    }
-    try {
-      console.log('Cropping with:', { cropImage, croppedAreaPixels });
-      const croppedImg = await getCroppedImg(cropImage, croppedAreaPixels);
-      // Save croppedImg as custom photo (base64)
-      setShowThemeModal(false);
-      setCropModalOpen(false);
-      setCropImage(null);
-      // Set as selected theme (simulate upload)
-      handleSelectTheme(croppedImg);
-    } catch (e) {
-      alert('Failed to crop image');
-    }
-  };
+
 
   const handleAddAttachment = (type) => {
     if (type === "Google Drive") {
@@ -3376,7 +3322,7 @@ useEffect(() => {
             year: selectedYear,
             audience: selectedAudience,
             visibleTo: selectedAnnouncementStudents,
-            allowComments: allowComments,
+
             scheduledFor: {
               date: scheduleDate,
               time: scheduleTime
@@ -3387,7 +3333,7 @@ useEffect(() => {
               originalFormData: {
                 title: newAnnouncementTitle,
                 content: newAnnouncement,
-                allowComments: allowComments,
+    
                 attachments: attachments,
                 selectedStudents: selectedAnnouncementStudents
               }
@@ -3440,7 +3386,7 @@ useEffect(() => {
         year: scheduledPost.year,
         audience: scheduledPost.audience,
         visibleTo: scheduledPost.visibleTo || [],
-        allowComments: true, // Default to allowing comments
+     // Default to allowing comments
         // Include any additional metadata from the scheduled post
         ...(scheduledPost.metadata && { metadata: scheduledPost.metadata })
       };
@@ -3467,10 +3413,7 @@ useEffect(() => {
       // const studentIds = scheduledPost.studentIds || scheduledPost.visible_to_student_ids || scheduledPost.visibleTo || [];
       // setSelectedAnnouncementStudents(Array.isArray(studentIds) ? studentIds : []);
       
-      // Restore allow comments setting if available
-      if (scheduledPost.allowComments !== undefined) {
-        setAllowComments(scheduledPost.allowComments);
-      }
+
       
       // Remove from scheduled posts and open form
       setScheduledPosts(prev => prev.filter((_, i) => i !== idx));
@@ -3787,7 +3730,7 @@ useEffect(() => {
       title: ann.title, 
       content: ann.content, 
       attachments: ann.attachments ? [...ann.attachments] : [],
-      allowComments: ann.allowComments,
+      
     });
     // No longer setting selected students - functionality removed
   };
@@ -3803,7 +3746,7 @@ useEffect(() => {
       const updateData = {
         title: editAnnouncementData.title,
         content: editAnnouncementData.content,
-        allow_comments: editAnnouncementData.allowComments ? 1 : 0
+        allow_comments: 1
       };
 
       // Call the API to update the stream post
@@ -3815,7 +3758,7 @@ useEffect(() => {
           ...a, 
           title: response.data.title, 
           content: response.data.content,
-          allowComments: response.data.allow_comments === 1,
+
           updated_at: response.data.updated_at
         } : a));
         
@@ -3824,7 +3767,7 @@ useEffect(() => {
         
         // Reset edit state
         setEditingAnnouncementId(null);
-        setEditAnnouncementData({ title: '', content: '', attachments: [], allowComments: true });
+        setEditAnnouncementData({ title: '', content: '', attachments: [] });
         // No longer resetting selected students
       } else {
         // Show error message
@@ -3838,7 +3781,7 @@ useEffect(() => {
 
   const handleCancelEditAnnouncement = () => {
     setEditingAnnouncementId(null);
-    setEditAnnouncementData({ title: '', content: '', attachments: [], allowComments: true });
+    setEditAnnouncementData({ title: '', content: '', attachments: [] });
     // No longer resetting selected students
   };
 
@@ -4349,8 +4292,12 @@ useEffect(() => {
   // Load available students for task assignment
   const loadAvailableStudents = async (classCodes) => {
     try {
+      console.log('Loading available students for class codes:', classCodes);
+      setLoadingUsers(true);
       const response = await apiService.getAvailableStudents(classCodes);
-      if (response.status) {
+      console.log('Available students API response:', response);
+      
+      if (response.status && response.data && response.data.length > 0) {
         // Transform the API response to match the expected format
         const availableStudents = response.data.map(student => ({
           id: student.student_id,
@@ -4358,45 +4305,44 @@ useEffect(() => {
           email: student.email,
           profile_pic: student.profile_pic,
           student_num: student.student_num,
-          class_code: student.class_code,
-          filtered: true
+          class_code: student.class_code
         }));
-        setStudents(availableStudents);
+        console.log('Transformed available students:', availableStudents);
+        setAvailableUsers(availableStudents);
+      } else {
+        console.log('No students from API, using current classroom students as fallback');
+        // Fallback to current classroom students
+        const fallbackStudents = students.map(student => ({
+          id: student.id,
+          name: student.name || student.full_name,
+          email: student.email,
+          profile_pic: student.profile_pic,
+          student_num: student.student_num,
+          class_code: code // Current classroom code
+        }));
+        console.log('Fallback students:', fallbackStudents);
+        setAvailableUsers(fallbackStudents);
       }
     } catch (error) {
       console.error('Error loading available students:', error);
-      // Fallback to current students if API fails
-      setStudents(prevStudents => prevStudents.map(student => ({
-        ...student,
-        filtered: true
-      })));
+      console.log('Using current classroom students as fallback due to error');
+      // Fallback to current classroom students
+      const fallbackStudents = students.map(student => ({
+        id: student.id,
+        name: student.name || student.full_name,
+        email: student.email,
+        profile_pic: student.profile_pic,
+        student_num: student.student_num,
+        class_code: code // Current classroom code
+      }));
+      setAvailableUsers(fallbackStudents);
+    } finally {
+      setLoadingUsers(false);
     }
   };
-  // Add state for cropping modal
-  const [cropModalOpen, setCropModalOpen] = useState(false);
-  const [cropImage, setCropImage] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [minZoom, setMinZoom] = useState(1);
 
-  useEffect(() => {
-    if (!cropImage) return;
-    const img = new window.Image();
-    img.onload = () => {
-      // Calculate the minimum zoom so the crop area never exceeds the image
-      const aspect = 3.5 / 1; // or your aspect ratio
-      const imgAspect = img.width / img.height;
-      let minZoomValue = 1;
-      if (imgAspect > aspect) {
-        minZoomValue = aspect / imgAspect;
-      } else {
-        minZoomValue = imgAspect / aspect;
-      }
-      setMinZoom(Math.max(1, minZoomValue));
-    };
-    img.src = cropImage;
-  }, [cropImage]);
+
+
 
   const [pillRemoveHoverId, setPillRemoveHoverId] = useState(null);
 
@@ -4415,7 +4361,7 @@ useEffect(() => {
             text: taskForm.text || '',
             dueDate: taskForm.dueDate || '',
             points: taskForm.points || '',
-            allowComments: taskForm.allowComments,
+
             attachments: taskAttachments,
             assignedStudents: taskAssignedStudents,
             scheduledFor: {
@@ -4431,7 +4377,7 @@ useEffect(() => {
           text: '',
           dueDate: '',
           points: '',
-          allowComments: true,
+      
           attachments: [],
           visibleTo: [],
           submitted: false
@@ -4521,7 +4467,7 @@ useEffect(() => {
             year: item.year,
             audience: item.audience,
             visibleTo: item.visibleTo || [],
-            allowComments: item.allowComments !== undefined ? item.allowComments : true
+
           };
           setAnnouncements(prev => [newAnnouncement, ...prev]);
         });
@@ -4576,7 +4522,7 @@ useEffect(() => {
             text: item.text,
             dueDate: item.dueDate,
             points: item.points,
-            allowComments: item.allowComments,
+
             attachments: item.attachments || [],
             assignedStudents: item.assignedStudents || [],
             author: item.author || currentUserName,
@@ -5149,28 +5095,31 @@ useEffect(() => {
       console.log('Assigned students:', taskAssignedStudents);
       console.log('Students data:', students);
       
-      // Prepare task data with student assignment fields
+      // Prepare task data with student assignment fields - matching the endpoint format
       const taskData = {
         title: taskForm.title.trim(),
         type: mapTaskTypeToBackend(taskForm.type),
         points: parseInt(taskForm.points),
         instructions: taskForm.text.trim(),
-        class_codes: classCodes, // Use all selected classroom codes
-        allow_comments: taskForm.allowComments,
+        class_codes: classCodes, // Array of classroom codes
+        assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
+        assigned_students: taskAssignedStudents.length > 0 ? taskAssignedStudents.map(studentId => {
+          // Find the student to get their details
+          const student = students.find(s => s.id === studentId);
+          // For each student, we need to assign them to the appropriate class_code
+          // If they're in multiple selected classrooms, we need to create entries for each
+          return classCodes.map(classCode => ({
+            student_id: studentId,
+            class_code: classCode
+          }));
+        }).flat() : [], // Flatten the array since we're creating multiple entries per student
+        allow_comments: true,
         is_draft: false,
         is_scheduled: false,
         scheduled_at: null,
         due_date: formatDueDate(taskForm.dueDate),
         attachment_type: taskAttachments.length > 0 ? 'file' : null,
-        attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null,
-        assignment_type: taskAssignedStudents.length > 0 ? 'individual' : 'classroom',
-        assigned_students: taskAssignedStudents.length > 0 ? taskAssignedStudents.map(studentId => {
-          const student = students.find(s => s.id === studentId);
-          return {
-            student_id: studentId,
-            class_code: code // Current classroom code
-          };
-        }) : []
+        attachment_url: taskAttachments.length > 0 ? taskAttachments[0].name : null
       };
       
       console.log('🐛 DEBUG - Creating task with data:', taskData);
@@ -5189,14 +5138,16 @@ useEffect(() => {
           // All three types - use FormData with mixed attachments
           const formData = new FormData();
           
-          // Add all task data fields
+          // Add all task data fields - ensure arrays are properly serialized
           Object.keys(taskData).forEach(key => {
             if (key === 'class_codes' || key === 'assigned_students') {
               formData.append(key, JSON.stringify(taskData[key]));
             } else if (typeof taskData[key] === 'boolean') {
               formData.append(key, taskData[key] ? '1' : '0');
+            } else if (taskData[key] === null || taskData[key] === undefined) {
+              formData.append(key, '');
             } else {
-              formData.append(key, taskData[key] || '');
+              formData.append(key, taskData[key]);
             }
           });
           
@@ -5229,14 +5180,16 @@ useEffect(() => {
           // Files and links only
           const formData = new FormData();
           
-          // Add all task data fields
+          // Add all task data fields - ensure arrays are properly serialized
           Object.keys(taskData).forEach(key => {
             if (key === 'class_codes' || key === 'assigned_students') {
               formData.append(key, JSON.stringify(taskData[key]));
             } else if (typeof taskData[key] === 'boolean') {
               formData.append(key, taskData[key] ? '1' : '0');
+            } else if (taskData[key] === null || taskData[key] === undefined) {
+              formData.append(key, '');
             } else {
-              formData.append(key, taskData[key] || '');
+              formData.append(key, taskData[key]);
             }
           });
           
@@ -5266,14 +5219,16 @@ useEffect(() => {
           // Files and external links only
           const formData = new FormData();
           
-          // Add all task data fields
+          // Add all task data fields - ensure arrays are properly serialized
           Object.keys(taskData).forEach(key => {
             if (key === 'class_codes' || key === 'assigned_students') {
               formData.append(key, JSON.stringify(taskData[key]));
             } else if (typeof taskData[key] === 'boolean') {
               formData.append(key, taskData[key] ? '1' : '0');
+            } else if (taskData[key] === null || taskData[key] === undefined) {
+              formData.append(key, '');
             } else {
-              formData.append(key, taskData[key] || '');
+              formData.append(key, taskData[key]);
             }
           });
           
@@ -5292,14 +5247,16 @@ useEffect(() => {
           // Links and external links only
           const formData = new FormData();
           
-          // Add all task data fields
+          // Add all task data fields - ensure arrays are properly serialized
           Object.keys(taskData).forEach(key => {
             if (key === 'class_codes' || key === 'assigned_students') {
               formData.append(key, JSON.stringify(taskData[key]));
             } else if (typeof taskData[key] === 'boolean') {
               formData.append(key, taskData[key] ? '1' : '0');
+            } else if (taskData[key] === null || taskData[key] === undefined) {
+              formData.append(key, '');
             } else {
-              formData.append(key, taskData[key] || '');
+              formData.append(key, taskData[key]);
             }
           });
           
@@ -5330,14 +5287,16 @@ useEffect(() => {
           // Links only - use FormData with link attachments
           const formData = new FormData();
           
-          // Add all task data fields
+          // Add all task data fields - ensure arrays are properly serialized
           Object.keys(taskData).forEach(key => {
             if (key === 'class_codes' || key === 'assigned_students') {
               formData.append(key, JSON.stringify(taskData[key]));
             } else if (typeof taskData[key] === 'boolean') {
               formData.append(key, taskData[key] ? '1' : '0');
+            } else if (taskData[key] === null || taskData[key] === undefined) {
+              formData.append(key, '');
             } else {
-              formData.append(key, taskData[key] || '');
+              formData.append(key, taskData[key]);
             }
           });
           
@@ -5362,8 +5321,10 @@ useEffect(() => {
           response = await apiService.createTaskWithExternalLinks(taskData, taskExternalLinks);
         }
       } else {
-        // No attachments, send as JSON
+        // No attachments, send as JSON - ensure proper format for endpoint
         console.log('Sending JSON data:', taskData);
+        console.log('Class codes being sent:', taskData.class_codes);
+        console.log('Assigned students being sent:', taskData.assigned_students);
         response = await apiService.createTask(taskData);
       }
       
@@ -5423,7 +5384,7 @@ useEffect(() => {
           text: '',
           dueDate: '',
           points: '',
-          allowComments: true,
+      
           attachments: [],
           visibleTo: [],
           postToClassrooms: ['current'],
@@ -5471,7 +5432,7 @@ useEffect(() => {
             class_code: code // Current classroom code
           };
         }) : [],
-        allow_comments: taskForm.allowComments,
+        allow_comments: 1,
         is_draft: true, // This is a draft
         is_scheduled: false,
         scheduled_at: null,
@@ -5554,7 +5515,7 @@ useEffect(() => {
           text: '',
           dueDate: '',
           points: '',
-          allowComments: true,
+      
           attachments: [],
           visibleTo: [],
           postToClassrooms: ['current'],
@@ -5623,7 +5584,7 @@ useEffect(() => {
             class_code: code // Current classroom code
           };
         }) : [],
-        allow_comments: taskForm.allowComments,
+        allow_comments: 1,
         is_draft: false, // This is scheduled, not a draft
         is_scheduled: true, // This is scheduled
         scheduled_at: scheduledDateTime,
@@ -5698,7 +5659,7 @@ useEffect(() => {
           text: '',
           dueDate: '',
           points: '',
-          allowComments: true,
+      
           attachments: [],
           visibleTo: [],
           postToClassrooms: ['current'],
@@ -5741,7 +5702,7 @@ useEffect(() => {
       text: '',
       dueDate: '',
       points: '',
-      allowComments: true,
+  
       attachments: [],
       visibleTo: [],
       postToClassrooms: ['current'],
@@ -5901,7 +5862,7 @@ useEffect(() => {
     text: '',
     dueDate: '',
     points: '',
-    allowComments: true,
+
     attachments: [],
     visibleTo: [],
     postToClassrooms: ['current'],
@@ -5955,7 +5916,7 @@ useEffect(() => {
         text: task.instructions || task.text || '',
         dueDate: formattedDueDate,
         points: task.points || '',
-        allowComments: task.allow_comments || task.allowComments || true,
+
         attachments: [],
         visibleTo: [],
         postToClassrooms: classCodes,
@@ -5994,7 +5955,7 @@ useEffect(() => {
         text: task.instructions,
         dueDate: formattedDueDate,
         points: task.points,
-        allowComments: task.allow_comments
+
       });
     } else {
       console.error('Task not found for editing:', taskId);
@@ -6036,7 +5997,7 @@ useEffect(() => {
         points: parseInt(editTaskForm.points),
         instructions: editTaskForm.text.trim(),
         class_codes: classCodes,
-        allow_comments: editTaskForm.allowComments,
+        allow_comments: 1,
         due_date: formattedDueDate,
         attachment_type: editTaskAttachments.length > 0 ? 'file' : null,
         attachment_url: editTaskAttachments.length > 0 ? editTaskAttachments[0].name : null
@@ -6124,7 +6085,7 @@ useEffect(() => {
           text: '',
           dueDate: '',
           points: '',
-          allowComments: true,
+      
           attachments: [],
           visibleTo: [],
           postToClassrooms: ['current'],
@@ -6153,7 +6114,7 @@ useEffect(() => {
       text: '',
       dueDate: '',
       points: '',
-      allowComments: true,
+  
       attachments: [],
       visibleTo: [],
       postToClassrooms: ['current'],
@@ -6445,14 +6406,7 @@ useEffect(() => {
             >
               Select theme
             </Button>
-            <Button 
-              color="link" 
-              style={{ color: '#fff', fontWeight: 400, fontSize: 13, padding: 0, textDecoration: 'none' }} 
-              onClick={() => fileInputRef.current && fileInputRef.current.click()}
-            >
-              Upload photo
-            </Button>
-            <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleUploadPhoto} />
+
           </div>
           <svg viewBox="0 0 1440 60" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 60 }} xmlns="http://www.w3.org/2000/svg">
             <path fill="#fff" fillOpacity="1" d="M0,32L48,37.3C96,43,192,53,288,49.3C384,45,480,27,576,21.3C672,16,768,32,864,37.3C960,43,1056,27,1152,21.3C1248,16,1344,32,1392,40.7L1440,48L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
@@ -7058,22 +7012,7 @@ useEffect(() => {
                       </div>
                       
                       {/* Debug: Show draft tracking info */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <div style={{ 
-                          background: '#f0f8ff', 
-                          border: '1px solid #b0d4f1', 
-                          borderRadius: '4px', 
-                          padding: '8px 12px', 
-                          marginBottom: '16px', 
-                          fontSize: '12px', 
-                          color: '#0066cc' 
-                        }}>
-                          <strong>Debug Info:</strong> 
-                          Current Draft ID: {currentDraftId || 'None'}, 
-                          Total Drafts: {drafts.length}, 
-                          Draft IDs: [{drafts.map(d => d.id).join(', ')}]
-                        </div>
-                      )}
+
                       {drafts.length === 0 ? (
                         <div style={{ color: '#888' }}>No drafts saved.</div>
                       ) : (
@@ -7211,54 +7150,53 @@ useEffect(() => {
                   )}
                   {/* Expanded announcement form */}
                   {formExpanded && (
-                    <div ref={formExpandedRef} className="post-form-container" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd22', padding: 24, marginBottom: 0, width: '100%', position: 'relative', zIndex: 10, minHeight: 220 }}>
-                      {/* Add Users button floating in upper right of the card */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          console.log('Opening Add Students modal');
-                          console.log('Current students state:', students);
-                          console.log('Current availableUsers state:', availableUsers);
-                          setShowAddUsersModal(true);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: 12,
-                          right: 12,
-                          background: '#f7fafd',
-                          border: 'none',
-                          borderRadius: 10,
-                          width: 54,
-                          height: 32,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 1px 4px #e9ecef',
-                          cursor: 'pointer',
-                          padding: 0,
-                          zIndex: 20,
-                          gap: 6
-                        }}
-                        aria-label="Add Students"
-                      >
-                        {selectedUsers.length > 0 && (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: 26,
-                            height: 26,
-                            borderRadius: '50%',
-                            background: '#e3eafe',
-                            color: '#324cdd',
-                            fontWeight: 600,
-                            fontSize: 15,
-                            marginRight: 2
-                          }}>{selectedUsers.length}</span>
-                        )}
-                        <i className="fa fa-user-plus" style={{ fontSize: 20, color: '#111' }}></i>
-                      </button>
+                    <div ref={formExpandedRef} className="post-form-container" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #324cdd22', padding: 24, marginBottom: 0, width: '100%', zIndex: 10, minHeight: 220 }}>
                       <form ref={postFormRef} onSubmit={handlePostAnnouncement} style={{ position: 'relative' }}>
+                        {/* Create announcement header */}
+                        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontWeight: 600, fontSize: 16, color: '#222', margin: 0 }}>Create announcement</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              console.log('Opening Add Students modal');
+                              console.log('Current students state:', students);
+                              console.log('Current availableUsers state:', availableUsers);
+                              setShowAddUsersModal(true);
+                            }}
+                            style={{
+                              background: '#f7fafd',
+                              border: 'none',
+                              borderRadius: 10,
+                              width: 54,
+                              height: 32,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 1px 4px #e9ecef',
+                              cursor: 'pointer',
+                              padding: 0,
+                              gap: 6
+                            }}
+                            aria-label="Add Students"
+                          >
+                            {selectedUsers.length > 0 && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 26,
+                                height: 26,
+                                borderRadius: '50%',
+                                background: '#e3eafe',
+                                color: '#324cdd',
+                                fontWeight: 600,
+                                fontSize: 15,
+                                marginRight: 2
+                              }}>{selectedUsers.length}</span>
+                            )}
+                            <i className="fa fa-user-plus" style={{ fontSize: 20, color: '#111' }}></i>
+                          </button>
+                        </div>
                         {/* Debug: Show current draft ID */}
                         {process.env.NODE_ENV === 'development' && currentDraftId && (
                           <div style={{ 
@@ -7278,16 +7216,7 @@ useEffect(() => {
                           </div>
                         )}
                         
-                        {/* Allow comments checkbox */}
-                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-                          <input
-                            type="checkbox"
-                            checked={allowComments}
-                            onChange={e => setAllowComments(e.target.checked)}
-                            style={{ marginRight: 8 }}
-                          />
-                          <span style={{ fontSize: 15, color: '#444', fontWeight: 500 }}>Allow comments</span>
-                        </div>
+
                         {/* Title input */}
                         <input
                           type="text"
@@ -7507,7 +7436,7 @@ useEffect(() => {
                               </div>
                             )}
                         {/* Action buttons */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 18, position: 'absolute', bottom: 0, right: 0, marginLeft: 'auto' }}>
                           <button
                             type="button"
                             onClick={() => { 
@@ -7762,7 +7691,7 @@ useEffect(() => {
                                         title: announcement.title,
                                         content: announcement.content,
                                         attachments: announcement.attachments ? [...announcement.attachments] : [],
-                                        allowComments: announcement.allowComments,
+
                                       });
                                       // No longer setting selected students
                                       setAnnouncementDropdowns({});
@@ -7854,19 +7783,7 @@ useEffect(() => {
                               }}
                               style={{ marginBottom: 16 }}
                             >
-                              {/* Allow comments at the top */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                                <input
-                                  type="checkbox"
-                                  id="editAllowComments"
-                                  checked={editAnnouncementData.allowComments}
-                                  onChange={e => setEditAnnouncementData(prev => ({ ...prev, allowComments: e.target.checked }))}
-                                  style={{ margin: 0 }}
-                                />
-                                <label htmlFor="editAllowComments" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: '#444' }}>
-                                  Allow comments
-                                </label>
-                              </div>
+
                               <input
                                 type="text"
                                 value={editAnnouncementData.title}
@@ -7903,25 +7820,7 @@ useEffect(() => {
                                   marginBottom: 8
                                 }}
                               />
-                              <div style={{ margin: '16px 0 0 0' }}>
-                                <button
-                                  type="button"
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: 'none', borderRadius: 12, boxShadow: '0 2px 8px #e9ecef', padding: '12px 18px', fontWeight: 600, fontSize: 17, marginBottom: 12, cursor: 'pointer', marginRight: 0
-                                  }}
-                                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                                >
-                                  <i className="fa fa-paperclip" style={{ fontSize: 22, marginRight: 8 }} /> Add Attachment
-                                </button>
-                                <input
-                                  type="file"
-                                  ref={fileInputRef}
-                                  style={{ display: 'none' }}
-                                  multiple
-                                  onChange={handleEditFileChange}
-                                />
-                                {/* Removed unnecessary "Select students" button */}
-                              </div>
+
                               <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
                                 <button
                                   type="button"
@@ -8369,10 +8268,7 @@ useEffect(() => {
                       <button onClick={() => setShowStudentSelectModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}>&times;</button>
                     </div>
                     <div style={{ padding: '0 24px 24px 24px' }}>
-                      {/* Debug Info */}
-                      <div style={{ background: '#e3f2fd', padding: '8px 12px', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', color: '#1976d2' }}>
-                        Debug Info: availableStudents: {students.length}, classroomStudents: {tempSelectedStudents.length}, loading: {loadingStudents}
-                      </div>
+
                       <div style={{ position: 'relative', width: '100%', marginBottom: 18 }}>
                         <i className="fa fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#b0b7c3', fontSize: 16, pointerEvents: 'none' }} />
                         <input
@@ -8478,18 +8374,18 @@ useEffect(() => {
                               tempSelectedStudents.map(id => {
                                 const s = students.find(stu => stu.id === id);
                                 return s ? (
-                                  <span key={id} style={{ display: 'inline-flex', alignItems: 'center', background: '#e9ecef', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 600, color: '#2d3748', minHeight: 22, minWidth: 120, maxWidth: 180, marginRight: 6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span key={id} style={{ display: 'inline-flex', alignItems: 'center', background: '#e9ecef', borderRadius: 12, padding: '6px 10px', fontSize: 11, fontWeight: 600, color: '#2d3748', minHeight: 32, minWidth: 140, maxWidth: 200, marginRight: 6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {(() => {
                                       const avatarUrl = getProfilePictureUrl(s);
                                       const bgColor = getAvatarColor(s);
                                       const initials = getUserInitials(s);
                                       return (
-                                        <div style={{ width: 16, height: 16, borderRadius: '50%', marginRight: 5, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 9 }}>
+                                        <div style={{ width: 24, height: 24, borderRadius: '50%', marginRight: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, fontSize: 10, flexShrink: 0 }}>
                                           {avatarUrl ? (
                                             <img
                                               src={avatarUrl}
                                               alt={s.name}
-                                              style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                              style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
                                               onError={(e) => {
                                                 e.target.style.display = 'none';
                                                 if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
@@ -8710,7 +8606,7 @@ useEffect(() => {
                                     text: draft.text || '',
                                     dueDate: draft.dueDate || '',
                                     points: draft.points || '',
-                                    allowComments: draft.allowComments !== undefined ? draft.allowComments : true,
+
                                     attachments: draft.attachments || [],
                                     visibleTo: draft.visibleTo || [],
                                     postToClassrooms: draft.postToClassrooms || ['current'],
@@ -8789,32 +8685,74 @@ useEffect(() => {
                         type="button"
                                 className="btn"
                         style={{
-                                  borderRadius: 6,
+                          borderRadius: 8,
                                   fontWeight: 600,
                                   width: 'auto',
                                   textAlign: 'center',
-                                  padding: '6px 12px',
-                          border: 'none',
-                                  background: 'none',
-                                  color: '#444',
+                          padding: '8px 12px',
+                          border: '1px solid #e9ecef',
+                          background: '#f8f9fa',
+                          color: '#495057',
                                   fontSize: 14,
                                   display: 'inline-flex',
                           alignItems: 'center',
-                                  gap: 4,
-                                  boxShadow: 'none',
-                                  transition: 'background 0.15s, color 0.15s',
-                                }}
-                                onClick={async () => {
-                                  // Load available students when opening the modal
-                                  const classCodes = (taskForm.postToClassrooms || []).map(classroom => {
-                                    if (classroom === 'current') {
-                                      return code; // Current classroom code
-                                    }
-                                    return classroom; // Other selected classroom codes
-                                  });
-                                  await loadAvailableStudents(classCodes);
-                                  setShowCreateStudentSelectModal(true);
-                                }}
+                          gap: 6,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          transition: 'all 0.15s ease',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          zIndex: 1
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#e9ecef';
+                          e.target.style.borderColor = '#dee2e6';
+                          e.target.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#f8f9fa';
+                          e.target.style.borderColor = '#e9ecef';
+                          e.target.style.transform = 'translateY(0)';
+                        }}
+                                                onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Add student button clicked');
+                          
+                          // Visual feedback
+                          e.target.style.background = '#28a745';
+                          e.target.style.color = '#fff';
+                          setTimeout(() => {
+                            e.target.style.background = '#f8f9fa';
+                            e.target.style.color = '#495057';
+                          }, 200);
+                          
+                          try {
+                            // Reset search and selected users
+                            setUserSearch('');
+                            setSelectedUsers([]);
+                            
+                            // Load available students when opening the modal
+                            const classCodes = (taskForm.postToClassrooms || []).map(classroom => {
+                              if (classroom === 'current') {
+                                return code; // Current classroom code
+                              }
+                              return classroom; // Other selected classroom codes
+                            });
+                            console.log('Loading students for class codes:', classCodes);
+                            await loadAvailableStudents(classCodes);
+                            setShowCreateStudentSelectModal(true);
+                            console.log('Student select modal opened successfully');
+                          } catch (error) {
+                            console.error('Error opening student select modal:', error);
+                            // Show error feedback
+                            e.target.style.background = '#dc3545';
+                            e.target.style.color = '#fff';
+                            setTimeout(() => {
+                              e.target.style.background = '#f8f9fa';
+                              e.target.style.color = '#495057';
+                            }, 1000);
+                          }
+                        }}
                                 aria-label="Add students"
                               >
                                 <i className="fa fa-user-plus" style={{ fontSize: 16 }} />
@@ -9395,19 +9333,8 @@ useEffect(() => {
                                 })}
                               </div>
                             )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <input
-                            type="checkbox"
-                            id="allowTaskComments"
-                            checked={taskForm.allowComments}
-                            onChange={(e) => setTaskForm(prev => ({ ...prev, allowComments: e.target.checked }))}
-                            style={{ margin: 0 }}
-                          />
-                          <label htmlFor="allowTaskComments" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#666' }}>
-                            Allow comments
-                          </label>
-                        </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: 16 }}>
+
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <button
                             type="button"
@@ -9754,21 +9681,13 @@ useEffect(() => {
                                   {task.likes > 0 && task.likes}
                                 </button>
                               )}
-                              {task.allowComments && (
-                                <button
-                                  onClick={() => setTaskCommentsOpen(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
-                                  style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 6, color: '#666', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-                                >
-                                  <i className="ni ni-chat-round" />
-                                  {task.comments ? task.comments.length : 0} Comments
-                                </button>
-                              )}
+
                             </div>
                             <div style={{ fontSize: 13, color: '#8898AA' }}>
                               {mapTaskTypeToFrontend(task.type)} • {task.points} pts • Due {task.due_date ? formatRelativeTime(task.due_date) : 'No due date'}
                             </div>
                           </div>
-                          {task.allowComments && taskCommentsOpen[task.id] && (
+                          {taskCommentsOpen[task.id] && (
                             <div style={{ borderTop: '1px solid #e9ecef', paddingTop: 16 }}>
                               {task.comments && task.comments.map((comment, idx) => {
                                 const isEditing = editingComment[task.id] === idx;
@@ -11228,13 +11147,14 @@ useEffect(() => {
         {/* Add Users Modal */}
         <Modal isOpen={showCreateStudentSelectModal} toggle={() => setShowCreateStudentSelectModal(false)} centered size="lg">
           <ModalHeader toggle={() => setShowCreateStudentSelectModal(false)}>
-            <div style={{ fontWeight: 600, fontSize: 18, color: '#333' }}>Add Users</div>
+            <div style={{ fontWeight: 600, fontSize: 18, color: '#333' }}>Add Students to Task</div>
           </ModalHeader>
           <ModalBody>
             <div style={{ marginBottom: 16 }}>
               <Input
                 type="text"
                 placeholder="Search students..."
+                value={userSearch}
                 style={{
                   borderRadius: 8,
                   border: '1px solid #e9ecef',
@@ -11242,25 +11162,20 @@ useEffect(() => {
                   fontSize: 14,
                   background: '#fff'
                 }}
-                onChange={(e) => {
-                  const searchTerm = e.target.value.toLowerCase();
-                  setStudents(prev => 
-                    prev.map(student => ({
-                      ...student,
-                      filtered: !searchTerm || 
-                        student.name.toLowerCase().includes(searchTerm) ||
-                        student.email.toLowerCase().includes(searchTerm)
-                    }))
-                  );
-                }}
+                onChange={(e) => setUserSearch(e.target.value)}
               />
             </div>
             
+
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
-                  Students ({taskAssignedStudents.length})
+                  Students ({taskAssignedStudents.length}) - Total: {availableUsers.length}
                 </span>
+                {(() => {
+                  const filtered = availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase())));
+                  const allSelected = filtered.length > 0 && filtered.every(u => taskAssignedStudents.includes(u.id));
+                  return (
                 <button
                   type="button"
                   style={{
@@ -11273,15 +11188,21 @@ useEffect(() => {
                     textDecoration: 'underline'
                   }}
                   onClick={() => {
-                    if (taskAssignedStudents.length === students.length) {
-                      setTaskAssignedStudents([]);
+                        if (allSelected) {
+                          // Deselect all filtered students
+                          const filteredIds = filtered.map(u => u.id);
+                          setTaskAssignedStudents(prev => prev.filter(id => !filteredIds.includes(id)));
                     } else {
-                      setTaskAssignedStudents(students.map(s => s.id));
+                          // Select all filtered students
+                          const filteredIds = filtered.map(u => u.id);
+                          setTaskAssignedStudents(prev => [...new Set([...prev, ...filteredIds])]);
                     }
                   }}
                 >
-                  {taskAssignedStudents.length === students.length ? 'Deselect All' : 'Select All'}
+                      {allSelected ? 'Deselect All' : 'Select All'}
                 </button>
+                  );
+                })()}
               </div>
               
               <div style={{ 
@@ -11291,7 +11212,16 @@ useEffect(() => {
                 borderRadius: 8,
                 background: '#fff'
               }}>
-                {students.filter(s => s.filtered !== false).map((student) => (
+                {loadingUsers ? (
+                  <div className="text-center text-muted py-5">Loading students...</div>
+                ) : availableUsers.length === 0 ? (
+                  <div className="text-center text-muted py-5">
+                    No students available to add to this task
+                  </div>
+                ) : availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()))).length === 0 ? (
+                  <div className="text-center text-muted py-5">No students match your search</div>
+                ) : (
+                  availableUsers.filter(u => (!userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()))).map((student) => (
                   <div
                     key={student.id}
                     style={{
@@ -11377,7 +11307,8 @@ useEffect(() => {
                       }}
                     />
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
             
@@ -11450,12 +11381,7 @@ useEffect(() => {
                   <button onClick={() => setShowAddUsersModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}>&times;</button>
                 </div>
                 <div style={{ padding: '0 24px 24px 24px' }}>
-                  {/* Debug information */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div style={{ background: '#f0f8ff', border: '1px solid #b0d4f1', borderRadius: 8, padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#0066cc' }}>
-                      <strong>Debug Info:</strong> availableStudents: {availableUsers.length}, classroomStudents: {students?.length || 0}, loading: {loadingUsers ? 'true' : 'false'}
-                    </div>
-                  )}
+
                   <div style={{ position: 'relative', width: '100%', marginBottom: 18 }}>
                     <i className="fa fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#b0b7c3', fontSize: 16, pointerEvents: 'none' }} />
                     <input
@@ -11584,18 +11510,18 @@ useEffect(() => {
                       selectedUsers.map(id => {
                         const u = availableUsers.find(user => user.id === id);
                         return u ? (
-                          <span key={id} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 9, padding: '1px 6px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 22 }}>
+                          <span key={id} style={{ display: 'flex', alignItems: 'center', background: '#e9ecef', borderRadius: 10, padding: '4px 8px', fontSize: 10, fontWeight: 600, color: '#2d3748', minHeight: 28 }}>
                             {(() => {
                               const avatarUrl = getProfilePictureUrl(u);
                               const bgColor = getAvatarColor(u);
                               const initials = getUserInitials(u);
                               return (
-                                <div style={{ width: 14, height: 14, borderRadius: '50%', marginRight: 4, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 8 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: '50%', marginRight: 6, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: avatarUrl ? '#e9ecef' : bgColor, color: '#fff', fontWeight: 700, border: '1px solid #fff', fontSize: 9, flexShrink: 0 }}>
                                   {avatarUrl ? (
                                     <img
                                       src={avatarUrl}
                                       alt={u.name}
-                                      style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                                      style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
                                       onError={(e) => {
                                         e.target.style.display = 'none';
                                         if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
@@ -11928,20 +11854,7 @@ useEffect(() => {
               )}
             </div>
             
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  name="allowComments"
-                  checked={editTaskForm.allowComments}
-                  onChange={(e) => setEditTaskForm(prev => ({ ...prev, allowComments: e.target.checked }))}
-                  style={{ margin: 0 }}
-                />
-                <label style={{ fontSize: 14, color: '#222', margin: 0 }}>
-                  Allow students to comment on this task
-                </label>
-              </div>
-            </div>
+
           </Form>
         </ModalBody>
         <ModalFooter>

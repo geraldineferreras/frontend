@@ -13,7 +13,7 @@ const AssignmentDetailStudent = () => {
   const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [privateComment, setPrivateComment] = useState("");
+
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -531,6 +531,16 @@ const AssignmentDetailStudent = () => {
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.txt')) return 'text/plain';
     if (lower.endsWith('.mp4')) return 'video/mp4';
+    if (lower.endsWith('.mp3')) return 'audio/mpeg';
+    if (lower.endsWith('.wav')) return 'audio/wav';
+    if (lower.endsWith('.ogg')) return 'audio/ogg';
+    if (lower.endsWith('.aac')) return 'audio/aac';
+    if (lower.endsWith('.flac')) return 'audio/flac';
+    if (lower.endsWith('.avi')) return 'video/x-msvideo';
+    if (lower.endsWith('.mov')) return 'video/quicktime';
+    if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
+    if (lower.endsWith('.m4v')) return 'video/x-m4v';
+    if (lower.endsWith('.webm')) return 'video/webm';
     return 'application/octet-stream';
   };
 
@@ -540,6 +550,9 @@ const AssignmentDetailStudent = () => {
     if (!url) return;
     const name = fileLike.original_name || fileLike.file_name || fileLike.name || 'File';
     const mime = fileLike.mime_type || inferMimeFromName(fileLike.original_name || fileLike.file_name || fileLike.file_path || fileLike.url);
+    
+    console.log('Opening preview for file:', { name, url, mime, fileLike });
+    
     setViewerFile({ name, url, mime });
     setPdfZoom(1);
     setCurrentPage(1);
@@ -623,8 +636,7 @@ const AssignmentDetailStudent = () => {
 
       // Prepare submission data
       const submissionData = {
-        class_code: finalClassCode,
-        submission_content: privateComment.trim() || undefined
+        class_code: finalClassCode
       };
 
       let response;
@@ -636,7 +648,6 @@ const AssignmentDetailStudent = () => {
         // Use Method 2 for files (different field names: attachment1, attachment2, etc.)
         response = await apiService.submitTaskWithDifferentFieldNames(taskId, selectedFiles, {
           class_code: finalClassCode,
-          submission_content: privateComment.trim() || undefined,
           external_links: externalLinks
         });
         
@@ -646,8 +657,7 @@ const AssignmentDetailStudent = () => {
         
         // Use Method 2 for files (different field names: attachment1, attachment2, etc.)
         response = await apiService.submitTaskWithDifferentFieldNames(taskId, selectedFiles, {
-          class_code: finalClassCode,
-          submission_content: privateComment.trim() || undefined
+          class_code: finalClassCode
         });
         
       } else if (externalLinks.length > 0) {
@@ -665,7 +675,6 @@ const AssignmentDetailStudent = () => {
         fileCount: selectedFiles.length,
         files: selectedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
         externalLinks: externalLinks.length,
-        hasSubmissionContent: !!privateComment.trim(),
         classCode: finalClassCode,
         submissionMethod: selectedFiles.length > 0 && externalLinks.length > 0 ? 'mixed' : 
                          selectedFiles.length > 0 ? 'files' : 'links'
@@ -685,9 +694,8 @@ const AssignmentDetailStudent = () => {
           // Update the assignment state with new data
           setAssignment(updatedResponse.data);
           
-          // Clear selected files, external links, and private comment
+          // Clear selected files and external links
           setSelectedFiles([]);
-          setPrivateComment('');
           setExternalLinks([]);
           
           // Show success message with status details
@@ -1478,7 +1486,7 @@ const AssignmentDetailStudent = () => {
                    onChange={handleFileSelect}
                    style={{ display: 'none' }}
                    id="file-upload"
-                   accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar"
+                   accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar,.mp4,.mp3,.wav,.ogg,.aac,.flac,.avi,.mov,.wmv,.m4v,.webm"
                    ref={(input) => {
                      if (input) {
                        input.onclick = () => {
@@ -1583,76 +1591,7 @@ const AssignmentDetailStudent = () => {
                   </div>
                 )}
 
-                {/* Private Message Section - Inside Your Work Card */}
-                <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e9ecef' }}>
-                  <h4 style={{
-                    fontWeight: 600,
-                    fontSize: '18px',
-                    marginBottom: '16px',
-                    color: '#212529',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: '#f8f9fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: '10px',
-                      border: '1px solid #e9ecef'
-                    }}>
-                      <i className="ni ni-chat-round" style={{ fontSize: '16px', color: '#6c757d' }} />
-                    </span>
-                    Private Message
-                  </h4>
 
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '12px',
-                    border: '2px solid #e9ecef',
-                    padding: '16px'
-                  }}>
-                    <Input
-                      type="textarea"
-                      placeholder="Send a private message to your teacher..."
-                      value={privateComment}
-                      onChange={e => setPrivateComment(e.target.value)}
-                      style={{
-                        border: 'none',
-                        fontSize: '14px',
-                        resize: 'none',
-                        minHeight: '60px',
-                        boxShadow: 'none'
-                      }}
-                    />
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginTop: '10px'
-                    }}>
-                      <small style={{ color: '#6c757d' }}>
-                        🔒 Only visible to your teacher
-                      </small>
-                      <Button
-                        color="warning"
-                        size="sm"
-                        style={{
-                          borderRadius: '18px',
-                          fontWeight: 600,
-                          padding: '6px 12px',
-                          fontSize: '12px'
-                        }}
-                        disabled={!privateComment.trim()}
-                      >
-                        📤 Send
-                      </Button>
-                    </div>
-                  </div>
-                </div>
               </CardBody>
             </Card>
           </Col>
@@ -1695,6 +1634,23 @@ const AssignmentDetailStudent = () => {
                   (() => {
                     const isPdf = viewerFile.mime === 'application/pdf' || viewerFile.url.toLowerCase().endsWith('.pdf');
                     const isImage = viewerFile.mime.startsWith('image/');
+                    const isVideo = viewerFile.mime.startsWith('video/') || 
+                                   viewerFile.url.toLowerCase().match(/\.(mp4|avi|mov|wmv|m4v|webm)$/) ||
+                                   viewerFile.name.toLowerCase().match(/\.(mp4|avi|mov|wmv|m4v|webm)$/);
+                    const isAudio = viewerFile.mime.startsWith('audio/') || 
+                                   viewerFile.url.toLowerCase().match(/\.(mp3|wav|ogg|aac|flac)$/) ||
+                                   viewerFile.name.toLowerCase().match(/\.(mp3|wav|ogg|aac|flac)$/);
+                    
+                    console.log('Preview modal file detection:', {
+                      name: viewerFile.name,
+                      url: viewerFile.url,
+                      mime: viewerFile.mime,
+                      isPdf,
+                      isImage,
+                      isVideo,
+                      isAudio
+                    });
+                    
                     if (isPdf) {
                       // Prefer iframe for cross-origin safety; react-pdf if same-origin
                       const useIframe = true;
@@ -1711,6 +1667,49 @@ const AssignmentDetailStudent = () => {
                     }
                     if (isImage) {
                       return (<img alt={viewerFile.name} src={viewerFile.url} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }} />);
+                    }
+                    if (isVideo) {
+                      return (
+                        <video 
+                          controls 
+                          style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 2px 8px #00000022' }}
+                          preload="metadata"
+                          onError={(e) => {
+                            console.error('Video load error:', e);
+                            console.error('Video URL:', viewerFile.url);
+                            console.error('Video MIME:', viewerFile.mime);
+                          }}
+                          onLoadStart={() => console.log('Video loading started:', viewerFile.url)}
+                          onCanPlay={() => console.log('Video can play:', viewerFile.url)}
+                        >
+                          <source src={viewerFile.url} type={viewerFile.mime} />
+                          Your browser does not support the video tag.
+                        </video>
+                      );
+                    }
+                    if (isAudio) {
+                      return (
+                        <div style={{ textAlign: 'center', width: '100%' }}>
+                          <audio 
+                            controls 
+                            style={{ width: '100%', maxWidth: '600px', marginBottom: 16 }}
+                            preload="metadata"
+                            onError={(e) => {
+                              console.error('Audio load error:', e);
+                              console.error('Audio URL:', viewerFile.url);
+                              console.error('Audio MIME:', viewerFile.mime);
+                            }}
+                            onLoadStart={() => console.log('Audio loading started:', viewerFile.url)}
+                            onCanPlay={() => console.log('Audio can play:', viewerFile.url)}
+                          >
+                            <source src={viewerFile.url} type={viewerFile.mime} />
+                            Your browser does not support the audio tag.
+                          </audio>
+                          <div style={{ color: '#666', fontSize: '14px' }}>
+                            {viewerFile.name}
+                          </div>
+                        </div>
+                      );
                     }
                     return (
                       <div style={{ textAlign: 'center', color: '#666' }}>
