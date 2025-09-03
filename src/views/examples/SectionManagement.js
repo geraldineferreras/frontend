@@ -1273,122 +1273,76 @@ const SectionManagement = () => {
     setIsCreatingSections(true);
     
     try {
-      // Use the existing API service which handles authentication properly
-      let result;
-      try {
-        result = await apiService.post('/admin/sections/auto-create', {}, true);
-        console.log('Auto-create response:', result);
-        console.log('Response type:', typeof result);
-        console.log('Response keys:', Object.keys(result || {}));
-        console.log('Response message:', result?.message);
-        console.log('Response success:', result?.success);
-        console.log('Response status:', result?.status);
-        console.log('Response data:', result?.data);
-      } catch (apiError) {
-        console.log('API call failed, but checking if it might be a success case:', apiError);
-        
-        // Sometimes the API returns a success message but with an error status
-        // Check if the error message contains success information
-        if (apiError.message && (
-          apiError.message.includes('Successfully created') ||
-          apiError.message.includes('Successfully') ||
-          apiError.message.includes('176 new sections')
-        )) {
-          // This is actually a success case
-          setError(null);
-          alert(apiError.message);
-          
-          // Refresh the sections data
-          await loadSectionsForCourse(activeCourseTab);
-          return; // Exit early since we handled the success case
-        }
-        
-        // Also check if the error response contains HTML (which might indicate a server error page)
-        if (apiError.response?.data && typeof apiError.response.data === 'string' && 
-            apiError.response.data.includes('Successfully created')) {
-          // Extract the success message from HTML response
-          const htmlContent = apiError.response.data;
-          const successMatch = htmlContent.match(/Successfully created[^<]*/);
-          if (successMatch) {
-            setError(null);
-            alert(successMatch[0]);
-            
-            // Refresh the sections data
-            await loadSectionsForCourse(activeCourseTab);
-            return; // Exit early since we handled the success case
-          }
-        }
-        
-        // Re-throw the error if it's not a success case
-        throw apiError;
+      // Since the auto-create endpoint doesn't exist, we'll create sections manually
+      // This creates sections A through K for each year level (1st-4th year) for each course
+      const courses = ['bsit', 'bscs', 'bsis', 'act'];
+      const years = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+      const sections = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+      
+      let totalCreated = 0;
+      const errors = [];
+      
+      // Get available teachers for assignment as advisers
+      const teachersResponse = await apiService.get('/admin/teachers/available', true);
+      const availableTeachers = teachersResponse?.data || [];
+      
+      if (availableTeachers.length === 0) {
+        throw new Error('No teachers available to assign as advisers. Please add teachers first.');
       }
       
-      // Check if the result contains success information
-      // The API might return success in different ways, so we check multiple possibilities
-      const isSuccess = result && (
-        result.success === true || 
-        result.status === 'success' || 
-        (result.message && result.message.includes('Successfully')) ||
-        (result.data && result.data.total_created !== undefined)
-      );
-      
-      if (isSuccess) {
-        // Show success message
-        setError(null);
-        
-        // Extract the success message from the result
-        let successMessage = 'Sections created successfully!';
-        if (result.message) {
-          successMessage = result.message;
-        } else if (result.data?.total_created !== undefined) {
-          successMessage = `Successfully created ${result.data.total_created} sections!`;
+      for (const course of courses) {
+        for (const year of years) {
+          for (const section of sections) {
+            try {
+              const sectionName = `${course.toUpperCase()} ${year.split(' ')[0]}${section}`;
+              
+              // Assign a random teacher as adviser (you can modify this logic)
+              const randomTeacher = availableTeachers[Math.floor(Math.random() * availableTeachers.length)];
+              
+              const sectionData = {
+                name: sectionName,
+                course: course,
+                year: year,
+                adviserId: randomTeacher.id,
+                ay: '2024-2025', // Current academic year
+                semester: '1st Semester'
+              };
+              
+              await apiService.post('/admin/sections', sectionData, true);
+              totalCreated++;
+              
+              // Add a small delay to avoid overwhelming the server
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+            } catch (sectionError) {
+              console.error(`Error creating section ${sectionName}:`, sectionError);
+              errors.push(`${sectionName}: ${sectionError.message}`);
+            }
+          }
         }
-        
-        alert(successMessage);
+      }
+      
+      // Show results
+      if (totalCreated > 0) {
+        setError(null);
+        let message = `Successfully created ${totalCreated} sections!`;
+        if (errors.length > 0) {
+          message += `\n\nSome sections could not be created:\n${errors.slice(0, 5).join('\n')}`;
+          if (errors.length > 5) {
+            message += `\n... and ${errors.length - 5} more errors.`;
+          }
+        }
+        alert(message);
         
         // Refresh the sections data
         await loadSectionsForCourse(activeCourseTab);
       } else {
-        // Check if there's an error message in the result
-        const errorMessage = result?.message || result?.error || 'Failed to create sections';
-        throw new Error(errorMessage);
+        throw new Error('No sections were created. Please check the errors and try again.');
       }
       
     } catch (error) {
       console.error('Error in automatic section creation:', error);
-      
-      // Check if the error message actually indicates success
-      // This can happen if the API returns a success message but it's caught as an error
-      if (error.message && (
-        error.message.includes('Successfully created') ||
-        error.message.includes('Successfully') ||
-        error.message.includes('176 new sections')
-      )) {
-        // This is actually a success case, not an error
-        setError(null);
-        alert(error.message);
-        
-        // Refresh the sections data
-        await loadSectionsForCourse(activeCourseTab);
-      } else {
-        // Check if the error response contains HTML with success information
-        if (error.response?.data && typeof error.response.data === 'string' && 
-            error.response.data.includes('Successfully created')) {
-          const htmlContent = error.response.data;
-          const successMatch = htmlContent.match(/Successfully created[^<]*/);
-          if (successMatch) {
-            setError(null);
-            alert(successMatch[0]);
-            
-            // Refresh the sections data
-            await loadSectionsForCourse(activeCourseTab);
-          } else {
-            setError(`Failed to create sections: ${error.message}`);
-          }
-        } else {
-          setError(`Failed to create sections: ${error.message}`);
-        }
-      }
+      setError(error.message || 'Failed to create sections automatically');
     } finally {
       setIsCreatingSections(false);
       setShowAutoCreateModal(false);
@@ -1410,11 +1364,11 @@ const SectionManagement = () => {
           <div className="text-center">
             <p className="mb-4">
               This will automatically create 176 sections for all programs (BSIT, BSIS, BSCS, ACT) from 1st year to 4th year, 
-              with sections A through K for each year level using the backend auto-create endpoint.
+              with sections A through K for each year level. Each section will be assigned a random teacher as adviser.
             </p>
             <p className="text-muted mb-3">
               <i className="ni ni-bell-55 mr-1" />
-              <strong>Note:</strong> Sections will be created without advisers initially. You can assign advisers later.
+              <strong>Note:</strong> Each section will be assigned a random teacher as adviser. You can reassign advisers later if needed.
             </p>
             <p className="text-muted mb-4">
               <strong>Total sections to create:</strong> 176 (4 programs × 4 years × 11 sections)
