@@ -835,7 +835,7 @@ const ClassroomDetailStudent = () => {
       
       try {
         const res = await axios.get(
-          `http://localhost/scms_new_backup/index.php/api/student/classroom/${code}/stream`,
+          `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/student/classroom/${code}/stream`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -846,7 +846,7 @@ const ClassroomDetailStudent = () => {
         console.log("API response:", res.data);
         if (res.data.status && Array.isArray(res.data.data)) {
           // Build a clean base URL for serving uploads (strip /index.php/api and /api)
-          const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+          const rawBase = (process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app');
           const base = rawBase
             .replace('/index.php/api', '')
             .replace('/api', '')
@@ -2122,7 +2122,7 @@ const ClassroomDetailStudent = () => {
                               if (isLink && linkUrl) {
                                 // Remove localhost prefixes if they exist
                                 if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                  linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                  linkUrl = linkUrl.replace('https://scms-backend.up.railway.app/', '');
                                   console.log('Removed localhost prefix, new URL:', linkUrl);
                                 } else if (linkUrl.includes('localhost/')) {
                                   // Handle other localhost variations

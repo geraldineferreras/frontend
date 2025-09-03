@@ -373,7 +373,7 @@ const ExcuseManagement = () => {
   const getAttachmentUrl = (excuse) => {
     // Check if image_path exists and construct the full URL
     if (excuse.image_path) {
-      const baseUrl = 'http://localhost/scms_new_backup/';
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
       return `${baseUrl}${excuse.image_path}`;
     }
     

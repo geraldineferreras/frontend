@@ -673,7 +673,7 @@ const UserManagement = () => {
       
       // If it's a relative path, construct the full URL
       if (user.profile_pic.startsWith('uploads/')) {
-        imageUrl = `http://localhost/scms_new_backup/${user.profile_pic}`;
+        imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.profile_pic}`;
       }
       // If it's already a full URL, use as is
       else if (user.profile_pic.startsWith('http://') || user.profile_pic.startsWith('https://')) {
@@ -685,7 +685,7 @@ const UserManagement = () => {
       }
       // For other cases, try to construct the full URL
       else {
-        imageUrl = `http://localhost/scms_new_backup/uploads/profile/${user.profile_pic}`;
+        imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/uploads/profile/${user.profile_pic}`;
       }
       
       // Add cache busting to prevent browser caching
@@ -706,7 +706,7 @@ const UserManagement = () => {
       
       // If it's a relative path, construct the full URL
       if (user.cover_pic.startsWith('uploads/')) {
-        imageUrl = `http://localhost/scms_new_backup/${user.cover_pic}`;
+        imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.cover_pic}`;
       }
       // If it's already a full URL, use as is
       else if (user.cover_pic.startsWith('http://') || user.cover_pic.startsWith('https://')) {
@@ -718,7 +718,7 @@ const UserManagement = () => {
       }
       // For other cases, try to construct the full URL
       else {
-        imageUrl = `http://localhost/scms_new_backup/uploads/cover/${user.cover_pic}`;
+        imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/uploads/cover/${user.cover_pic}`;
       }
       
       // Add cache busting to prevent browser caching

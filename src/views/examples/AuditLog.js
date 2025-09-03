@@ -128,7 +128,7 @@ const AuditLog = () => {
     
     // If it's a relative path, construct the full URL
     if (user.profile_pic.startsWith('uploads/')) {
-      imageUrl = `http://localhost/scms_new_backup/${user.profile_pic}`;
+      imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.profile_pic}`;
     }
     // If it's already a full URL, return as is
     else if (user.profile_pic.startsWith('http://') || user.profile_pic.startsWith('https://')) {
@@ -140,7 +140,7 @@ const AuditLog = () => {
     }
     // For other cases, try to construct the full URL
     else {
-      imageUrl = `http://localhost/scms_new_backup/uploads/profile/${user.profile_pic}`;
+      imageUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/uploads/profile/${user.profile_pic}`;
     }
     
     console.log(`Profile picture URL: ${imageUrl}`);

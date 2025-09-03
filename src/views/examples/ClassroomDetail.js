@@ -224,7 +224,7 @@ const getAvatarForUser = (user) => {
       return user.profile_pic;
     }
     // Construct full URL for profile picture - use the correct path structure
-    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${user.profile_pic}`;
+    return `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.profile_pic}`;
   }
   
   // Check for profile_image as alternative field name
@@ -232,7 +232,7 @@ const getAvatarForUser = (user) => {
     if (user.profile_image.startsWith('http')) {
       return user.profile_image;
     }
-    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${user.profile_image}`;
+    return `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.profile_image}`;
   }
   
   if (user.id) {
@@ -434,7 +434,7 @@ const ClassroomDetail = () => {
   // Build absolute URL for profile_pic regardless of API base format
   const buildImageUrlFromProfilePic = (profilePic) => {
     if (!profilePic) return null;
-    const apiBase = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+    const apiBase = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
     let siteBase = apiBase.replace('/index.php/api', '').replace('/api', '').replace(/\/$/, '');
     const pic = String(profilePic).replace(/\\\\/g, '/').replace(/\\/g, '/');
     if (pic.startsWith('http://') || pic.startsWith('https://')) return pic;
@@ -2573,7 +2573,7 @@ useEffect(() => {
       if (response?.status && response?.data) {
         // Derive a clean site base for serving uploaded files
         // Strip both "/index.php/api" and "/api" if present, and any trailing slash
-        const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+        const rawBase = (process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app');
         const base = rawBase
           .replace('/index.php/api', '')
           .replace('/api', '')
@@ -6811,7 +6811,7 @@ useEffect(() => {
                                   if (isLink && linkUrl) {
                                     // Remove localhost prefixes if they exist
                                     if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                      linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                      linkUrl = linkUrl.replace('https://scms-backend.up.railway.app/', '');
                                       console.log('Removed localhost prefix, new URL:', linkUrl);
                                     } else if (linkUrl.includes('localhost/')) {
                                       // Handle other localhost variations
@@ -7884,7 +7884,7 @@ useEffect(() => {
                                 if (isLink && linkUrl) {
                                   // Remove localhost prefixes if they exist
                                   if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                    linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                    linkUrl = linkUrl.replace('https://scms-backend.up.railway.app/', '');
                                     console.log('Removed localhost prefix, new URL:', linkUrl);
                                   } else if (linkUrl.includes('localhost/')) {
                                     // Handle other localhost variations
@@ -9264,7 +9264,7 @@ useEffect(() => {
                                   if (isLink && linkUrl) {
                                     // Remove localhost prefixes if they exist
                                     if (linkUrl.includes('localhost/scms_new_backup/')) {
-                                      linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                                      linkUrl = linkUrl.replace('https://scms-backend.up.railway.app/', '');
                                       console.log('Removed localhost prefix, new URL:', linkUrl);
                                     } else if (linkUrl.includes('localhost/')) {
                                       // Handle other localhost variations
@@ -9618,7 +9618,7 @@ useEffect(() => {
                                   if (typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'))) {
                                     url = p;
                                   } else if (typeof p === 'string') {
-                                    const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup').replace(/\/$/, '');
+                                    const base = (process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app').replace(/\/$/, '');
                                     url = p.startsWith('uploads/') ? `${base}/${p}` : `${base}/uploads/tasks/${p}`;
                                   }
                                 }

@@ -237,7 +237,7 @@ const EditUser = () => {
             setProfileImageUrl(profileUrl + (profileUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
           } else {
             // Construct full URL with cache busting
-            setProfileImageUrl(`http://localhost/scms_new_backup/${profileUrl}?t=${Date.now()}`);
+            setProfileImageUrl(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${profileUrl}?t=${Date.now()}`);
           }
         }
         
@@ -249,7 +249,7 @@ const EditUser = () => {
             setCoverPhotoUrl(coverUrl + (coverUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
           } else {
             // Construct full URL with cache busting
-            setCoverPhotoUrl(`http://localhost/scms_new_backup/${coverUrl}?t=${Date.now()}`);
+            setCoverPhotoUrl(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${coverUrl}?t=${Date.now()}`);
           }
         }
         
@@ -1001,7 +1001,7 @@ const EditUser = () => {
             if (profileUrl.startsWith('http')) {
               setProfileImageUrl(profileUrl + (profileUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
             } else {
-              setProfileImageUrl(`http://localhost/scms_new_backup/${profileUrl}?t=${Date.now()}`);
+              setProfileImageUrl(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${profileUrl}?t=${Date.now()}`);
             }
           }
           
@@ -1011,7 +1011,7 @@ const EditUser = () => {
             if (coverUrl.startsWith('http')) {
               setCoverPhotoUrl(coverUrl + (coverUrl.includes('?') ? '&' : '?') + `t=${Date.now()}`);
             } else {
-              setCoverPhotoUrl(`http://localhost/scms_new_backup/${coverUrl}?t=${Date.now()}`);
+              setCoverPhotoUrl(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${coverUrl}?t=${Date.now()}`);
             }
           }
         }

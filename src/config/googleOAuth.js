@@ -42,10 +42,10 @@ export const GoogleOAuthConfig = {
   // Backend endpoints
   API: {
     // Your backend Google OAuth endpoint
-    AUTH_ENDPOINT: '/auth/google',
+    AUTH_ENDPOINT: '/api/auth/google',
     
     // Backend base URL (from environment)
-    BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api'
+    BASE_URL: process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'
   },
   
   // Feature flags

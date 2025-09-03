@@ -24,7 +24,7 @@ export const getProfilePictureUrl = (user) => {
   let imageUrl = '';
 
   // Normalize base root (strip /index.php and /api if present)
-  const rawBase = (process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api');
+  const rawBase = (process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app');
   const baseRoot = rawBase
     .replace(/\/index\.php\/api$/i, '')
     .replace(/\/index\.php$/i, '')

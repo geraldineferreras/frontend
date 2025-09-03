@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
 
 class ApiService {
   // Helper method to validate token presence
@@ -136,7 +136,7 @@ class ApiService {
 
   // Authentication methods
   async login(email, password) {
-    return this.makeRequest('/auth/login', {
+    return this.makeRequest('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -144,7 +144,7 @@ class ApiService {
 
   // Google OAuth authentication
   async googleAuth(googleUserData) {
-    return this.makeRequest('/auth/google', {
+    return this.makeRequest('/api/auth/google', {
       method: 'POST',
       body: JSON.stringify(googleUserData),
       requireAuth: false // Google auth doesn't require existing auth
@@ -153,7 +153,7 @@ class ApiService {
 
   // Check account status for unified login system
   async checkAccountStatus(email) {
-    return this.makeRequest('/auth/account-status', {
+    return this.makeRequest('/api/auth/account-status', {
       method: 'POST',
       body: JSON.stringify({ email }),
       requireAuth: false
@@ -162,7 +162,7 @@ class ApiService {
 
   // Link Google account to existing local account
   async linkGoogleAccount(email, googleId) {
-    return this.makeRequest('/auth/link-google', {
+    return this.makeRequest('/api/auth/link-google', {
       method: 'POST',
       body: JSON.stringify({ email, google_id: googleId }),
       requireAuth: true
@@ -171,7 +171,7 @@ class ApiService {
 
   // Unlink Google account from unified account
   async unlinkGoogleAccount(email) {
-    return this.makeRequest('/auth/unlink-google', {
+    return this.makeRequest('/api/auth/unlink-google', {
       method: 'POST',
       body: JSON.stringify({ email }),
       requireAuth: true
@@ -180,7 +180,7 @@ class ApiService {
 
   // Current user profile
   async getCurrentUser() {
-    return this.makeRequest('/user/me', {
+    return this.makeRequest('/api/user/me', {
       method: 'GET',
       requireAuth: true,
     });
@@ -189,7 +189,7 @@ class ApiService {
   async register(userData) {
 
     
-    return this.makeRequest('/register', {
+    return this.makeRequest('/api/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -202,7 +202,7 @@ class ApiService {
     }
     
     try {
-      const response = await axios.post(`${API_BASE}/register`, formData, {
+      const response = await axios.post(`${API_BASE}/api/register`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -217,7 +217,7 @@ class ApiService {
   }
 
   async logout() {
-    return this.makeRequest('/auth/logout', {
+    return this.makeRequest('/api/auth/logout', {
       method: 'POST',
       requireAuth: true,
     });
@@ -225,7 +225,7 @@ class ApiService {
 
   // Authenticated requests
   async getProfile() {
-    return this.makeRequest('/user/me', {
+    return this.makeRequest('/api/user/me', {
       method: 'GET',
       requireAuth: true,
     });
@@ -233,14 +233,14 @@ class ApiService {
 
   // Get student profile data specifically
   async getStudentProfile() {
-    return this.makeRequest('/student/profile', {
+    return this.makeRequest('/api/student/profile', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async updateProfile(userData) {
-    return this.makeRequest('/user', {
+    return this.makeRequest('/api/user', {
       method: 'PUT',
       body: JSON.stringify(userData),
       requireAuth: true,
@@ -249,7 +249,7 @@ class ApiService {
 
   // Get all sections for profile form
   async getAllSections() {
-    return this.makeRequest('/admin/sections', {
+    return this.makeRequest('/api/admin/sections', {
       method: 'GET',
       requireAuth: true,
     });
@@ -257,42 +257,42 @@ class ApiService {
 
   // Section Management API endpoints - Individual methods for each program
   async getSectionsBSIT() {
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getSectionsBSCS() {
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Computer Science')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Computer Science')}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getSectionsBSIS() {
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Systems')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Systems')}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getSectionsACT() {
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Associate in Computer Technology')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Associate in Computer Technology')}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getSectionsByProgram(program) {
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent(program)}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent(program)}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getSectionsByProgramAndYear(program, yearLevel) {
-    return this.makeRequest(`/admin/sections_by_program_year_specific?program=${encodeURIComponent(program)}&year_level=${yearLevel}`, {
+    return this.makeRequest(`/api/admin/sections_by_program_year_specific?program=${encodeURIComponent(program)}&year_level=${yearLevel}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -300,7 +300,7 @@ class ApiService {
 
   // New method using the correct endpoint for sections by year level
   async getSectionsByYearLevel(yearLevel) {
-    return this.makeRequest(`/admin/sections/year?year_level=${yearLevel}`, {
+    return this.makeRequest(`/api/admin/sections/year?year_level=${yearLevel}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -319,7 +319,7 @@ class ApiService {
     
     try {
       // First try to get all sections and filter on frontend
-      const allSectionsResponse = await this.makeRequest(`/admin/sections`, {
+      const allSectionsResponse = await this.makeRequest(`/api/admin/sections`, {
         method: 'GET',
         requireAuth: true,
       });
@@ -393,7 +393,7 @@ class ApiService {
       }
       
       // Fallback to original method
-      const response = await this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent(program)}`, {
+      const response = await this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent(program)}`, {
         method: 'GET',
         requireAuth: true,
       });
@@ -419,7 +419,7 @@ class ApiService {
       '4th Year': '4th'
     };
     const yearLevel = yearMap[year] || '1st';
-    return this.makeRequest(`/admin/sections_by_program_year_specific?program=${encodeURIComponent('Bachelor of Science in Information Technology')}&year_level=${yearLevel}`, {
+    return this.makeRequest(`/api/admin/sections_by_program_year_specific?program=${encodeURIComponent('Bachelor of Science in Information Technology')}&year_level=${yearLevel}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -427,7 +427,7 @@ class ApiService {
 
   async getSectionsByAcademicYear(academicYear) {
     // For now, return all sections since the API doesn't support academic year filtering
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -435,7 +435,7 @@ class ApiService {
 
   async getSectionsBySemester(semester) {
     // For now, return all sections since the API doesn't support semester filtering
-    return this.makeRequest(`/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
+    return this.makeRequest(`/api/admin/sections_by_program?program=${encodeURIComponent('Bachelor of Science in Information Technology')}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -453,7 +453,7 @@ class ApiService {
 
   async createSection(sectionData) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest('/admin/sections', {
+    return this.makeRequest('/api/admin/sections', {
       method: 'POST',
       body: JSON.stringify(sectionData),
       requireAuth: true,
@@ -462,7 +462,7 @@ class ApiService {
 
   async updateSection(sectionId, sectionData) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/${sectionId}`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}`, {
       method: 'PUT',
       body: JSON.stringify(sectionData),
       requireAuth: true,
@@ -471,7 +471,7 @@ class ApiService {
 
   async deleteSection(sectionId) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/${sectionId}`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -479,7 +479,7 @@ class ApiService {
 
   async getSectionStudents(sectionId) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/${sectionId}/students`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}/students`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -487,7 +487,7 @@ class ApiService {
 
   async addStudentToSection(sectionId, studentData) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/${sectionId}/students`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}/students`, {
       method: 'POST',
       body: JSON.stringify(studentData),
       requireAuth: true,
@@ -496,7 +496,7 @@ class ApiService {
 
   async removeStudentFromSection(sectionId, studentId) {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/${sectionId}/students/${studentId}`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}/students/${studentId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -504,7 +504,7 @@ class ApiService {
 
   // Update user's section_id
   async updateUserSectionId(userId, sectionId) {
-    return this.makeRequest(`/admin/users/${userId}/section`, {
+    return this.makeRequest(`/api/admin/users/${userId}/section`, {
       method: 'PUT',
       body: JSON.stringify({ section_id: sectionId }),
       requireAuth: true,
@@ -513,7 +513,7 @@ class ApiService {
 
   // Get section students with enrollment count
   async getSectionStudentsWithCount(sectionId) {
-    return this.makeRequest(`/admin/sections/${sectionId}/students`, {
+    return this.makeRequest(`/api/admin/sections/${sectionId}/students`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -533,7 +533,7 @@ class ApiService {
 
   async exportSections(format = 'csv') {
     // Note: This endpoint might not exist in your backend yet
-    return this.makeRequest(`/admin/sections/export?format=${format}`, {
+    return this.makeRequest(`/api/admin/sections/export?format=${format}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -578,7 +578,7 @@ class ApiService {
 
   // Fetch users by role
   async getUsersByRole(role) {
-    return this.makeRequest(`/users?role=${role}`, {
+    return this.makeRequest(`/api/users?role=${role}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -586,7 +586,7 @@ class ApiService {
 
   // Get all users (for admin)
   async getAllUsers() {
-    return this.makeRequest('/users', {
+    return this.makeRequest('/api/users?role=all', {
       method: 'GET',
       requireAuth: true,
     });
@@ -602,7 +602,7 @@ class ApiService {
     try {
       console.log('Updating user with data:', userData);
       
-      const response = await axios.put(`${API_BASE}/auth/update_user`, userData, {
+      const response = await axios.put(`${API_BASE}/api/auth/update_user`, userData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -633,7 +633,7 @@ class ApiService {
       const role = formData.get('role');
       console.log('Updating user with role:', role);
       
-      console.log('Using endpoint:', `${API_BASE}/auth/update_user`);
+      console.log('Using endpoint:', `${API_BASE}/api/auth/update_user`);
       
       // Log FormData contents for debugging
       console.log('FormData contents:');
@@ -641,7 +641,7 @@ class ApiService {
         console.log(`${key}:`, value instanceof File ? `File: ${value.name}` : value);
       }
       
-      const response = await axios.put(`${API_BASE}/auth/update_user`, formData, {
+      const response = await axios.put(`${API_BASE}/api/auth/update_user`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -693,7 +693,7 @@ class ApiService {
       let response;
       if (hasFiles) {
         // Send as multipart/form-data using POST
-        response = await axios.post(`${API_BASE}/admin/update`, formData, {
+        response = await axios.post(`${API_BASE}/api/admin/update`, formData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -707,7 +707,7 @@ class ApiService {
           jsonData[key] = value;
         }
         
-        response = await axios.put(`${API_BASE}/admin/update`, jsonData, {
+        response = await axios.put(`${API_BASE}/api/admin/update`, jsonData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -746,7 +746,7 @@ class ApiService {
       let response;
       if (hasFiles) {
         // Send as multipart/form-data using POST
-        response = await axios.post(`${API_BASE}/teacher/update`, formData, {
+        response = await axios.post(`${API_BASE}/api/teacher/update`, formData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -760,7 +760,7 @@ class ApiService {
           jsonData[key] = value;
         }
         
-        response = await axios.put(`${API_BASE}/teacher/update`, jsonData, {
+        response = await axios.put(`${API_BASE}/api/teacher/update`, jsonData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -802,7 +802,7 @@ class ApiService {
       try {
         if (hasFiles) {
           // Send as multipart/form-data using POST
-          response = await axios.post(`${API_BASE}/student/update`, formData, {
+          response = await axios.post(`${API_BASE}/api/student/update`, formData, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'multipart/form-data',
@@ -816,7 +816,7 @@ class ApiService {
             jsonData[key] = value;
           }
           
-          response = await axios.put(`${API_BASE}/student/update`, jsonData, {
+          response = await axios.put(`${API_BASE}/api/student/update`, jsonData, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -845,7 +845,7 @@ class ApiService {
           
           console.log('🔄 Trying general user update endpoint with data:', jsonData);
           
-          response = await axios.put(`${API_BASE}/auth/update_user`, jsonData, {
+          response = await axios.put(`${API_BASE}/api/auth/update_user`, jsonData, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -877,7 +877,7 @@ class ApiService {
   }
 
   async fetchUserByRoleAndId(role, userId) {
-    return this.makeRequest(`/user?role=${role}&user_id=${userId}`, {
+    return this.makeRequest(`/api/user?role=${role}&user_id=${userId}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -887,7 +887,7 @@ class ApiService {
     try {
       // First, try the standard approach with user_id parameter
       console.log(`🔍 Attempting to fetch user with standard endpoint: /user?role=${role}&user_id=${userId}`);
-      const response = await this.makeRequest(`/user?role=${role}&user_id=${userId}`, {
+      const response = await this.makeRequest(`/api/user?role=${role}&user_id=${userId}`, {
         method: 'GET',
         requireAuth: true,
       });
@@ -900,7 +900,7 @@ class ApiService {
       // Since the backend doesn't support alternative endpoints, go straight to fallback
       try {
         console.log('🔄 Fetching all users to find the specific user...');
-        const allUsersResponse = await this.makeRequest(`/users?role=${role}`, {
+        const allUsersResponse = await this.makeRequest(`/api/users?role=${role}`, {
           method: 'GET',
           requireAuth: true,
         });
@@ -958,7 +958,7 @@ class ApiService {
 
   // Delete user
   async deleteUser(userId) {
-    return this.makeRequest(`/users/${userId}`, {
+    return this.makeRequest(`/api/users/${userId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -975,7 +975,7 @@ class ApiService {
     formData.append('image', file);
     
     try {
-      const response = await axios.post(`${API_BASE}/upload/profile`, formData, {
+      const response = await axios.post(`${API_BASE}/api/upload/profile`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -1000,7 +1000,7 @@ class ApiService {
     formData.append('image', file);
     
     try {
-      const response = await axios.post(`${API_BASE}/upload/cover`, formData, {
+      const response = await axios.post(`${API_BASE}/api/upload/cover`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -1016,14 +1016,14 @@ class ApiService {
   }
 
   async getTeachers() {
-    return this.makeRequest('/users?role=teacher', {
+    return this.makeRequest('/api/users?role=teacher', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getStudents() {
-    return this.makeRequest('/users?role=student', {
+    return this.makeRequest('/api/users?role=student', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1037,7 +1037,7 @@ class ApiService {
     }
     
     try {
-      const response = await axios.delete(`${API_BASE}/admin/delete`, {
+      const response = await axios.delete(`${API_BASE}/api/admin/delete`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1067,7 +1067,7 @@ class ApiService {
     }
     
     try {
-      const response = await axios.delete(`${API_BASE}/teacher/delete`, {
+      const response = await axios.delete(`${API_BASE}/api/teacher/delete`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1097,7 +1097,7 @@ class ApiService {
     }
     
     try {
-      const response = await axios.delete(`${API_BASE}/student/delete`, {
+      const response = await axios.delete(`${API_BASE}/api/student/delete`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1122,14 +1122,14 @@ class ApiService {
 
   // Subject Management Methods
   async getSubjects() {
-    return this.makeRequest('/admin/subjects', {
+    return this.makeRequest('/api/admin/subjects', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async createSubject(subjectData) {
-    return this.makeRequest('/admin/subjects', {
+    return this.makeRequest('/api/admin/subjects', {
       method: 'POST',
       body: JSON.stringify(subjectData),
       requireAuth: true,
@@ -1137,7 +1137,7 @@ class ApiService {
   }
 
   async updateSubject(subjectId, subjectData) {
-    return this.makeRequest(`/admin/subjects/${subjectId}`, {
+    return this.makeRequest(`/api/admin/subjects/${subjectId}`, {
       method: 'PUT',
       body: JSON.stringify(subjectData),
       requireAuth: true,
@@ -1145,7 +1145,7 @@ class ApiService {
   }
 
   async deleteSubject(subjectId) {
-    return this.makeRequest(`/admin/subjects/${subjectId}`, {
+    return this.makeRequest(`/api/admin/subjects/${subjectId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1153,14 +1153,14 @@ class ApiService {
 
   // Classes/Offerings Management Methods
   async getClasses() {
-    return this.makeRequest('/admin/classes', {
+    return this.makeRequest('/api/admin/classes', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async createClass(classData) {
-    return this.makeRequest('/admin/classes', {
+    return this.makeRequest('/api/admin/classes', {
       method: 'POST',
       body: JSON.stringify(classData),
       requireAuth: true,
@@ -1168,7 +1168,7 @@ class ApiService {
   }
 
   async updateClass(classId, classData) {
-    return this.makeRequest(`/admin/classes/${classId}`, {
+    return this.makeRequest(`/api/admin/classes/${classId}`, {
       method: 'PUT',
       body: JSON.stringify(classData),
       requireAuth: true,
@@ -1176,7 +1176,7 @@ class ApiService {
   }
 
   async deleteClass(classId) {
-    return this.makeRequest(`/admin/classes/${classId}`, {
+    return this.makeRequest(`/api/admin/classes/${classId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1184,7 +1184,7 @@ class ApiService {
 
   // Teacher Classrooms API
   async getTeacherClassrooms() {
-    return this.makeRequest('/teacher/classrooms', {
+    return this.makeRequest('/api/teacher/classrooms', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1192,7 +1192,7 @@ class ApiService {
 
   // Teacher Assigned Subjects API
   async getTeacherAssignedSubjects() {
-    return this.makeRequest('/teacher/assigned-subjects', {
+    return this.makeRequest('/api/teacher/assigned-subjects', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1200,7 +1200,7 @@ class ApiService {
 
   // Teacher Available Subjects API
   async getTeacherAvailableSubjects() {
-    return this.makeRequest('/teacher/available-subjects', {
+    return this.makeRequest('/api/teacher/available-subjects', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1208,7 +1208,7 @@ class ApiService {
 
   // Teacher Available Sections for Subject API
   async getTeacherAvailableSections(subjectId) {
-    return this.makeRequest(`/teacher/available-sections/${subjectId}`, {
+    return this.makeRequest(`/api/teacher/available-sections/${subjectId}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1216,7 +1216,7 @@ class ApiService {
 
   // Teacher Create Classroom API
   async createClassroom(classroomData) {
-    return this.makeRequest('/teacher/classrooms', {
+    return this.makeRequest('/api/teacher/classrooms', {
       method: 'POST',
       body: JSON.stringify(classroomData),
       requireAuth: true,
@@ -1225,7 +1225,7 @@ class ApiService {
 
   // Teacher Get Classroom by Code API
   async getClassroomByCode(classCode) {
-    return this.makeRequest(`/teacher/classrooms/${classCode}`, {
+    return this.makeRequest(`/api/teacher/classrooms/${classCode}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1233,7 +1233,7 @@ class ApiService {
 
   // Teacher Get Classroom Stream Posts API
   async getClassroomStream(classCode) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1241,7 +1241,7 @@ class ApiService {
 
   // Teacher Get Draft Posts Only
   async getClassroomStreamDrafts(classCode) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/drafts`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/drafts`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1249,7 +1249,7 @@ class ApiService {
 
   // Teacher Get Scheduled Posts Only
   async getClassroomStreamScheduled(classCode) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/scheduled`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/scheduled`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1257,7 +1257,7 @@ class ApiService {
 
   // Teacher Update Draft Post (can also publish or schedule)
   async updateClassroomStreamDraft(classCode, draftId, postData) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/draft/${draftId}`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/draft/${draftId}`, {
       method: 'PUT',
       body: JSON.stringify(postData),
       requireAuth: true,
@@ -1268,7 +1268,7 @@ class ApiService {
   async createClassroomStreamPost(classCode, postData) {
     // Support both JSON and FormData payloads
     const isForm = (typeof FormData !== 'undefined') && (postData instanceof FormData);
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream`, {
       method: 'POST',
       body: isForm ? postData : JSON.stringify(postData),
       requireAuth: true,
@@ -1277,7 +1277,7 @@ class ApiService {
 
   // Teacher Delete Classroom Stream Post API
   async deleteClassroomStreamPost(classCode, postId) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1312,7 +1312,7 @@ class ApiService {
     });
 
     try {
-      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+      const response = await axios.post(`${API_BASE}/api/teacher/classroom/${classCode}/stream`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
@@ -1367,7 +1367,7 @@ class ApiService {
     });
 
     try {
-      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+      const response = await axios.post(`${API_BASE}/api/teacher/classroom/${classCode}/stream`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
@@ -1427,7 +1427,7 @@ class ApiService {
     });
 
     try {
-      const response = await axios.post(`${API_BASE}/teacher/classroom/${classCode}/stream`, formData, {
+      const response = await axios.post(`${API_BASE}/api/teacher/classroom/${classCode}/stream`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
@@ -1443,7 +1443,7 @@ class ApiService {
 
   // Teacher add comment to a stream post
   async addTeacherStreamComment(classCode, postId, commentText) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}/comment`, {
       method: 'POST',
       body: JSON.stringify({ comment: commentText }),
       requireAuth: true,
@@ -1452,7 +1452,7 @@ class ApiService {
 
   // Teacher get all comments for a stream post
   async getTeacherStreamComments(classCode, postId) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comments`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}/comments`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1460,7 +1460,7 @@ class ApiService {
 
   // Teacher edit a specific comment on a stream post
   async editTeacherStreamComment(classCode, postId, commentId, newText) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
       method: 'PUT',
       body: JSON.stringify({ comment: newText }),
       requireAuth: true,
@@ -1469,7 +1469,7 @@ class ApiService {
 
   // Teacher delete a specific comment on a stream post
   async deleteTeacherStreamComment(classCode, postId, commentId) {
-    return this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1477,14 +1477,14 @@ class ApiService {
 
   // Student methods
   async getStudentClasses() {
-    return this.makeRequest('/student/my-classes', {
+    return this.makeRequest('/api/student/my-classes', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async joinClass(classCode) {
-    return this.makeRequest('/student/join-class', {
+    return this.makeRequest('/api/student/join-class', {
       method: 'POST',
       body: JSON.stringify({ class_code: classCode }),
       requireAuth: true,
@@ -1493,7 +1493,7 @@ class ApiService {
 
   // Student classroom members API
   async getClassroomMembers(classCode) {
-    return this.makeRequest(`/student/classroom/${classCode}/people`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/people`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1501,35 +1501,35 @@ class ApiService {
 
   // Attendance Management Methods
   async getTeacherAssignments() {
-    return this.makeRequest('/attendance/teacher-assignments', {
+    return this.makeRequest('/api/attendance/teacher-assignments', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getTeacherClasses() {
-    return this.makeRequest('/admin/classes', {
+    return this.makeRequest('/api/admin/classes', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getStudentsByClass(classId) {
-    return this.makeRequest(`/attendance/students/${classId}`, {
+    return this.makeRequest(`/api/attendance/students/${classId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getStudentsBySubjectAndSection(subjectId, sectionName) {
-    return this.makeRequest(`/teacher/subject/${subjectId}/section/${sectionName}/students`, {
+    return this.makeRequest(`/api/teacher/subject/${subjectId}/section/${sectionName}/students`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async recordAttendance(attendanceData) {
-    return this.makeRequest('/attendance/record', {
+    return this.makeRequest('/api/attendance/record', {
       method: 'POST',
       body: JSON.stringify(attendanceData),
       requireAuth: true,
@@ -1537,7 +1537,7 @@ class ApiService {
   }
 
   async recordAttendanceQR(qrData) {
-    return this.makeRequest('/attendance/record-qr', {
+    return this.makeRequest('/api/attendance/record-qr', {
       method: 'POST',
       body: JSON.stringify(qrData),
       requireAuth: true,
@@ -1545,7 +1545,7 @@ class ApiService {
   }
 
   async updateAttendanceRecord(attendanceId, updateData) {
-    return this.makeRequest(`/attendance/update/${attendanceId}`, {
+    return this.makeRequest(`/api/attendance/update/${attendanceId}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
       requireAuth: true,
@@ -1564,7 +1564,7 @@ class ApiService {
     if (filters.limit) queryParams.append('limit', filters.limit);
     if (filters.offset) queryParams.append('offset', filters.offset);
 
-    const endpoint = `/attendance/records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/attendance/records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1582,7 +1582,7 @@ class ApiService {
     if (filters.limit) queryParams.append('limit', filters.limit);
     if (filters.offset) queryParams.append('offset', filters.offset);
 
-    const endpoint = `/attendance/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/attendance/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1591,21 +1591,21 @@ class ApiService {
   }
 
   async getAllAttendanceRecords() {
-    return this.makeRequest('/attendance/all', {
+    return this.makeRequest('/api/attendance/all', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAttendanceRecordsByClassId(classId) {
-    return this.makeRequest(`/attendance/all?class_id=${classId}`, {
+    return this.makeRequest(`/api/attendance/all?class_id=${classId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async updateAttendanceStatus(attendanceId, status, notes = '') {
-    return this.makeRequest(`/attendance/${attendanceId}/status`, {
+    return this.makeRequest(`/api/attendance/${attendanceId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status, notes }),
       requireAuth: true,
@@ -1613,7 +1613,7 @@ class ApiService {
   }
 
   async bulkUpdateAttendance(updates) {
-    return this.makeRequest('/attendance/bulk-update', {
+    return this.makeRequest('/api/attendance/bulk-update', {
       method: 'PUT',
       body: JSON.stringify({ updates }),
       requireAuth: true,
@@ -1626,7 +1626,7 @@ class ApiService {
     if (sectionName) queryParams.append('section_name', sectionName);
     if (date) queryParams.append('date', date);
 
-    const endpoint = `/attendance/summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/attendance/summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1645,7 +1645,7 @@ class ApiService {
     if (filters.studentId) queryParams.append('student_id', filters.studentId);
     queryParams.append('format', format);
 
-    const endpoint = `/attendance/export?${queryParams.toString()}`;
+    const endpoint = `/api/attendance/export?${queryParams.toString()}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1654,7 +1654,7 @@ class ApiService {
   }
 
   async deleteAttendanceRecord(attendanceId) {
-    return this.makeRequest(`/attendance/${attendanceId}`, {
+    return this.makeRequest(`/api/attendance/${attendanceId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1668,7 +1668,7 @@ class ApiService {
     if (dateRange.startDate) queryParams.append('start_date', dateRange.startDate);
     if (dateRange.endDate) queryParams.append('end_date', dateRange.endDate);
 
-    const endpoint = `/attendance/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/attendance/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1683,7 +1683,7 @@ class ApiService {
     if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom);
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
 
-    const endpoint = `/attendance/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/attendance/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1693,7 +1693,7 @@ class ApiService {
 
   // Get attendance records for a specific class and date
   async getAttendanceRecordsByClassAndDate(classId, date) {
-    return this.makeRequest(`/attendance/records/${classId}/${date}`, {
+    return this.makeRequest(`/api/attendance/records/${classId}/${date}`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1701,7 +1701,7 @@ class ApiService {
 
   // Get all classes for attendance dropdown
   async getAttendanceClasses() {
-    return this.makeRequest(`/attendance/classes`, {
+    return this.makeRequest(`/api/attendance/classes`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -1710,7 +1710,7 @@ class ApiService {
   // Excuse Letter methods
   async submitExcuseLetter(excuseData) {
     console.log('Submitting excuse letter with data:', excuseData);
-    return this.makeRequest('/excuse-letters/submit', {
+    return this.makeRequest('/api/excuse-letters/submit', {
       method: 'POST',
       body: JSON.stringify(excuseData),
       requireAuth: true,
@@ -1724,7 +1724,7 @@ class ApiService {
     }
     
     try {
-      const response = await axios.post(`${API_BASE}/excuse-letters/submit`, formData, {
+      const response = await axios.post(`${API_BASE}/api/excuse-letters/submit`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           // Don't set Content-Type for FormData, let browser set it with boundary
@@ -1743,7 +1743,7 @@ class ApiService {
     const queryParams = new URLSearchParams();
     if (filters.classId) queryParams.append('class_id', filters.classId);
     if (filters.status) queryParams.append('status', filters.status);
-    const endpoint = `/excuse-letters/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/excuse-letters/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     console.log('Student excuse letters endpoint:', endpoint);
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1752,7 +1752,7 @@ class ApiService {
   }
 
   async deleteExcuseLetter(letterId) {
-    return this.makeRequest(`/excuse-letters/delete/${letterId}`, {
+    return this.makeRequest(`/api/excuse-letters/delete/${letterId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -1760,14 +1760,14 @@ class ApiService {
 
   // Teacher excuse letter methods
   async getTeacherExcuseLetters() {
-    return this.makeRequest('/excuse-letters/teacher', {
+    return this.makeRequest('/api/excuse-letters/teacher', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async updateExcuseLetterStatus(letterId, statusData) {
-    return this.makeRequest(`/excuse-letters/update/${letterId}`, {
+    return this.makeRequest(`/api/excuse-letters/update/${letterId}`, {
       method: 'PUT',
       body: JSON.stringify(statusData),
       requireAuth: true,
@@ -1775,7 +1775,7 @@ class ApiService {
   }
 
   async getExcuseLetterStatistics() {
-    return this.makeRequest('/excuse-letters/statistics', {
+    return this.makeRequest('/api/excuse-letters/statistics', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1795,7 +1795,7 @@ class ApiService {
     if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
 
-    const endpoint = `/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1817,7 +1817,7 @@ class ApiService {
     if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
 
-    const endpoint = `/admin/audit-logs/admin${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/admin${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1838,7 +1838,7 @@ class ApiService {
     if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
 
-    const endpoint = `/admin/audit-logs/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1859,7 +1859,7 @@ class ApiService {
     if (filters.sortBy) queryParams.append('sort_by', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sort_order', filters.sortOrder);
 
-    const endpoint = `/admin/audit-logs/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1868,21 +1868,21 @@ class ApiService {
   }
 
   async getAuditLogById(logId) {
-    return this.makeRequest(`/admin/audit-logs/${logId}`, {
+    return this.makeRequest(`/api/admin/audit-logs/${logId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAuditLogModules() {
-    return this.makeRequest('/admin/audit-logs/modules', {
+    return this.makeRequest('/api/admin/audit-logs/modules', {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAuditLogRoles() {
-    return this.makeRequest('/admin/audit-logs/roles', {
+    return this.makeRequest('/api/admin/audit-logs/roles', {
       method: 'GET',
       requireAuth: true,
     });
@@ -1897,7 +1897,7 @@ class ApiService {
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
     if (filters.search) queryParams.append('search', filters.search);
 
-    const endpoint = `/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1915,7 +1915,7 @@ class ApiService {
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
     if (filters.search) queryParams.append('search', filters.search);
 
-    const endpoint = `/admin/audit-logs/admin/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/admin/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1932,7 +1932,7 @@ class ApiService {
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
     if (filters.search) queryParams.append('search', filters.search);
 
-    const endpoint = `/admin/audit-logs/teacher/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/teacher/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1949,7 +1949,7 @@ class ApiService {
     if (filters.dateTo) queryParams.append('date_to', filters.dateTo);
     if (filters.search) queryParams.append('search', filters.search);
 
-    const endpoint = `/admin/audit-logs/student/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/admin/audit-logs/student/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -1969,14 +1969,14 @@ class ApiService {
       
       if (taskData instanceof FormData) {
         // Handle FormData (file uploads)
-        response = await axios.post(`${API_BASE}/tasks/create`, taskData, {
+        response = await axios.post(`${API_BASE}/api/tasks/create`, taskData, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
       } else {
         // Handle JSON data
-        response = await axios.post(`${API_BASE}/tasks/create`, taskData, {
+        response = await axios.post(`${API_BASE}/api/tasks/create`, taskData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -2025,7 +2025,7 @@ class ApiService {
         formData.append(key, file);
       });
       
-      const response = await axios.post(`${API_BASE}/tasks/create`, formData, {
+      const response = await axios.post(`${API_BASE}/api/tasks/create`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -2064,7 +2064,7 @@ class ApiService {
         formData.append(`attachment${index + 1}`, file);
       });
       
-      const response = await axios.post(`${API_BASE}/tasks/create`, formData, {
+      const response = await axios.post(`${API_BASE}/api/tasks/create`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -2098,7 +2098,7 @@ class ApiService {
         }))
       };
       
-      const response = await axios.post(`${API_BASE}/tasks/create`, payload, {
+      const response = await axios.post(`${API_BASE}/api/tasks/create`, payload, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -2121,7 +2121,7 @@ class ApiService {
     if (filters.classCode) queryParams.append('class_code', filters.classCode);
     if (filters.status) queryParams.append('status', filters.status);
     
-    const endpoint = `/tasks/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/tasks/teacher${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -2130,35 +2130,35 @@ class ApiService {
   }
 
   async getTaskDetails(taskId) {
-    return this.makeRequest(`/tasks/${taskId}`, {
+    return this.makeRequest(`/api/tasks/${taskId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getTaskSubmissions(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/submissions`, {
+    return this.makeRequest(`/api/tasks/${taskId}/submissions`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getStudentTaskDetails(taskId) {
-    return this.makeRequest(`/tasks/student/${taskId}`, {
+    return this.makeRequest(`/api/tasks/student/${taskId}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getTaskSubmission(taskId, classCode) {
-    return this.makeRequest(`/tasks/${taskId}/submission?class_code=${classCode}`, {
+    return this.makeRequest(`/api/tasks/${taskId}/submission?class_code=${classCode}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async updateTask(taskId, taskData) {
-    return this.makeRequest(`/tasks/${taskId}`, {
+    return this.makeRequest(`/api/tasks/${taskId}`, {
       method: 'PUT',
       body: JSON.stringify(taskData),
       requireAuth: true,
@@ -2166,14 +2166,14 @@ class ApiService {
   }
 
   async publishTask(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/publish`, {
+    return this.makeRequest(`/api/tasks/${taskId}/publish`, {
       method: 'POST',
       requireAuth: true,
     });
   }
 
   async scheduleTask(taskId, scheduleData) {
-    return this.makeRequest(`/tasks/${taskId}/schedule`, {
+    return this.makeRequest(`/api/tasks/${taskId}/schedule`, {
       method: 'POST',
       body: JSON.stringify(scheduleData),
       requireAuth: true,
@@ -2181,7 +2181,7 @@ class ApiService {
   }
 
   async archiveTask(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/archive`, {
+    return this.makeRequest(`/api/tasks/${taskId}/archive`, {
       method: 'POST',
       requireAuth: true,
     });
@@ -2189,9 +2189,9 @@ class ApiService {
 
   async deleteTask(taskId) {
     console.log('API Service: Hard deleting task with ID:', taskId);
-    console.log('API Service: Endpoint:', `/tasks/${taskId}/hard-delete`);
+    console.log('API Service: Endpoint:', `/api/tasks/${taskId}/hard-delete`);
     
-    const response = await this.makeRequest(`/tasks/${taskId}/hard-delete`, {
+    const response = await this.makeRequest(`/api/tasks/${taskId}/hard-delete`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -2201,7 +2201,7 @@ class ApiService {
   }
 
   async submitTask(taskId, submissionData) {
-    return this.makeRequest(`/tasks/${taskId}/submit`, {
+    return this.makeRequest(`/api/tasks/${taskId}/submit`, {
       method: 'POST',
       body: JSON.stringify(submissionData),
       requireAuth: true,
@@ -2221,7 +2221,7 @@ class ApiService {
       if (submissionData instanceof FormData) {
         // Method 1: Multiple files with same field name (attachment[])
         // Method 2: Multiple files with different field names (attachment1, attachment2, etc.)
-        response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, submissionData, {
+        response = await axios.post(`${API_BASE}/api/tasks/${taskId}/submit`, submissionData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             // Don't set Content-Type for FormData, let browser set it with boundary
@@ -2229,7 +2229,7 @@ class ApiService {
         });
       } else {
         // Method 3: JSON array of external files/URLs
-        response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, submissionData, {
+        response = await axios.post(`${API_BASE}/api/tasks/${taskId}/submit`, submissionData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -2275,7 +2275,7 @@ class ApiService {
         formData.append('external_links', JSON.stringify(submissionData.external_links));
       }
       
-      const response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, formData, {
+      const response = await axios.post(`${API_BASE}/api/tasks/${taskId}/submit`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -2309,7 +2309,7 @@ class ApiService {
         }))
       };
       
-      const response = await axios.post(`${API_BASE}/tasks/${taskId}/submit`, payload, {
+      const response = await axios.post(`${API_BASE}/api/tasks/${taskId}/submit`, payload, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -2325,7 +2325,7 @@ class ApiService {
   }
 
   async gradeSubmission(submissionId, gradeData) {
-    return this.makeRequest(`/tasks/submissions/${submissionId}/grade`, {
+    return this.makeRequest(`/api/tasks/submissions/${submissionId}/grade`, {
       method: 'POST',
       body: JSON.stringify(gradeData),
       requireAuth: true,
@@ -2333,7 +2333,7 @@ class ApiService {
   }
 
   async manualGradeTask(taskId, gradeData) {
-    return this.makeRequest(`/tasks/${taskId}/manual-grade`, {
+    return this.makeRequest(`/api/tasks/${taskId}/manual-grade`, {
       method: 'POST',
       body: JSON.stringify(gradeData),
       requireAuth: true,
@@ -2341,7 +2341,7 @@ class ApiService {
   }
 
   async addTaskComment(taskId, commentData) {
-    return this.makeRequest(`/tasks/${taskId}/comments`, {
+    return this.makeRequest(`/api/tasks/${taskId}/comments`, {
       method: 'POST',
       body: JSON.stringify(commentData),
       requireAuth: true,
@@ -2377,7 +2377,7 @@ class ApiService {
         },
       };
       try {
-        const response = await axios.post(`${API_BASE}/qr-grading/quick-grade`, formData, config);
+        const response = await axios.post(`${API_BASE}/api/qr-grading/quick-grade`, formData, config);
         return response.data;
       } catch (error) {
         const message = error.response?.data?.message || error.message || 'QR quick grade failed';
@@ -2392,7 +2392,7 @@ class ApiService {
       feedback,
       qr_data: qrData,
     };
-    return this.makeRequest(`/qr-grading/quick-grade`, {
+    return this.makeRequest(`/api/qr-grading/quick-grade`, {
       method: 'POST',
       body: JSON.stringify(payload),
       requireAuth: true,
@@ -2401,7 +2401,7 @@ class ApiService {
 
   async qrBulkQuickGrade({ taskId, grades = [], classCode }) {
     const payload = { task_id: taskId, class_code: classCode, grades };
-    return this.makeRequest(`/qr-grading/bulk-quick-grade`, {
+    return this.makeRequest(`/api/qr-grading/bulk-quick-grade`, {
       method: 'POST',
       body: JSON.stringify(payload),
       requireAuth: true,
@@ -2409,21 +2409,21 @@ class ApiService {
   }
 
   async getClassQRCodes(classCode) {
-    return this.makeRequest(`/qr-grading/class-qr/${encodeURIComponent(classCode)}`, {
+    return this.makeRequest(`/api/qr-grading/class-qr/${encodeURIComponent(classCode)}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getStudentQRCode(studentId) {
-    return this.makeRequest(`/qr-grading/student-qr/${encodeURIComponent(studentId)}`, {
+    return this.makeRequest(`/api/qr-grading/student-qr/${encodeURIComponent(studentId)}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getTaskComments(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/comments`, {
+    return this.makeRequest(`/api/tasks/${taskId}/comments`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -2436,7 +2436,7 @@ class ApiService {
     if (filters.type) queryParams.append('type', filters.type);
     if (filters.status) queryParams.append('status', filters.status);
     
-    const endpoint = `/tasks/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/tasks/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     return this.makeRequest(endpoint, {
       method: 'GET',
@@ -2446,21 +2446,21 @@ class ApiService {
 
   // Fetch individually assigned tasks for a student including grade/status for a class
   async getStudentAssignedTasks(classCode) {
-    return this.makeRequest(`/tasks/student/assigned?class_code=${encodeURIComponent(classCode)}`, {
+    return this.makeRequest(`/api/tasks/student/assigned?class_code=${encodeURIComponent(classCode)}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getTaskStatistics(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/stats`, {
+    return this.makeRequest(`/api/tasks/${taskId}/stats`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async bulkGradeSubmissions(taskId, gradesData) {
-    return this.makeRequest(`/tasks/${taskId}/bulk-grade`, {
+    return this.makeRequest(`/api/tasks/${taskId}/bulk-grade`, {
       method: 'POST',
       body: JSON.stringify(gradesData),
       requireAuth: true,
@@ -2470,14 +2470,14 @@ class ApiService {
   // Student Assignment Methods
   async getAvailableStudents(classCodes) {
     const codes = Array.isArray(classCodes) ? classCodes.join(',') : classCodes;
-    return this.makeRequest(`/tasks/available-students?class_codes=${codes}`, {
+    return this.makeRequest(`/api/tasks/available-students?class_codes=${codes}`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async assignStudentsToTask(taskId, students) {
-    return this.makeRequest(`/tasks/${taskId}/assign-students`, {
+    return this.makeRequest(`/api/tasks/${taskId}/assign-students`, {
       method: 'POST',
       body: JSON.stringify({ students }),
       requireAuth: true,
@@ -2485,14 +2485,14 @@ class ApiService {
   }
 
   async getAssignedStudents(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/assigned-students`, {
+    return this.makeRequest(`/api/tasks/${taskId}/assigned-students`, {
       method: 'GET',
       requireAuth: true,
     });
   }
 
   async getAssignmentStatistics(taskId) {
-    return this.makeRequest(`/tasks/${taskId}/assignment-stats`, {
+    return this.makeRequest(`/api/tasks/${taskId}/assignment-stats`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -2529,7 +2529,7 @@ class ApiService {
         return { status: false, message: 'No filename provided' };
       }
       // Endpoint: /tasks/files/info/{filename}
-      return await this.makeRequest(`/tasks/files/info/${encodeURIComponent(filename)}`, {
+      return await this.makeRequest(`/api/tasks/files/info/${encodeURIComponent(filename)}`, {
         method: 'GET',
         requireAuth: true,
       });
@@ -2541,7 +2541,7 @@ class ApiService {
 
   // Student Stream Posting with Smart Notification Logic
   async createStudentStreamPost(classCode, postData) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream`, {
       method: 'POST',
       body: JSON.stringify(postData),
       requireAuth: true,
@@ -2549,7 +2549,7 @@ class ApiService {
   }
 
   async getStudentStreamPosts(classCode) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -2557,7 +2557,7 @@ class ApiService {
 
   // Student: get comments for a specific stream post
   async getStudentStreamComments(classCode, postId) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comments`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream/${postId}/comments`, {
       method: 'GET',
       requireAuth: true,
     });
@@ -2565,7 +2565,7 @@ class ApiService {
 
   // Student: add a comment to a specific stream post
   async addStudentStreamComment(classCode, postId, commentText) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream/${postId}/comment`, {
       method: 'POST',
       body: JSON.stringify({ comment: commentText }),
       requireAuth: true,
@@ -2574,7 +2574,7 @@ class ApiService {
 
   // Student: edit a comment on a specific stream post
   async editStudentStreamComment(classCode, postId, commentId, commentText) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
       method: 'PUT',
       body: JSON.stringify({ comment: commentText }),
       requireAuth: true,
@@ -2583,7 +2583,7 @@ class ApiService {
 
   // Student: delete a comment on a specific stream post
   async deleteStudentStreamComment(classCode, postId, commentId) {
-    return this.makeRequest(`/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
+    return this.makeRequest(`/api/student/classroom/${classCode}/stream/${postId}/comment/${commentId}`, {
       method: 'DELETE',
       requireAuth: true,
     });
@@ -2722,7 +2722,7 @@ class ApiService {
   // Helper method to send notifications
   async sendNotification(notificationData) {
     try {
-      return await this.makeRequest('/notifications', {
+      return await this.makeRequest('/api/notifications', {
         method: 'POST',
         body: JSON.stringify(notificationData),
         requireAuth: true,
@@ -2736,7 +2736,7 @@ class ApiService {
   // Get classroom members for notification logic
   async getClassroomMembers(classCode) {
     try {
-      return await this.makeRequest(`/student/classroom/${classCode}/people`, {
+      return await this.makeRequest(`/api/student/classroom/${classCode}/people`, {
         method: 'GET',
         requireAuth: true,
       });
@@ -2749,7 +2749,7 @@ class ApiService {
 
   // Get all sections
   async getSections() {
-    return this.makeRequest('/admin/sections', {
+    return this.makeRequest('/api/admin/sections', {
       method: 'GET',
       requireAuth: true,
     });
@@ -2757,7 +2757,7 @@ class ApiService {
 
   // Forgot Password
   async forgotPassword(email) {
-    return this.makeRequest('/auth/forgot-password', {
+    return this.makeRequest('/api/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
       requireAuth: false,
@@ -2766,7 +2766,7 @@ class ApiService {
 
   // Reset Password
   async resetPassword(token, newPassword) {
-    return this.makeRequest('/auth/reset-password', {
+    return this.makeRequest('/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, new_password: newPassword }),
       requireAuth: false,
@@ -2806,11 +2806,7 @@ class ApiService {
       
       // Try multiple URL variations to find the working one
       const urls = [
-        'http://localhost/scms_new_backup/index.php//api/2fa/status',
-        'http://localhost/scms_new_backup/index.php/api/2fa/status',
-        'http://localhost/scms_new_backup/api/2fa/status',
-        'http://localhost/scms_new_backup/index.php/2fa/status',
-        'http://localhost/scms_new_backup/2fa/status'
+        'https://scms-backend.up.railway.app/api/2fa/status'
       ];
       
       let response = null;
@@ -2908,11 +2904,7 @@ class ApiService {
       
       // Try multiple URL variations to find the working one
       const urls = [
-        'http://localhost/scms_new_backup/index.php//api/2fa/setup',
-        'http://localhost/scms_new_backup/index.php/api/2fa/setup',
-        'http://localhost/scms_new_backup/api/2fa/setup',
-        'http://localhost/scms_new_backup/index.php/2fa/setup',
-        'http://localhost/scms_new_backup/2fa/setup'
+        'https://scms-backend.up.railway.app/api/2fa/setup'
       ];
       
       let response = null;
@@ -2995,7 +2987,7 @@ class ApiService {
       const token = this.getToken();
       console.log('🔐 validate2FACode: Token exists:', !!token);
       
-      const response = await fetch('http://localhost/scms_new_backup/index.php//api/2fa/verify', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/2fa/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3081,7 +3073,7 @@ class ApiService {
     try {
       console.log('🔐 disable2FA: Disabling 2FA with code:', code);
       
-      const response = await fetch('http://localhost/scms_new_backup/index.php//api/2fa/disable', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/2fa/disable', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3135,11 +3127,7 @@ class ApiService {
     
     // Try multiple URL variations to find the working one
     const urls = [
-      'http://localhost/scms_new_backup/index.php//api/2fa/login-verify',
-      'http://localhost/scms_new_backup/index.php/api/2fa/login-verify',
-      'http://localhost/scms_new_backup/api/2fa/login-verify',
-      'http://localhost/scms_new_backup/index.php/2fa/login-verify',
-      'http://localhost/scms_new_backup/2fa/login-verify'
+      'https://scms-backend.up.railway.app/api/2fa/login-verify'
     ];
     
     let response = null;
@@ -3338,7 +3326,7 @@ class ApiService {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-codes', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/2fa/backup-codes', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -3386,7 +3374,7 @@ class ApiService {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-codes/generate', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/2fa/backup-codes/generate', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -3428,7 +3416,7 @@ class ApiService {
   async verifyBackupCode(email, backupCode) {
     console.log('🔐 verifyBackupCode called with:', { email, backupCode });
     try {
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/2fa/backup-code', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/2fa/backup-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -3495,7 +3483,7 @@ class ApiService {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/auth/change-password', {
+      const response = await fetch('https://scms-backend.up.railway.app/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3557,7 +3545,7 @@ class ApiService {
   // 📊 NEW: Admin Dashboard Statistics
   async getAdminDashboardStats() {
     try {
-      const response = await this.get('/admin/dashboard/stats', true);
+      const response = await this.get('/api/admin/dashboard/stats', true);
       return response;
     } catch (error) {
       console.error('Error fetching admin dashboard stats:', error);
@@ -3572,7 +3560,7 @@ class ApiService {
   // 👥 NEW: Admin User Count Summary
   async getAdminUserCount() {
     try {
-      const response = await this.get('/admin/users/count', true);
+      const response = await this.get('/api/admin/users/count', true);
       return response;
     } catch (error) {
       console.error('Error fetching admin user count:', error);
@@ -3587,7 +3575,7 @@ class ApiService {
   // 📚 NEW: Admin Section Count Summary
   async getAdminSectionCount() {
     try {
-      const response = await this.get('/admin/sections/count', true);
+      const response = await this.get('/api/admin/sections/count', true);
       return response;
     } catch (error) {
       console.error('Error fetching admin section count:', error);
@@ -3602,7 +3590,7 @@ class ApiService {
   // ✏️ NEW: Update Classroom Stream Post
   async updateClassroomStreamPost(classCode, postId, updateData) {
     try {
-      const response = await this.makeRequest(`/teacher/classroom/${classCode}/stream/${postId}`, {
+      const response = await this.makeRequest(`/api/teacher/classroom/${classCode}/stream/${postId}`, {
         method: 'PUT',
         body: JSON.stringify(updateData),
         requireAuth: true

@@ -755,7 +755,7 @@ const StudentSettings = () => {
       console.log('Sending update data to new endpoint:', updateData);
 
       // Use the new student profile update endpoint
-      const response = await fetch('http://localhost/scms_new_backup/index.php/api/student/profile/update', {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/student/profile/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

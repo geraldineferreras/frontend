@@ -1076,7 +1076,7 @@ const AssignmentDetailStudent = () => {
                        if (isLink && linkUrl) {
                          // Remove localhost prefixes if they exist
                          if (linkUrl.includes('localhost/scms_new_backup/')) {
-                           linkUrl = linkUrl.replace('http://localhost/scms_new_backup/', '');
+                           linkUrl = linkUrl.replace('https://scms-backend.up.railway.app/', '');
                          } else if (linkUrl.includes('localhost/')) {
                            // Handle other localhost variations
                            linkUrl = linkUrl.replace(/^https?:\/\/localhost\/[^\/]*\//, '');

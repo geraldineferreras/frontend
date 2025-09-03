@@ -36,7 +36,7 @@
   },
   "build": {
     "env": {
-      "REACT_APP_API_BASE_URL": "@react_app_api_base_url"
+      "REACT_APP_API_BASE_URL": "https://scms-backend.up.railway.app"
     }
   }
 }

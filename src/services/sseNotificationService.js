@@ -71,14 +71,14 @@ export default class SseNotificationService {
 
     // Fallback only if no environment variable is set
     console.warn('[SSE] No REACT_APP_SSE_URL found, using fallback');
-    const apiBase = process.env.REACT_APP_API_BASE_URL || '';
+    const apiBase = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
     // Strip trailing /index.php/api or /api
     let base = apiBase.replace(/\/?index\.php\/api$/, '').replace(/\/?api$/, '');
     base = base.replace(/\/$/, '');
     // Common SSE endpoints candidates; server should handle one of these
     const candidates = [
-      `${base}/sse/notifications`,
-      `${base}/notifications/stream`,
+      `${base}/api/sse/notifications`,
+      `${base}/api/notifications/stream`,
       `${base}/api/notifications/stream`,
     ];
     // Pick first candidate

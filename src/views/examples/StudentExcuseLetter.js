@@ -26,7 +26,7 @@ import { FaPlus, FaTrash, FaEye, FaFileUpload, FaCalendarAlt } from "react-icons
 import apiService from "../../services/api";
 
 // Get API_BASE from the same source as apiService
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup/index.php/api';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
 
 const StudentExcuseLetter = () => {
   // State for excuse letters data
@@ -1164,7 +1164,7 @@ const StudentExcuseLetter = () => {
   // Helper function to get attachment URL
   const getAttachmentUrl = (letter) => {
     if (letter.image_path) {
-      const baseUrl = 'http://localhost/scms_new_backup/';
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
       return `${baseUrl}${letter.image_path}`;
     }
     return null;

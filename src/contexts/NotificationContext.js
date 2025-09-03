@@ -404,7 +404,7 @@ export const NotificationProvider = ({ children }) => {
     if (!sseUrl) {
       console.error('[Notifications] REACT_APP_SSE_URL not found! Please check your .env.local file');
       // Temporary fallback for testing
-      const fallbackUrl = 'http://localhost/scms_new_backup/index.php/api/notifications/stream';
+      const fallbackUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/notifications/stream`;
       console.log('[Notifications] Using fallback URL:', fallbackUrl);
              svc.connect({ 
          url: fallbackUrl, 

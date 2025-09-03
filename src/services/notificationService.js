@@ -65,7 +65,7 @@ class NotificationService {
   // Check for new notifications
   async checkForNewNotifications() {
     try {
-      const response = await api.get('/notifications/recent');
+      const response = await api.get('/api/notifications/recent');
       if (response.success && response.data && response.data.notifications) {
         const notifications = response.data.notifications;
         
@@ -158,7 +158,7 @@ class NotificationService {
   // Get all notifications
   async getNotifications() {
     try {
-      const response = await api.get('/notifications');
+      const response = await api.get('/api/notifications');
       if (response.success && response.data) {
         return response.data.notifications || [];
       }
@@ -172,7 +172,7 @@ class NotificationService {
   // Get recent notifications
   async getRecentNotifications(limit = 10) {
     try {
-      const response = await api.get('/notifications/recent');
+      const response = await api.get('/api/notifications/recent');
       if (response.success && response.data) {
         return response.data.notifications || [];
       }
@@ -186,7 +186,7 @@ class NotificationService {
   // Get unread count
   async getUnreadCount() {
     try {
-      const response = await api.get('/notifications/unread-count');
+      const response = await api.get('/api/notifications/unread-count');
       if (response.success && response.data) {
         return response.data.count || 0;
       }
@@ -211,7 +211,7 @@ class NotificationService {
   // Mark all notifications as read
   async markAllAsRead() {
     try {
-      const response = await api.put('/notifications/mark-all-read');
+      const response = await api.put('/api/notifications/mark-all-read');
       return response.success;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -233,7 +233,7 @@ class NotificationService {
   // Get notification settings
   async getNotificationSettings() {
     try {
-      const response = await api.get('/notifications/settings');
+      const response = await api.get('/api/notifications/settings');
       if (response.success && response.data) {
         return response.data.settings || {};
       }
@@ -247,7 +247,7 @@ class NotificationService {
   // Update notification settings
   async updateNotificationSettings(settings) {
     try {
-      const response = await api.put('/notifications/settings', settings);
+      const response = await api.put('/api/notifications/settings', settings);
       return response.success;
     } catch (error) {
       console.error('Error updating notification settings:', error);
@@ -258,7 +258,7 @@ class NotificationService {
   // Get urgent notifications
   async getUrgentNotifications() {
     try {
-      const response = await api.get('/notifications/urgent');
+      const response = await api.get('/api/notifications/urgent');
       if (response.success && response.data) {
         return response.data.notifications || [];
       }

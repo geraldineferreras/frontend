@@ -32,7 +32,7 @@ const SimpleProfileTest = () => {
           <div>
             <p>✅ Profile picture found: {user.profile_pic}</p>
             <img 
-              src={user.profile_pic.startsWith('http') ? user.profile_pic : `http://localhost/scms_new_backup/${user.profile_pic}`}
+              src={user.profile_pic.startsWith('http') ? user.profile_pic : `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${user.profile_pic}`}
               alt="Profile" 
               style={{ width: '100px', height: '100px', borderRadius: '50%', border: '2px solid #ccc' }}
               onError={(e) => {

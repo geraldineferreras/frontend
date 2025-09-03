@@ -159,7 +159,7 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
       
       // Method 1: Try the specific year level endpoint
       try {
-        const apiUrl = `http://localhost/scms_new_backup/index.php/api/admin/sections/year?year_level=${yearNumber}`;
+        const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/admin/sections/year?year_level=${yearNumber}`;
         console.log(`Method 1 - Making API call to: ${apiUrl}`);
         
         const response = await fetch(apiUrl, {
@@ -210,7 +210,7 @@ const CreateUser = ({ editUser, editMode, onEditDone }) => {
       // Method 3: Try different API endpoint structure
       if (!apiWorked) {
         try {
-          const apiUrl = `http://localhost/scms_new_backup/index.php/api/sections?year_level=${yearNumber}`;
+          const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/sections?year_level=${yearNumber}`;
           console.log(`Method 3 - Making API call to: ${apiUrl}`);
           
           const response = await fetch(apiUrl, {

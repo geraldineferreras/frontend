@@ -391,7 +391,7 @@ const AttendanceLog = () => {
       // Test if API is accessible
       console.log("Testing API accessibility...");
       try {
-        const testResponse = await fetch('http://localhost/scms_new_backup/index.php/api/attendance-logs/logs', {
+        const testResponse = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
@@ -437,7 +437,7 @@ const AttendanceLog = () => {
              // First, let's test if there's any data at all without filters
        console.log("Testing if there's any data available...");
        try {
-         const testAllDataUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+         const testAllDataUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs`;
          const testAllDataResponse = await fetch(testAllDataUrl, {
            method: 'GET',
            headers: {
@@ -466,7 +466,7 @@ const AttendanceLog = () => {
        let attendanceResponse;
        try {
          console.log("Attempting to fetch attendance data...");
-         const url = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs?${params.toString()}`;
+         const url = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs?${params.toString()}`;
                   console.log("Fetching from:", url);
           console.log("Full URL with params:", url);
          
@@ -510,7 +510,7 @@ const AttendanceLog = () => {
        if (activeCourseTab !== "all") {
          console.log("Trying without program filter as fallback...");
          try {
-           const fallbackUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           const fallbackUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs`;
            console.log("Fallback URL:", fallbackUrl);
            
            const fallbackResponse = await fetch(fallbackUrl, {
@@ -557,7 +557,7 @@ const AttendanceLog = () => {
          // Try without authentication as last resort
          console.log("Trying without authentication...");
          try {
-           const noAuthUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           const noAuthUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs`;
            console.log("No auth URL:", noAuthUrl);
            
            const noAuthResponse = await fetch(noAuthUrl, {
@@ -638,7 +638,7 @@ const AttendanceLog = () => {
          
          // Try without program filter as fallback
          try {
-           const fallbackUrl = `http://localhost/scms_new_backup/index.php/api/attendance-logs/logs`;
+           const fallbackUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/api/attendance-logs/logs`;
            console.log("Fallback URL:", fallbackUrl);
            
            const fallbackResponse = await fetch(fallbackUrl, {
@@ -1490,11 +1490,11 @@ const AttendanceLog = () => {
                             fileName = attachment.split('/').pop() || 'Attachment';
                           } else if (attachment.startsWith('uploads/')) {
                             // Relative path from server root
-                            fileUrl = `http://localhost/scms_new_backup/${attachment}`;
+                            fileUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/${attachment}`;
                             fileName = attachment.split('/').pop() || 'Attachment';
                           } else {
                             // Assume it's just a filename in uploads directory
-                            fileUrl = `http://localhost/scms_new_backup/uploads/${attachment}`;
+                            fileUrl = `${process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app'}/uploads/${attachment}`;
                             fileName = attachment;
                           }
                           
