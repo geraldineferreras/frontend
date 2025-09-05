@@ -1283,7 +1283,7 @@ const SectionManagement = () => {
       const errors = [];
       
       // Get available teachers for assignment as advisers
-      const teachersResponse = await apiService.get('/admin/teachers/available', true);
+      const teachersResponse = await apiService.getTeachers();
       const availableTeachers = teachersResponse?.data || [];
       
       if (availableTeachers.length === 0) {
@@ -1293,9 +1293,9 @@ const SectionManagement = () => {
       for (const course of courses) {
         for (const year of years) {
           for (const section of sections) {
+            const sectionName = `${course.toUpperCase()} ${year.split(' ')[0]}${section}`;
+            
             try {
-              const sectionName = `${course.toUpperCase()} ${year.split(' ')[0]}${section}`;
-              
               // Assign a random teacher as adviser (you can modify this logic)
               const randomTeacher = availableTeachers[Math.floor(Math.random() * availableTeachers.length)];
               
@@ -1308,7 +1308,7 @@ const SectionManagement = () => {
                 semester: '1st Semester'
               };
               
-              await apiService.post('/admin/sections', sectionData, true);
+              await apiService.post('/api/admin/sections/auto-create', sectionData, true);
               totalCreated++;
               
               // Add a small delay to avoid overwhelming the server

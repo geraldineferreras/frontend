@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom Student Count Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: #28a745;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .classroom-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+        }
+        .classroom-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .student-count {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Classroom Student Count Fix Test</h1>
+        <p>This test verifies that the classroom student count functionality is working correctly after fixing the 404 errors.</p>
+        
+        <div class="test-section info">
+            <h3>📋 Test Overview</h3>
+            <p><strong>Issues Fixed:</strong></p>
+            <ul>
+                <li>Added missing API methods: <code>getClassroomStudents()</code>, <code>getTaskDrafts()</code>, <code>getScheduledTasks()</code></li>
+                <li>Created backend endpoint: <code>/api/teacher/classrooms/{classCode}</code></li>
+                <li>Updated frontend to use proper API methods instead of direct makeRequest calls</li>
+                <li>Fixed API endpoint paths for drafts and scheduled tasks</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Classroom Student Count</h3>
+            <p>Test the student count functionality for classroom code: <strong>9C4K8N</strong></p>
+            
+            <button onclick="testClassroomStudents()">Test Student Count API</button>
+            <button onclick="testClassroomDetails()">Test Classroom Details API</button>
+            <button onclick="testTaskDrafts()">Test Task Drafts API</button>
+            <button onclick="testScheduledTasks()">Test Scheduled Tasks API</button>
+            <button onclick="testAllEndpoints()">Test All Endpoints</button>
+            
+            <div id="testResults" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Classroom Display Test</h3>
+            <p>Simulate the classroom card display with student count:</p>
+            
+            <div id="classroomDisplay" class="classroom-card">
+                <div class="classroom-info">
+                    <div>
+                        <h4>Object Oriented Programming</h4>
+                        <p>BSIT 1A • 1ST SEMESTER • 2023-2024</p>
+                        <p>Class Code: 9C4K8N</p>
+                    </div>
+                    <div class="student-count" id="studentCountDisplay">
+                        <span class="loading">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="updateStudentCount()">Update Student Count</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://scms-backend.up.railway.app';
+        const CLASS_CODE = '9C4K8N';
+        
+        // Mock API service methods (simplified version of the actual implementation)
+        class MockApiService {
+            async makeRequest(endpoint, options = {}) {
+                const url = `${API_BASE}${endpoint}`;
+                console.log('API Request URL:', url);
+                
+                const { method = 'GET', headers = {}, body, requireAuth = false } = options;
+                
+                const config = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...headers
+                    }
+                };
+                
+                if (body) {
+                    config.body = body;
+                }
+                
+                if (requireAuth) {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        throw new Error('Authentication token not found');
+                    }
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+                
+                const response = await fetch(url, config);
+                
+                if (!response.ok) {
+                    throw new Error(`Request failed with status code ${response.status}`);
+                }
+                
+                return await response.json();
+            }
+            
+            async getClassroomStudents(classCode) {
+                return this.makeRequest(`/api/teacher/classroom/${classCode}/students`, {
+                    method: 'GET',
+                    requireAuth: true,
+                });
+            }
+            
+            async getClassroomByCode(classCode) {
+                return this.makeRequest(`/api/teacher/classrooms/${classCode}`, {
+                    method: 'GET',
+                    requireAuth: true,
+                });
+            }
+            
+            async getTaskDrafts(classCode) {
+                return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/drafts`, {
+                    method: 'GET',
+                    requireAuth: true,
+                });
+            }
+            
+            async getScheduledTasks(classCode) {
+                return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/scheduled`, {
+                    method: 'GET',
+                    requireAuth: true,
+                });
+            }
+        }
+        
+        const apiService = new MockApiService();
+        
+        function logResult(message, isError = false) {
+            const resultsDiv = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = isError ? 'error' : 'success';
+            resultsDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+        }
+        
+        async function testClassroomStudents() {
+            try {
+                logResult('Testing getClassroomStudents API...');
+                const response = await apiService.getClassroomStudents(CLASS_CODE);
+                logResult(`✅ getClassroomStudents SUCCESS: Found ${response.data?.students?.length || 0} students`);
+                console.log('getClassroomStudents response:', response);
+            } catch (error) {
+                logResult(`❌ getClassroomStudents FAILED: ${error.message}`, true);
+                console.error('getClassroomStudents error:', error);
+            }
+        }
+        
+        async function testClassroomDetails() {
+            try {
+                logResult('Testing getClassroomByCode API...');
+                const response = await apiService.getClassroomByCode(CLASS_CODE);
+                logResult(`✅ getClassroomByCode SUCCESS: Classroom "${response.data?.name}" found`);
+                console.log('getClassroomByCode response:', response);
+            } catch (error) {
+                logResult(`❌ getClassroomByCode FAILED: ${error.message}`, true);
+                console.error('getClassroomByCode error:', error);
+            }
+        }
+        
+        async function testTaskDrafts() {
+            try {
+                logResult('Testing getTaskDrafts API...');
+                const response = await apiService.getTaskDrafts(CLASS_CODE);
+                logResult(`✅ getTaskDrafts SUCCESS: Found ${response.data?.length || 0} drafts`);
+                console.log('getTaskDrafts response:', response);
+            } catch (error) {
+                logResult(`❌ getTaskDrafts FAILED: ${error.message}`, true);
+                console.error('getTaskDrafts error:', error);
+            }
+        }
+        
+        async function testScheduledTasks() {
+            try {
+                logResult('Testing getScheduledTasks API...');
+                const response = await apiService.getScheduledTasks(CLASS_CODE);
+                logResult(`✅ getScheduledTasks SUCCESS: Found ${response.data?.length || 0} scheduled tasks`);
+                console.log('getScheduledTasks response:', response);
+            } catch (error) {
+                logResult(`❌ getScheduledTasks FAILED: ${error.message}`, true);
+                console.error('getScheduledTasks error:', error);
+            }
+        }
+        
+        async function testAllEndpoints() {
+            logResult('🧪 Running all endpoint tests...');
+            document.getElementById('testResults').innerHTML = '';
+            
+            await testClassroomStudents();
+            await testClassroomDetails();
+            await testTaskDrafts();
+            await testScheduledTasks();
+            
+            logResult('🏁 All tests completed!');
+        }
+        
+        async function updateStudentCount() {
+            const countDisplay = document.getElementById('studentCountDisplay');
+            countDisplay.innerHTML = '<span class="loading">Loading...</span>';
+            
+            try {
+                const response = await apiService.getClassroomStudents(CLASS_CODE);
+                const studentCount = response.data?.students?.length || 0;
+                countDisplay.innerHTML = `${studentCount} STUDENTS`;
+                logResult(`✅ Student count updated: ${studentCount} students`);
+            } catch (error) {
+                countDisplay.innerHTML = '<span style="color: #dc3545;">Error</span>';
+                logResult(`❌ Failed to update student count: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            logResult('🚀 Classroom Student Count Fix Test loaded');
+            logResult('📝 Note: You need to be logged in with a valid token to test the APIs');
+            logResult('💡 Check the browser console for detailed API responses');
+        });
+    </script>
+</body>
+</html>

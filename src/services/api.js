@@ -1231,6 +1231,14 @@ class ApiService {
     });
   }
 
+  // Teacher Get Classroom Students API
+  async getClassroomStudents(classCode) {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/students`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
   // Teacher Get Classroom Stream Posts API
   async getClassroomStream(classCode) {
     return this.makeRequest(`/api/teacher/classroom/${classCode}/stream`, {
@@ -1249,6 +1257,22 @@ class ApiService {
 
   // Teacher Get Scheduled Posts Only
   async getClassroomStreamScheduled(classCode) {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/scheduled`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher Get Task Drafts API
+  async getTaskDrafts(classCode) {
+    return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/drafts`, {
+      method: 'GET',
+      requireAuth: true,
+    });
+  }
+
+  // Teacher Get Scheduled Tasks API
+  async getScheduledTasks(classCode) {
     return this.makeRequest(`/api/teacher/classroom/${classCode}/stream/scheduled`, {
       method: 'GET',
       requireAuth: true,
@@ -1724,14 +1748,28 @@ class ApiService {
     }
     
     try {
+      console.log('Making request to:', `${API_BASE}/api/excuse-letters/submit`);
+      console.log('Request headers:', {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data (auto-set by browser)'
+      });
+      
       const response = await axios.post(`${API_BASE}/api/excuse-letters/submit`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           // Don't set Content-Type for FormData, let browser set it with boundary
         },
       });
+      
+      console.log('Response received:', response.data);
       return response.data;
     } catch (error) {
+      console.error('Full error object:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error response status:', error.response?.status);
+      console.error('Error response headers:', error.response?.headers);
+      
       const message = error.response?.data?.message || error.message || 'API Error';
       console.error('API Error (submitExcuseLetterWithAttachment):', message);
       throw new Error(message);

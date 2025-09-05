@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const ProfilePictureTest = ({ user, size = 40, className = "", style = {} }) => {
   // Check for profile picture in multiple possible field names
@@ -19,7 +19,7 @@ const ProfilePictureTest = ({ user, size = 40, className = "", style = {} }) => 
       console.log('✅ Using full URL:', fullProfilePicUrl);
     } else if (hasProfilePic.startsWith('uploads/')) {
       // Relative path - construct full URL
-      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup';
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
       fullProfilePicUrl = `${baseUrl}/${hasProfilePic}`;
       console.log('🔗 Constructed full URL from relative path:', fullProfilePicUrl);
     } else if (hasProfilePic.startsWith('data:')) {
@@ -28,7 +28,7 @@ const ProfilePictureTest = ({ user, size = 40, className = "", style = {} }) => 
       console.log('✅ Using data URL:', fullProfilePicUrl);
     } else {
       // Assume it's a filename in uploads directory
-      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup';
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
       fullProfilePicUrl = `${baseUrl}/uploads/profile/${hasProfilePic}`;
       console.log('🔗 Constructed full URL from filename:', fullProfilePicUrl);
     }
@@ -62,9 +62,38 @@ const ProfilePictureTest = ({ user, size = 40, className = "", style = {} }) => 
     );
   }
   
-  // Show profile picture with fallback initials
+  // Show profile picture with fallback initials (avoid flicker)
+  const [isLoaded, setIsLoaded] = useState(false);
+  const initialsText = user?.full_name ? 
+    user.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 
+    'U';
+
   return (
     <div style={{ position: 'relative', width: `${size}px`, height: `${size}px` }}>
+      {/* Placeholder initials shown until image loads or if it errors */}
+      {!isLoaded && (
+        <div
+          className="fallback-initials"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: `${size}px`,
+            height: `${size}px`,
+            borderRadius: '50%',
+            backgroundColor: '#5e72e4',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: `${Math.max(12, size / 3)}px`,
+            fontWeight: 'bold',
+            color: 'white'
+          }}
+        >
+          {initialsText}
+        </div>
+      )}
+
       <img
         src={fullProfilePicUrl}
         alt={`${user?.full_name || 'User'}'s profile`}
@@ -74,46 +103,19 @@ const ProfilePictureTest = ({ user, size = 40, className = "", style = {} }) => 
           height: `${size}px`,
           borderRadius: '50%',
           objectFit: 'cover',
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 150ms ease-out',
           ...style
         }}
-        onError={(e) => {
+        onError={() => {
           console.log('Profile image failed to load:', fullProfilePicUrl);
-          // Hide the failed image and show initials
-          e.target.style.display = 'none';
-          const initialsDiv = e.target.parentElement.querySelector('.fallback-initials');
-          if (initialsDiv) {
-            initialsDiv.style.display = 'flex';
-          }
+          setIsLoaded(false);
         }}
         onLoad={() => {
+          setIsLoaded(true);
           console.log('✅ Profile image loaded successfully from:', fullProfilePicUrl);
         }}
       />
-      
-      {/* Fallback initials (hidden by default, shown on image error) */}
-      <div
-        className="fallback-initials"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: '50%',
-          backgroundColor: '#5e72e4',
-          display: 'none',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: `${Math.max(12, size / 3)}px`,
-          fontWeight: 'bold',
-          color: 'white'
-        }}
-      >
-        {user?.full_name ? 
-          user.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 
-          'U'
-        }
-      </div>
     </div>
   );
 };

@@ -1545,7 +1545,7 @@ const ClassroomDetailStudent = () => {
       setGradesError(null);
       
       // Use confirmed endpoint
-      apiService.get(`/student/grades?class_code=${currentClass.code}`)
+      apiService.get(`/api/student/grades?class_code=${currentClass.code}`)
         .then(response => {
           console.log('Grades API Response:', response);
           const ok = response?.status === true || response?.status === 'success' || !!response?.data;

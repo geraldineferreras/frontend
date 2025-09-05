@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notification Audio Files</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .audio-test {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Notification Audio Files</h1>
+    
+    <div class="test-section">
+        <h2>Audio File Tests</h2>
+        <p>This test verifies that the notification audio files can be loaded and played correctly.</p>
+        
+        <div class="audio-test">
+            <h3>Notification Sound</h3>
+            <audio id="notificationAudio" controls>
+                <source src="/sounds/notification.mp3" type="audio/mpeg">
+                <source src="/notification.mp3" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <button onclick="testNotificationAudio()">Test Notification Audio</button>
+            <div id="notificationResult" class="result"></div>
+        </div>
+        
+        <div class="audio-test">
+            <h3>Error Sound</h3>
+            <audio id="errorAudio" controls>
+                <source src="/sounds/error.mp3" type="audio/mpeg">
+                <source src="/error.mp3" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <button onclick="testErrorAudio()">Test Error Audio</button>
+            <div id="errorResult" class="result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>File Path Tests</h2>
+        <p>Test different file paths to see which ones work:</p>
+        <button onclick="testAllPaths()">Test All Audio Paths</button>
+        <div id="pathResults" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Audio Element Status</h2>
+        <button onclick="checkAudioStatus()">Check Audio Status</button>
+        <div id="statusResults" class="result"></div>
+    </div>
+
+    <script>
+        function testNotificationAudio() {
+            const audio = document.getElementById('notificationAudio');
+            const resultDiv = document.getElementById('notificationResult');
+            
+            resultDiv.textContent = 'Testing notification audio...';
+            resultDiv.className = 'result info';
+            
+            audio.addEventListener('canplay', () => {
+                resultDiv.textContent = '✅ Notification audio loaded successfully!\nReady to play.';
+                resultDiv.className = 'result success';
+            });
+            
+            audio.addEventListener('error', (e) => {
+                resultDiv.textContent = `❌ Failed to load notification audio:\n${e.target.error?.message || 'Unknown error'}`;
+                resultDiv.className = 'result error';
+            });
+            
+            // Try to load the audio
+            audio.load();
+        }
+        
+        function testErrorAudio() {
+            const audio = document.getElementById('errorAudio');
+            const resultDiv = document.getElementById('errorResult');
+            
+            resultDiv.textContent = 'Testing error audio...';
+            resultDiv.className = 'result info';
+            
+            audio.addEventListener('canplay', () => {
+                resultDiv.textContent = '✅ Error audio loaded successfully!\nReady to play.';
+                resultDiv.className = 'result success';
+            });
+            
+            audio.addEventListener('error', (e) => {
+                resultDiv.textContent = `❌ Failed to load error audio:\n${e.target.error?.message || 'Unknown error'}`;
+                resultDiv.className = 'result error';
+            });
+            
+            // Try to load the audio
+            audio.load();
+        }
+        
+        async function testAllPaths() {
+            const resultDiv = document.getElementById('pathResults');
+            resultDiv.textContent = 'Testing all audio file paths...';
+            resultDiv.className = 'result info';
+            
+            const paths = [
+                '/sounds/notification.mp3',
+                '/sounds/error.mp3',
+                '/notification.mp3',
+                '/error.mp3'
+            ];
+            
+            let results = [];
+            
+            for (const path of paths) {
+                try {
+                    const response = await fetch(path, { method: 'HEAD' });
+                    if (response.ok) {
+                        results.push(`✅ ${path} - Found (${response.status})`);
+                    } else {
+                        results.push(`❌ ${path} - Not found (${response.status})`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${path} - Error: ${error.message}`);
+                }
+            }
+            
+            resultDiv.textContent = results.join('\n');
+            resultDiv.className = 'result info';
+        }
+        
+        function checkAudioStatus() {
+            const resultDiv = document.getElementById('statusResults');
+            const notificationAudio = document.getElementById('notificationAudio');
+            const errorAudio = document.getElementById('errorAudio');
+            
+            const status = {
+                notification: {
+                    readyState: notificationAudio.readyState,
+                    networkState: notificationAudio.networkState,
+                    src: notificationAudio.src,
+                    duration: notificationAudio.duration || 'Unknown',
+                    paused: notificationAudio.paused
+                },
+                error: {
+                    readyState: errorAudio.readyState,
+                    networkState: errorAudio.networkState,
+                    src: errorAudio.src,
+                    duration: errorAudio.duration || 'Unknown',
+                    paused: errorAudio.paused
+                }
+            };
+            
+            resultDiv.textContent = `Audio Status:\n\nNotification Audio:\n${JSON.stringify(status.notification, null, 2)}\n\nError Audio:\n${JSON.stringify(status.error, null, 2)}`;
+            resultDiv.className = 'result info';
+        }
+        
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testAllPaths();
+                checkAudioStatus();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

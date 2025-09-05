@@ -374,7 +374,15 @@ const ExcuseManagement = () => {
     // Check if image_path exists and construct the full URL
     if (excuse.image_path) {
       const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
-      return `${baseUrl}${excuse.image_path}`;
+      // Ensure proper URL construction - handle both absolute and relative paths
+      let imagePath = excuse.image_path;
+      if (imagePath.startsWith('/')) {
+        // If image_path starts with /, concatenate directly
+        return `${baseUrl}${imagePath}`;
+      } else {
+        // If image_path doesn't start with /, add it
+        return `${baseUrl}/${imagePath}`;
+      }
     }
     
     // Fallback to other possible field names

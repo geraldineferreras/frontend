@@ -70,7 +70,7 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
 // Real API calls for notifications
 const fetchNotifications = async () => {
   try {
-    const response = await api.get('/notifications');
+    const response = await api.get('/api/notifications');
     if (response.success && response.data) {
       return response.data.notifications || [];
     }
@@ -83,7 +83,7 @@ const fetchNotifications = async () => {
 
 const markAsRead = async (notificationId) => {
   try {
-    await api.put(`/notifications/${notificationId}/read`);
+    await api.put(`/api/notifications/${notificationId}/read`);
     return true;
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -93,7 +93,7 @@ const markAsRead = async (notificationId) => {
 
 const markAllAsRead = async () => {
   try {
-    await api.put('/notifications/mark-all-read');
+    await api.put('/api/notifications/mark-all-read');
     return true;
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -103,7 +103,7 @@ const markAllAsRead = async () => {
 
 const deleteNotification = async (notificationId) => {
   try {
-    await api.delete(`/notifications/${notificationId}`);
+    await api.delete(`/api/notifications/${notificationId}`);
     return true;
   } catch (error) {
     console.error('Error deleting notification:', error);

@@ -139,21 +139,71 @@ export const NotificationProvider = ({ children }) => {
     if (!preferences.soundEnabled) return;
     const soundKey = type === 'error' ? 'error' : 'notification';
     const audio = soundRefs.current[soundKey];
+    
     if (!audio) {
-      // eslint-disable-next-line no-console
       console.warn('[Notifications] Audio element missing for key:', soundKey);
+      // Fallback to browser beep if audio files are not available
+      playFallbackSound(type);
       return;
     }
+    
+    // Check if audio is ready to play
+    if (audio.readyState < 2) {
+      console.warn('[Notifications] Audio not ready to play for type:', type, 'readyState:', audio.readyState);
+      // Fallback to browser beep
+      playFallbackSound(type);
+      return;
+    }
+    
     try {
-      audio.volume = 1.0;
+      audio.volume = 0.5; // Lower volume to be less intrusive
       audio.currentTime = 0;
       audio.play()
-        // eslint-disable-next-line no-console
         .then(() => console.debug('[Notifications] Played sound for type:', type))
-        // eslint-disable-next-line no-console
-        .catch((err) => console.warn('[Notifications] Audio play blocked or failed:', err));
-    } catch (_) {
-      // ignore
+        .catch((err) => {
+          console.warn('[Notifications] Audio play blocked or failed:', err);
+          // Fallback to browser beep
+          playFallbackSound(type);
+        });
+    } catch (err) {
+      console.warn('[Notifications] Audio play error:', err);
+      // Fallback to browser beep
+      playFallbackSound(type);
+    }
+  };
+
+  // Fallback sound using Web Audio API or simple beep
+  const playFallbackSound = (type) => {
+    try {
+      // Try to use Web Audio API for a simple beep
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Different frequencies for different notification types
+      oscillator.frequency.setValueAtTime(type === 'error' ? 800 : 400, audioContext.currentTime);
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+      
+      console.debug('[Notifications] Played fallback sound for type:', type);
+    } catch (err) {
+      console.warn('[Notifications] Fallback sound failed:', err);
+      // Last resort: try to play a system beep (this might not work in all browsers)
+      try {
+        const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+        beep.volume = 0.1;
+        beep.play().catch(() => {});
+      } catch (beepErr) {
+        console.warn('[Notifications] System beep also failed:', beepErr);
+      }
     }
   };
 
@@ -468,19 +518,31 @@ export const NotificationProvider = ({ children }) => {
       {/* Hidden audio elements for notification sounds. Place files in public/sounds/. */}
       <audio
         ref={(el) => { if (el) soundRefs.current.notification = el; }}
-        src={`${process.env.PUBLIC_URL || ''}/sounds/notification.mp3`}
+        src="/sounds/notification.mp3"
         preload="auto"
         style={{ display: 'none' }}
         onCanPlay={() => console.debug('[Notifications] notification.mp3 ready')}
-        onError={(e) => console.warn('[Notifications] Failed to load notification.mp3', e)}
+        onError={(e) => {
+          console.warn('[Notifications] Failed to load notification.mp3', e);
+          // Try fallback path
+          if (e.target.src.includes('/sounds/')) {
+            e.target.src = '/notification.mp3';
+          }
+        }}
       />
       <audio
         ref={(el) => { if (el) soundRefs.current.error = el; }}
-        src={`${process.env.PUBLIC_URL || ''}/sounds/error.mp3`}
+        src="/sounds/error.mp3"
         preload="auto"
         style={{ display: 'none' }}
         onCanPlay={() => console.debug('[Notifications] error.mp3 ready')}
-        onError={(e) => console.warn('[Notifications] Failed to load error.mp3', e)}
+        onError={(e) => {
+          console.warn('[Notifications] Failed to load error.mp3', e);
+          // Try fallback path
+          if (e.target.src.includes('/sounds/')) {
+            e.target.src = '/error.mp3';
+          }
+        }}
       />
     </NotificationContext.Provider>
   );

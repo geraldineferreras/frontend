@@ -1165,7 +1165,15 @@ const StudentExcuseLetter = () => {
   const getAttachmentUrl = (letter) => {
     if (letter.image_path) {
       const baseUrl = process.env.REACT_APP_API_BASE_URL || 'https://scms-backend.up.railway.app';
-      return `${baseUrl}${letter.image_path}`;
+      // Ensure proper URL construction - handle both absolute and relative paths
+      let imagePath = letter.image_path;
+      if (imagePath.startsWith('/')) {
+        // If image_path starts with /, concatenate directly
+        return `${baseUrl}${imagePath}`;
+      } else {
+        // If image_path doesn't start with /, add it
+        return `${baseUrl}/${imagePath}`;
+      }
     }
     return null;
   };
@@ -1280,6 +1288,16 @@ const StudentExcuseLetter = () => {
         formData.append('attachment', submitForm.attachment);
 
         console.log('Submitting with attachment using class_id:', submitForm.class_id);
+        console.log('Attachment file details:', {
+          name: submitForm.attachment.name,
+          size: submitForm.attachment.size,
+          type: submitForm.attachment.type,
+          lastModified: submitForm.attachment.lastModified
+        });
+        console.log('FormData contents:');
+        for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+        }
         response = await apiService.submitExcuseLetterWithAttachment(formData);
       } else {
         // Submit without attachment using JSON

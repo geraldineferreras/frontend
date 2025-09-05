@@ -178,10 +178,7 @@ const Classroom = () => {
   // Function to fetch real student count for a classroom
   const fetchStudentCount = async (classCode) => {
     try {
-      const response = await apiService.makeRequest(`/teacher/classroom/${classCode}/students`, {
-        method: 'GET',
-        requireAuth: true,
-      });
+      const response = await apiService.getClassroomStudents(classCode);
       
       if (response.status && response.data && response.data.students) {
         return response.data.students.length;
@@ -477,7 +474,7 @@ const Classroom = () => {
 
       for (const cls of classes) {
         try {
-          const response = await apiService.get(`/teacher/classroom/${cls.code}/grades`);
+          const response = await apiService.get(`/api/teacher/classroom/${cls.code}/grades`);
           if (!response || !response.status || !response.data) continue;
 
           const gradesData = response.data;

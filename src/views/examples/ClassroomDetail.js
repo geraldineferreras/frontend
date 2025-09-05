@@ -893,21 +893,18 @@ const ClassroomDetail = () => {
       
       let response;
       try {
-        // Try the original path
-        response = await apiService.makeRequest(`/teacher/classroom/${code}/students`, {
-          method: 'GET',
-          requireAuth: true
-        });
+        // Use the new API method
+        response = await apiService.getClassroomStudents(code);
         console.log('API Response received:', response);
       } catch (error1) {
-        console.log('First path failed, trying alternative...');
+        console.log('getClassroomStudents failed, trying fallback...');
         try {
-          // Try alternative path
-          response = await apiService.makeRequest(`/teacher/classrooms/${code}/students`, {
+          // Try fallback with direct makeRequest
+          response = await apiService.makeRequest(`/teacher/classroom/${code}/students`, {
             method: 'GET',
             requireAuth: true
           });
-          console.log('Alternative path API Response received:', response);
+          console.log('Fallback API Response received:', response);
         } catch (error2) {
           console.log('Alternative path also failed, trying section students...');
           try {
@@ -1549,11 +1546,61 @@ const ClassroomDetail = () => {
 
 // Play grading success audio
   const playGradingSuccessAudio = () => {
-    const audioFile = voiceType === 'male'
-      ? process.env.PUBLIC_URL + '/grading-success-male.mp3'
-      : process.env.PUBLIC_URL + '/grading-success-female.mp3';
-    const audio = new Audio(audioFile);
-    audio.play();
+    try {
+      const audioFile = voiceType === 'male'
+        ? '/grading-success-male.mp3'
+        : '/grading-success-female.mp3';
+      
+      console.log('Playing QR grading audio:', { voiceType, audioFile });
+      
+      const audio = new Audio(audioFile);
+      
+      // Add event listeners for debugging
+      audio.addEventListener('loadstart', () => console.log('Audio load started'));
+      audio.addEventListener('canplay', () => console.log('Audio can play'));
+      audio.addEventListener('canplaythrough', () => console.log('Audio can play through'));
+      audio.addEventListener('error', (e) => console.error('Audio error:', e));
+      audio.addEventListener('abort', () => console.log('Audio aborted'));
+      
+      // Set volume and play
+      audio.volume = 0.8;
+      
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('QR grading audio played successfully');
+          })
+          .catch((error) => {
+            console.error('QR grading audio play failed:', error);
+            // Try fallback - create a simple beep sound
+            try {
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const oscillator = audioContext.createOscillator();
+              const gainNode = audioContext.createGain();
+              
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+              
+              oscillator.frequency.value = 800; // 800Hz tone
+              oscillator.type = 'sine';
+              
+              gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+              
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.5);
+              
+              console.log('Played fallback beep sound');
+            } catch (fallbackError) {
+              console.error('Fallback audio also failed:', fallbackError);
+            }
+          });
+      }
+    } catch (error) {
+      console.error('Error in playGradingSuccessAudio:', error);
+    }
   };
 
 // Handler for QR Grading submission (simulate QR scan)
@@ -3043,7 +3090,7 @@ useEffect(() => {
       setLoadingGrades(true);
       setGradesError(null);
       
-      apiService.get(`/teacher/classroom/${code}/grades`)
+      apiService.get(`/api/teacher/classroom/${code}/grades`)
         .then(response => {
           console.log('Grades API Response:', response);
           if (response.status && response.data) {
@@ -3067,7 +3114,7 @@ useEffect(() => {
       
       // Fetch drafts
       setLoadingDrafts(true);
-      apiService.get(`/tasks/drafts?class_code=${code}`)
+      apiService.getTaskDrafts(code)
         .then(response => {
           console.log('Drafts API Response:', response);
           if (response.status && response.data) {
@@ -3101,7 +3148,7 @@ useEffect(() => {
 
       // Fetch scheduled tasks
       setLoadingScheduled(true);
-      apiService.get(`/tasks/scheduled?class_code=${code}`)
+      apiService.getScheduledTasks(code)
         .then(response => {
           console.log('Scheduled Tasks API Response:', response);
           if (response.status && response.data) {

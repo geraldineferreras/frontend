@@ -36,13 +36,13 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
     try {
-      const response = await api.get('/notifications/recent');
+      const response = await api.get('/api/notifications/recent');
       if (response.success && response.data) {
         const recentNotifications = response.data.notifications || [];
         setNotifications(recentNotifications);
         
         // Get unread count
-        const unreadResponse = await api.get('/notifications/unread-count');
+        const unreadResponse = await api.get('/api/notifications/unread-count');
         if (unreadResponse.success && unreadResponse.data) {
           setUnreadCount(unreadResponse.data.count || 0);
         }
@@ -58,7 +58,7 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      await api.put(`/notifications/${notificationId}/read`);
+      await api.put(`/api/notifications/${notificationId}/read`);
       setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
@@ -71,7 +71,7 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
-      await api.put('/notifications/mark-all-read');
+      await api.put('/api/notifications/mark-all-read');
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {

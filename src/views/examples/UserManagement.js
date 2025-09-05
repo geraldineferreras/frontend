@@ -66,16 +66,24 @@ const defaultCoverPhotoSvg =
   "data:image/svg+xml;utf8,<svg width='600' height='240' viewBox='0 0 600 240' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='600' height='240' fill='%23f7f7f7'/><path d='M0 180 Q150 120 300 180 T600 180 V240 H0 Z' fill='%23e3eafc'/><path d='M0 200 Q200 140 400 200 T600 200 V240 H0 Z' fill='%23cfd8dc' opacity='0.7'/></svg>";
 
 // Helper function to add cache busting to image URLs
+// Make it idempotent and stable to avoid flicker from changing URLs per render
 const addCacheBuster = (url) => {
   if (!url || url.startsWith('data:')) return url;
-  const cacheBuster = `t=${Date.now()}`;
-  return url + (url.includes('?') ? '&' : '?') + cacheBuster;
+  // If a cache-busting or any query param already exists, don't change the URL
+  if (url.includes('?') && /(\?|&)t=/.test(url)) {
+    return url;
+  }
+  if (url.includes('?')) {
+    return url; // keep existing query params stable
+  }
+  // Add a single, stable cache-buster once
+  return `${url}?t=1`;
 };
 
 // Floating effect for content over header
 const userManagementStyles = `
   .section-content-container {
-    margin-top: -150px;
+    margin-top: -100px;
     z-index: 2;
     position: relative;
   }
@@ -90,6 +98,31 @@ const userManagementStyles = `
     padding: 2rem;
     margin-bottom: 2rem;
     box-shadow: none;
+  }
+  /* Hide big title on small screens to save space */
+  @media (max-width: 768px) {
+    .header-section .display-4 {
+      display: none;
+    }
+    .header-section p {
+      display: none;
+    }
+    .header-section .badge {
+      display: none;
+    }
+  }
+  /* Reduce top spacing of main content card */
+  .section-content-card .card-body {
+    padding-top: 1.5rem !important;
+  }
+  /* Ensure card is fully visible on mobile */
+  @media (max-width: 768px) {
+    .section-content-container {
+      margin-top: -50px;
+    }
+    .section-content-card {
+      margin: 0 1rem;
+    }
   }
   .header-section h1 {
     color: #32325d !important;

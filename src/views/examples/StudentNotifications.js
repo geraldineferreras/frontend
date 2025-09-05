@@ -68,7 +68,7 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
 // Real API calls for student notifications
 const fetchNotifications = async () => {
   try {
-    const response = await api.get('/notifications');
+    const response = await api.get('/api/notifications');
     if (response.success && response.data) {
       return response.data.notifications || [];
     }
@@ -81,7 +81,7 @@ const fetchNotifications = async () => {
 
 const markAsRead = async (notificationId) => {
   try {
-    await api.put(`/notifications/${notificationId}/read`);
+    await api.put(`/api/notifications/${notificationId}/read`);
     return true;
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -91,7 +91,7 @@ const markAsRead = async (notificationId) => {
 
 const markAllAsRead = async () => {
   try {
-    await api.put('/notifications/mark-all-read');
+    await api.put('/api/notifications/mark-all-read');
     return true;
   } catch (error) {
     console.error('Error marking all notifications as read:', error);

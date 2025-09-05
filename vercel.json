@@ -23,8 +23,44 @@
       "dest": "/manifest.json"
     },
     {
+      "src": "/site.webmanifest",
+      "dest": "/site.webmanifest"
+    },
+    {
+      "src": "/scms/site.webmanifest",
+      "dest": "/scms/site.webmanifest"
+    },
+    {
       "src": "/pdf.worker.js",
       "dest": "/pdf.worker.js"
+    },
+    {
+      "src": "/grading-success-female.mp3",
+      "dest": "/grading-success-female.mp3"
+    },
+    {
+      "src": "/grading-success-male.mp3",
+      "dest": "/grading-success-male.mp3"
+    },
+    {
+      "src": "/notification.mp3",
+      "dest": "/notification.mp3"
+    },
+    {
+      "src": "/error.mp3",
+      "dest": "/error.mp3"
+    },
+    {
+      "src": "/sounds/(.*)",
+      "dest": "/sounds/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/test-audio.html",
+      "dest": "/test-audio.html"
     },
     {
       "src": "/(.*)",
@@ -36,7 +72,8 @@
   },
   "build": {
     "env": {
-      "REACT_APP_API_BASE_URL": "https://scms-backend.up.railway.app"
+      "REACT_APP_API_BASE_URL": "https://scms-backend.up.railway.app",
+      "REACT_APP_SSE_URL": "https://scms-backend.up.railway.app/api/notifications/stream"
     }
   }
 }

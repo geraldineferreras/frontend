@@ -32,9 +32,11 @@ export const getProfilePictureUrl = (user) => {
     .replace(/\/$/, '');
 
   // Handle different URL formats
-  if (profilePic.startsWith('uploads/')) {
+  // Support both 'uploads/...' and '/uploads/...'
+  if (profilePic.startsWith('uploads/') || profilePic.startsWith('/uploads/')) {
     // Relative path - construct full URL using the correct base URL
-    imageUrl = `${baseRoot}/${profilePic}`;
+    const normalizedPath = profilePic.startsWith('/') ? profilePic.substring(1) : profilePic;
+    imageUrl = `${baseRoot}/${normalizedPath}`;
     console.log('📁 Relative path detected, constructed URL:', imageUrl);
   } else if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
     // Full URL

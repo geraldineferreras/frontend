@@ -200,7 +200,7 @@ class NotificationService {
   // Mark notification as read
   async markAsRead(notificationId) {
     try {
-      const response = await api.put(`/notifications/${notificationId}/read`);
+      const response = await api.put(`/api/notifications/${notificationId}/read`);
       return response.success;
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -222,7 +222,7 @@ class NotificationService {
   // Delete notification
   async deleteNotification(notificationId) {
     try {
-      const response = await api.delete(`/notifications/${notificationId}`);
+      const response = await api.delete(`/api/notifications/${notificationId}`);
       return response.success;
     } catch (error) {
       console.error('Error deleting notification:', error);

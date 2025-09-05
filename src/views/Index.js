@@ -1389,13 +1389,7 @@ const Index = (props) => {
 
             try {
 
-              const res = await apiService.makeRequest(`/teacher/classroom/${cls.code}/students`, {
-
-                method: "GET",
-
-                requireAuth: true,
-
-              });
+              const res = await apiService.getClassroomStudents(cls.code);
 
               const count = res?.data?.students ? res.data.students.length : 0;
 

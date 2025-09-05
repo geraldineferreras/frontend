@@ -118,10 +118,7 @@ export default function OfferingsManagement() {
     // Load sections
     try {
       setLoadingDropdowns(prev => ({ ...prev, sections: true }));
-      const sectionsResponse = await apiService.makeRequest('/admin/sections', {
-        method: 'GET',
-        requireAuth: true,
-      });
+      const sectionsResponse = await apiService.getSections();
       console.log('Sections response:', sectionsResponse);
       const sectionsData = sectionsResponse.data || sectionsResponse || [];
       setSections(sectionsData);
