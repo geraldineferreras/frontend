@@ -1551,18 +1551,7 @@ const ClassroomDetail = () => {
         ? '/grading-success-male.mp3'
         : '/grading-success-female.mp3';
       
-      console.log('Playing QR grading audio:', { voiceType, audioFile });
-      
       const audio = new Audio(audioFile);
-      
-      // Add event listeners for debugging
-      audio.addEventListener('loadstart', () => console.log('Audio load started'));
-      audio.addEventListener('canplay', () => console.log('Audio can play'));
-      audio.addEventListener('canplaythrough', () => console.log('Audio can play through'));
-      audio.addEventListener('error', (e) => console.error('Audio error:', e));
-      audio.addEventListener('abort', () => console.log('Audio aborted'));
-      
-      // Set volume and play
       audio.volume = 0.8;
       
       const playPromise = audio.play();
@@ -1570,7 +1559,7 @@ const ClassroomDetail = () => {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('QR grading audio played successfully');
+            // Audio played successfully
           })
           .catch((error) => {
             console.error('QR grading audio play failed:', error);
@@ -1591,8 +1580,6 @@ const ClassroomDetail = () => {
               
               oscillator.start(audioContext.currentTime);
               oscillator.stop(audioContext.currentTime + 0.5);
-              
-              console.log('Played fallback beep sound');
             } catch (fallbackError) {
               console.error('Fallback audio also failed:', fallbackError);
             }

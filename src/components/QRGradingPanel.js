@@ -225,63 +225,6 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
           <option value="female">Female</option>
           <option value="male">Male</option>
         </Input>
-        <Button 
-          color="info" 
-          size="sm" 
-          onClick={() => {
-            console.log('Testing audio notification:', audioType);
-            const audioSrc = audioType === 'female'
-              ? '/grading-success-female.mp3'
-              : '/grading-success-male.mp3';
-            
-            console.log('Audio file path:', audioSrc);
-            console.log('Current URL:', window.location.href);
-            console.log('Full audio URL:', window.location.origin + audioSrc);
-            
-            const tryPlayAudio = (src, attempt = 1) => {
-              console.log(`Attempt ${attempt}: Trying audio source:`, src);
-              
-              const audio = new Audio(src);
-              audio.addEventListener('loadstart', () => console.log(`Test audio load started (attempt ${attempt})`));
-              audio.addEventListener('canplay', () => console.log(`Test audio can play (attempt ${attempt})`));
-              audio.addEventListener('error', (e) => {
-                console.error(`Test audio error (attempt ${attempt}):`, e);
-                if (attempt === 1) {
-                  // Try alternative path
-                  const altSrc = attempt === 1 ? `./grading-success-${audioType}.mp3` : `grading-success-${audioType}.mp3`;
-                  console.log('Trying alternative path:', altSrc);
-                  tryPlayAudio(altSrc, 2);
-                } else {
-                  alert('Audio file not found. Please check if the audio files are properly deployed.\n\nExpected files:\n- /grading-success-female.mp3\n- /grading-success-male.mp3');
-                }
-              });
-              
-              audio.volume = 0.8;
-              const playPromise = audio.play();
-              
-              if (playPromise !== undefined) {
-                playPromise
-                  .then(() => console.log(`Test audio played successfully (attempt ${attempt})`))
-                  .catch((error) => {
-                    console.error(`Test audio play failed (attempt ${attempt}):`, error);
-                    if (attempt === 1) {
-                      // Try alternative path
-                      const altSrc = `./grading-success-${audioType}.mp3`;
-                      console.log('Trying alternative path due to play error:', altSrc);
-                      tryPlayAudio(altSrc, 2);
-                    } else {
-                      alert('Audio play failed: ' + error.message + '\n\nThis might be due to browser autoplay policy. Try clicking somewhere on the page first, then test again.');
-                    }
-                  });
-              }
-            };
-            
-            tryPlayAudio(audioSrc);
-          }}
-          style={{ marginTop: 8, fontSize: 12 }}
-        >
-          🔊 Test Audio
-        </Button>
       </div>
       <div className="mb-2">
         <Label className="font-weight-bold" style={{ fontSize: 15 }}>QR Scanner Camera</Label>
@@ -359,22 +302,13 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
               : '/grading-success-male.mp3';
             
             if (!window.__qrGradingLastPlayed || window.__qrGradingLastPlayed !== scannedId) {
-              console.log('Playing QR grading audio:', { audioType, audioSrc, scannedId });
-              
               const audio = new window.Audio(audioSrc);
-              
-              // Add event listeners for debugging
-              audio.addEventListener('loadstart', () => console.log('QR Audio load started'));
-              audio.addEventListener('canplay', () => console.log('QR Audio can play'));
-              audio.addEventListener('error', (e) => console.error('QR Audio error:', e));
-              
               audio.volume = 0.8;
               const playPromise = audio.play();
               
               if (playPromise !== undefined) {
                 playPromise
                   .then(() => {
-                    console.log('QR grading audio played successfully');
                     window.__qrGradingLastPlayed = scannedId;
                   })
                   .catch((error) => {
@@ -397,7 +331,6 @@ const QRGradingPanel = ({ student, onGradeSubmit }) => {
                       oscillator.start(audioContext.currentTime);
                       oscillator.stop(audioContext.currentTime + 0.5);
                       
-                      console.log('Played fallback beep for QR grading');
                       window.__qrGradingLastPlayed = scannedId;
                     } catch (fallbackError) {
                       console.error('Fallback audio also failed:', fallbackError);
