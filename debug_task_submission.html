@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Submission Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Task Submission Debug Tool</h1>
+        <p>Use this tool to test the task submission API endpoints and troubleshoot file upload issues.</p>
+
+        <!-- Authentication Section -->
+        <div class="section">
+            <h2>🔐 Authentication</h2>
+            <div class="form-group">
+                <label for="token">JWT Token:</label>
+                <input type="text" id="token" placeholder="Enter your JWT token here">
+            </div>
+            <button onclick="testAuth()">Test Authentication</button>
+            <div id="authResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Task Details Section -->
+        <div class="section">
+            <h2>📋 Task Details</h2>
+            <div class="form-group">
+                <label for="taskId">Task ID:</label>
+                <input type="text" id="taskId" placeholder="Enter task ID (e.g., 23)">
+            </div>
+            <div class="form-group">
+                <label for="classCode">Class Code:</label>
+                <input type="text" id="classCode" placeholder="Enter class code (e.g., J56NHD)">
+            </div>
+            <button onclick="getTaskDetails()">Get Task Details</button>
+            <button onclick="getStudentTaskDetails()">Get Student Task Details</button>
+            <div id="taskResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="section">
+            <h2>📁 File Upload Test</h2>
+            <div class="form-group">
+                <label for="submissionContent">Submission Content:</label>
+                <textarea id="submissionContent" rows="3" placeholder="Enter submission content (optional)"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="fileInput">Select Files:</label>
+                <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar">
+            </div>
+            <button onclick="submitTask()">Submit Task</button>
+            <div id="submitResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- API Endpoints Info -->
+        <div class="section">
+            <h2>📚 API Endpoints Reference</h2>
+            <div class="info">
+                <strong>Student Endpoints:</strong>
+                • GET /api/tasks/student/{task_id} - Get task details with submission status
+                • POST /api/tasks/{task_id}/submit - Submit files and content
+                
+                <strong>Teacher Endpoints:</strong>
+                • GET /api/tasks/{task_id} - Get task with all submissions
+                • POST /api/tasks/submissions/{id}/grade - Grade a submission
+                
+                <strong>File Upload:</strong>
+                • Content-Type: multipart/form-data
+                • Fields: submission_content, class_code, attachment (files)
+                • Max file size: 10MB
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost/scms_new_backup/index.php/api';
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function getToken() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                throw new Error('JWT token is required');
+            }
+            return token;
+        }
+
+        function getHeaders() {
+            return {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function testAuth() {
+            try {
+                const response = await fetch(`${BASE_URL}/auth/verify`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('authResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getTaskDetails() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/${taskId}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getStudentTaskDetails() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/student/${taskId}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('taskResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('taskResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function submitTask() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                const classCode = document.getElementById('classCode').value.trim();
+                const submissionContent = document.getElementById('submissionContent').value.trim();
+                const fileInput = document.getElementById('fileInput');
+
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+                if (!classCode) {
+                    throw new Error('Class code is required');
+                }
+                if (fileInput.files.length === 0 && !submissionContent) {
+                    throw new Error('Either files or submission content is required');
+                }
+
+                const formData = new FormData();
+                
+                if (submissionContent) {
+                    formData.append('submission_content', submissionContent);
+                }
+                
+                formData.append('class_code', classCode);
+                
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('attachment', fileInput.files[i]);
+                }
+
+                // Log FormData contents
+                console.log('FormData contents:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}:`, value instanceof File ? value.name : value);
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/${taskId}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                        // Don't set Content-Type for FormData
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                showResult('submitResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('submitResult', `Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html> 

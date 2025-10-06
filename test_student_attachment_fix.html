@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attachment Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .input {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 5px;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        .output {
+            font-family: monospace;
+            background: #d4edda;
+            padding: 5px;
+            border-radius: 3px;
+            margin: 5px 0;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 5px;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .success {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Student Attachment Fix Test</h1>
+    
+    <div class="test-section">
+        <h2>🔧 Issue Description</h2>
+        <p><strong>Problem:</strong> When students try to view attachments in the classwork section, they get a 404 error instead of a file preview.</p>
+        <p><strong>Root Cause:</strong> The frontend was constructing file URLs incorrectly, trying to access files through the API base URL instead of the proper file serving endpoint.</p>
+        <p><strong>Solution:</strong> Updated the file URL construction logic to use the API service's <code>getFilePreviewUrl</code> function for consistent and correct URL generation.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ Files Fixed</h2>
+        <ul>
+            <li><strong>AssignmentDetailStudent.js</strong> - Updated <code>getFileUrl</code> function</li>
+            <li><strong>TaskDetail.js</strong> - Updated <code>getFileUrl</code> function</li>
+            <li>Both now use <code>apiService.getFilePreviewUrl()</code> for consistency</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 URL Construction Test Cases</h2>
+        
+        <div class="test-case">
+            <h3>Test Case 1: Full URL (should pass through)</h3>
+            <div class="input">Input: https://example.com/file.pdf</div>
+            <div class="output">Expected: https://example.com/file.pdf</div>
+            <div class="success">✅ Should work correctly - full URLs are passed through unchanged</div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test Case 2: Uploads path (should append to server root)</h3>
+            <div class="input">Input: uploads/tasks/document.pdf</div>
+            <div class="output">Expected: http://localhost/scms_new_backup/uploads/tasks/document.pdf</div>
+            <div class="success">✅ Should work correctly - uploads paths are properly constructed</div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test Case 3: Bare filename (should append to tasks directory)</h3>
+            <div class="input">Input: document.pdf</div>
+            <div class="output">Expected: http://localhost/scms_new_backup/uploads/tasks/document.pdf</div>
+            <div class="success">✅ Should work correctly - bare filenames are properly routed to tasks directory</div>
+        </div>
+
+        <div class="test-case">
+            <h3>Test Case 4: Submissions (TaskDetail.js)</h3>
+            <div class="input">Input: submission.pdf</div>
+            <div class="output">Expected: http://localhost/scms_new_backup/uploads/submissions/submission.pdf</div>
+            <div class="success">✅ Should work correctly - submissions are routed to submissions directory</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Technical Details</h2>
+        
+        <h3>Before (Broken):</h3>
+        <div class="input">
+            <pre>const getFileUrl = (filePath) => {
+  if (!filePath) return null;
+  
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  } else if (filePath.startsWith('uploads/')) {
+    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/${filePath}`;
+  } else {
+    return `${process.env.REACT_APP_API_BASE_URL || 'http://localhost/scms_new_backup'}/uploads/tasks/${filePath}`;
+  }
+};</pre>
+        </div>
+        
+        <h3>After (Fixed):</h3>
+        <div class="output">
+            <pre>const getFileUrl = (filePath) => {
+  if (!filePath) return null;
+  
+  // Use the API service's getFilePreviewUrl function for consistency
+  return apiService.getFilePreviewUrl(filePath, false); // false for tasks
+};</pre>
+        </div>
+
+        <h3>API Service Logic:</h3>
+        <div class="output">
+            <pre>getFilePreviewUrl(filename, isSubmission = false) {
+  if (!filename) return '';
+  
+  // Pass-through absolute URLs
+  if (typeof filename === 'string' && (filename.startsWith('http://') || filename.startsWith('https://'))) {
+    return filename;
+  }
+
+  // Derive site base (strip both /index.php and /api if present)
+  const apiBase = process.env.REACT_APP_API_BASE_URL || API_BASE;
+  let baseUrl = apiBase;
+  baseUrl = baseUrl.replace('/index.php/api', '');
+  baseUrl = baseUrl.replace('/api', '');
+  baseUrl = baseUrl.replace(/\/$/, ''); // remove trailing slash
+
+  // If backend returned a relative path like "uploads/tasks/filename.pdf"
+  if (filename.startsWith('uploads/')) {
+    return `${baseUrl}/${filename}`;
+  }
+
+  // Otherwise assume bare filename
+  const endpoint = isSubmission ? `/uploads/submissions/${filename}` : `/uploads/tasks/${filename}`;
+  return `${baseUrl}${endpoint}`;
+}</pre>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Expected Results</h2>
+        <div class="success">
+            <strong>✅ Students should now be able to:</strong>
+            <ul>
+                <li>View PDF attachments directly in the browser</li>
+                <li>Preview image attachments</li>
+                <li>Download file attachments</li>
+                <li>Access all attachment types without 404 errors</li>
+            </ul>
+        </div>
+        
+        <div class="success">
+            <strong>✅ Technical improvements:</strong>
+            <ul>
+                <li>Consistent file URL construction across components</li>
+                <li>Proper handling of different file path formats</li>
+                <li>Centralized file serving logic in API service</li>
+                <li>Elimination of hardcoded localhost URLs in attachment handling</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🚀 Next Steps</h2>
+        <ol>
+            <li><strong>Test the fix:</strong> Navigate to student classwork section and try to view attachments</li>
+            <li><strong>Verify file previews:</strong> Check that PDFs, images, and other files load correctly</li>
+            <li><strong>Test different file types:</strong> Ensure all supported file types work properly</li>
+            <li><strong>Check teacher side:</strong> Verify that teacher file viewing still works correctly</li>
+        </ol>
+    </div>
+
+    <script>
+        // Simple test function to demonstrate the logic
+        function testFileUrlConstruction() {
+            console.log('🧪 Testing file URL construction logic...');
+            
+            // Mock the API service function
+            const mockApiService = {
+                getFilePreviewUrl: (filename, isSubmission = false) => {
+                    if (!filename) return '';
+                    
+                    // Pass-through absolute URLs
+                    if (filename.startsWith('http://') || filename.startsWith('https://')) {
+                        return filename;
+                    }
+
+                    // Derive site base (strip both /index.php and /api if present)
+                    const apiBase = 'http://localhost/scms_new_backup/index.php/api';
+                    let baseUrl = apiBase;
+                    baseUrl = baseUrl.replace('/index.php/api', '');
+                    baseUrl = baseUrl.replace('/api', '');
+                    baseUrl = baseUrl.replace(/\/$/, ''); // remove trailing slash
+
+                    // If backend returned a relative path like "uploads/tasks/filename.pdf"
+                    if (filename.startsWith('uploads/')) {
+                        return `${baseUrl}/${filename}`;
+                    }
+
+                    // Otherwise assume bare filename
+                    const endpoint = isSubmission ? `/uploads/submissions/${filename}` : `/uploads/tasks/${filename}`;
+                    return `${baseUrl}${endpoint}`;
+                }
+            };
+
+            // Test cases
+            const testCases = [
+                { input: 'https://example.com/file.pdf', expected: 'https://example.com/file.pdf', description: 'Full URL' },
+                { input: 'uploads/tasks/document.pdf', expected: 'http://localhost/scms_new_backup/uploads/tasks/document.pdf', description: 'Uploads path' },
+                { input: 'document.pdf', expected: 'http://localhost/scms_new_backup/uploads/tasks/document.pdf', description: 'Bare filename (tasks)' },
+                { input: 'submission.pdf', expected: 'http://localhost/scms_new_backup/uploads/submissions/submission.pdf', description: 'Bare filename (submissions)', isSubmission: true }
+            ];
+
+            testCases.forEach(testCase => {
+                const result = mockApiService.getFilePreviewUrl(testCase.input, testCase.isSubmission);
+                const passed = result === testCase.expected;
+                console.log(`${passed ? '✅' : '❌'} ${testCase.description}:`);
+                console.log(`  Input: ${testCase.input}`);
+                console.log(`  Expected: ${testCase.expected}`);
+                console.log(`  Got: ${result}`);
+                console.log(`  ${passed ? 'PASS' : 'FAIL'}\n`);
+            });
+        }
+
+        // Run the test when page loads
+        window.addEventListener('load', testFileUrlConstruction);
+    </script>
+</body>
+</html>

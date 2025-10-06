@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .upload-section.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .preview {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .preview img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .cover-preview img {
+            max-width: 300px;
+            max-height: 120px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .file-input-label:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Upload Test</h1>
+        <p>This page tests the image upload functionality with your backend implementation.</p>
+        
+                 <div class="result info">
+             <strong>Backend Endpoints:</strong>
+             - Profile Upload: POST http://localhost/scms_new_backup/index.php/api/upload/profile
+- Cover Upload: POST http://localhost/scms_new_backup/index.php/api/upload/cover
+- Test Endpoint: GET http://localhost/scms_new_backup/index.php/api/test/upload
+         </div>
+
+        <h2>1. Test Upload Endpoints</h2>
+        
+        <div class="upload-section">
+            <h3>Profile Image Upload</h3>
+            <label for="profileInput" class="file-input-label">Choose Profile Image</label>
+            <input type="file" id="profileInput" accept="image/*">
+            <div class="preview" id="profilePreview"></div>
+            <button onclick="uploadProfile()" id="uploadProfileBtn" disabled>Upload Profile Image</button>
+        </div>
+
+        <div class="upload-section">
+            <h3>Cover Photo Upload</h3>
+            <label for="coverInput" class="file-input-label">Choose Cover Photo</label>
+            <input type="file" id="coverInput" accept="image/*">
+            <div class="preview cover-preview" id="coverPreview"></div>
+            <button onclick="uploadCover()" id="uploadCoverBtn" disabled>Upload Cover Photo</button>
+        </div>
+
+        <div id="uploadResult"></div>
+
+        <h2>2. Test User Registration with Images</h2>
+        <div class="result info">
+            <strong>Note:</strong> This will create a test user with the uploaded image paths.
+        </div>
+        <button onclick="testUserRegistration()" id="testRegBtn" disabled>Test User Registration</button>
+        <div id="registrationResult"></div>
+
+        <h2>3. Test Endpoint</h2>
+        <button onclick="testEndpoint()">Test Backend Connection</button>
+        <div id="testResult"></div>
+    </div>
+
+    <script>
+        let profilePath = null;
+        let coverPath = null;
+
+        // File input handlers
+        document.getElementById('profileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                previewImage(file, 'profilePreview');
+                document.getElementById('uploadProfileBtn').disabled = false;
+            }
+        });
+
+        document.getElementById('coverInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                previewImage(file, 'coverPreview');
+                document.getElementById('uploadCoverBtn').disabled = false;
+            }
+        });
+
+        function previewImage(file, previewId) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById(previewId);
+                preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function uploadProfile() {
+            const file = document.getElementById('profileInput').files[0];
+            if (!file) {
+                showResult('uploadResult', 'Please select a profile image first.', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/upload/profile', {
+                     method: 'POST',
+                     body: formData
+                 });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    profilePath = result.data.file_path;
+                    showResult('uploadResult', `Profile upload successful!\nPath: ${profilePath}\nResponse: ${JSON.stringify(result, null, 2)}`, 'success');
+                    updateTestButton();
+                } else {
+                    showResult('uploadResult', `Profile upload failed: ${result.message}\nResponse: ${JSON.stringify(result, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('uploadResult', `Profile upload error: ${error.message}`, 'error');
+            }
+        }
+
+        async function uploadCover() {
+            const file = document.getElementById('coverInput').files[0];
+            if (!file) {
+                showResult('uploadResult', 'Please select a cover photo first.', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/upload/cover', {
+                     method: 'POST',
+                     body: formData
+                 });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    coverPath = result.data.file_path;
+                    showResult('uploadResult', `Cover upload successful!\nPath: ${coverPath}\nResponse: ${JSON.stringify(result, null, 2)}`, 'success');
+                    updateTestButton();
+                } else {
+                    showResult('uploadResult', `Cover upload failed: ${result.message}\nResponse: ${JSON.stringify(result, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('uploadResult', `Cover upload error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateTestButton() {
+            const testBtn = document.getElementById('testRegBtn');
+            if (profilePath && coverPath) {
+                testBtn.disabled = false;
+                testBtn.textContent = 'Test User Registration (Both Images Ready)';
+            } else if (profilePath || coverPath) {
+                testBtn.disabled = false;
+                testBtn.textContent = `Test User Registration (${profilePath ? 'Profile' : ''}${profilePath && coverPath ? ' & ' : ''}${coverPath ? 'Cover' : ''} Ready)`;
+            }
+        }
+
+        async function testUserRegistration() {
+            const userData = {
+                role: 'student',
+                full_name: 'Test User Upload',
+                email: 'testupload@example.com',
+                password: 'test123456',
+                program: 'Bachelor of Science in Information Technology',
+                student_num: '2024000001',
+                section_id: 1,
+                qr_code: 'IDNo: 2024000001\nFull Name: Test User Upload\nProgram: Bachelor of Science in Information Technology',
+                contact_num: '09123456789',
+                address: 'Test Address',
+                profile_pic: profilePath || 'uploads/profile/default.jpg',
+                cover_pic: coverPath || 'uploads/cover/default_cover.jpg'
+            };
+
+            try {
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/register', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json'
+                     },
+                     body: JSON.stringify(userData)
+                 });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult('registrationResult', `User registration successful!\nUser ID: ${result.data?.id}\nResponse: ${JSON.stringify(result, null, 2)}`, 'success');
+                } else {
+                    showResult('registrationResult', `User registration failed: ${result.message}\nResponse: ${JSON.stringify(result, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('registrationResult', `User registration error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEndpoint() {
+            try {
+                                 const response = await fetch('http://localhost/scms_new_backup/index.php/api/test/upload');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult('testResult', `Backend connection successful!\nResponse: ${JSON.stringify(result, null, 2)}`, 'success');
+                } else {
+                    showResult('testResult', `Backend connection failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('testResult', `Backend connection error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+    </script>
+</body>
+</html> 

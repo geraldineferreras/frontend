@@ -1,0 +1,19 @@
+{
+  "name": "scms-notification-server",
+  "version": "1.0.0",
+  "description": "Real-time notification server for SCMS",
+  "main": "notification-server.js",
+  "scripts": {
+    "start": "node notification-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.8.1",
+    "mysql2": "^3.6.5",
+    "web-push": "^3.6.7",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

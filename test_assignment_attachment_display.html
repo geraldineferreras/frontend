@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Assignment Attachment Display</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .attachment-preview {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .attachment-preview:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .file-icon {
+            width: 50px;
+            height: 60px;
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 16px;
+            box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        .file-details {
+            color: #718096;
+            font-size: 14px;
+        }
+        .arrow-icon {
+            width: 40px;
+            height: 40px;
+            background: #f7fafc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Assignment Attachment Display</h1>
+        <p>This test verifies that assignment attachments are properly displayed in the student view.</p>
+
+        <div class="test-section">
+            <h3>1. Test Assignment Data Structure</h3>
+            <p>Simulating the assignment data that should include attachment information:</p>
+            
+            <div id="assignmentData" class="result info">
+                // Assignment data structure
+                {
+                  "id": "58",
+                  "title": "Task Testing due date",
+                  "description": "testing testing",
+                  "instructions": "testing testing",
+                  "attachment_url": "55531ede80d7ff9617a3e073f55597c4.pdf",
+                  "attachment_type": "file",
+                  "due_date": "2025-08-11 04:21:00",
+                  "teacher_name": "Joel Quiambao",
+                  "points": "50"
+                }
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Assignment Attachment Display</h3>
+            <p>This shows how the assignment attachment should appear in the "Assignment Details" section:</p>
+            
+            <div id="attachmentDisplay">
+                <h4 style="font-weight: 600; font-size: 18px; margin-bottom: 16px; color: #212529; display: flex; align-items: center;">
+                    📄 Assignment Files
+                </h4>
+                
+                <div class="attachment-preview" onclick="openFile('55531ede80d7ff9617a3e073f55597c4.pdf')">
+                    <div class="file-icon">PDF</div>
+                    <div class="file-info">
+                        <div class="file-name">55531ede80d7ff9617a3e073f55597c4.pdf</div>
+                        <div class="file-details">PDF Document • Click to view</div>
+                    </div>
+                    <div class="arrow-icon">
+                        →
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Expected Behavior</h3>
+            <ul>
+                <li><strong>Assignment Details Section:</strong> Should show both the description AND any attached files</li>
+                <li><strong>File Display:</strong> Each attachment should show as a clickable card with file name and type</li>
+                <li><strong>File Access:</strong> Clicking the file should open it in a new tab</li>
+                <li><strong>Multiple Files:</strong> If assignment has multiple attachments, all should be displayed</li>
+                <li><strong>No Files:</strong> If no attachments, the section should not appear</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>4. API Response Check</h3>
+            <p>Test the student task details API to see what attachment data is returned:</p>
+            
+            <input type="text" id="taskId" placeholder="Enter Task ID (e.g., 58)" value="58">
+            <button onclick="getStudentTaskDetails()">Get Assignment Details</button>
+            
+            <div id="apiResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Implementation Notes</h3>
+            <div class="result info">
+                ✅ Added getFileUrl() helper function to construct proper file URLs
+                ✅ Added assignment attachment display section in Assignment Details card
+                ✅ Supports both single attachment_url and multiple attachments array
+                ✅ Handles both PDF files and external links
+                ✅ Clickable file cards that open files in new tab
+                ✅ Consistent styling with the rest of the application
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost/scms_new_backup/index.php/api';
+        
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || 'test-token')
+            };
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function openFile(filePath) {
+            const fileUrl = filePath.startsWith('http') ? filePath : `http://localhost/scms_new_backup/uploads/${filePath}`;
+            window.open(fileUrl, '_blank', 'noopener,noreferrer');
+        }
+
+        async function getStudentTaskDetails() {
+            try {
+                const taskId = document.getElementById('taskId').value.trim();
+                if (!taskId) {
+                    throw new Error('Task ID is required');
+                }
+
+                const response = await fetch(`${BASE_URL}/tasks/student/${taskId}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                showResult('apiResult', 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    response.ok ? 'success' : 'error'
+                );
+
+                // Check for attachment data
+                if (data.status && data.data) {
+                    const assignment = data.data;
+                    console.log('Assignment attachment data:', {
+                        attachment_url: assignment.attachment_url,
+                        attachment_type: assignment.attachment_type,
+                        attachments: assignment.attachments
+                    });
+                }
+            } catch (error) {
+                showResult('apiResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run the test when page loads
+        window.onload = function() {
+            console.log('Assignment attachment display test loaded');
+            console.log('Expected behavior: Assignment attachments should appear in Assignment Details section');
+        };
+    </script>
+</body>
+</html>

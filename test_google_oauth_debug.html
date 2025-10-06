@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Debug Test - SCMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .debug-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+        .response-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">🔍 Google OAuth Debug Test</h1>
+        
+        <div class="alert alert-warning">
+            <strong>Purpose:</strong> This page helps debug the Google OAuth data flow and see exactly what's being sent to the backend.
+        </div>
+
+        <!-- Manual API Test -->
+        <div class="debug-section">
+            <h3>1. Manual API Test</h3>
+            <p>Test the backend endpoint directly with the correct data format:</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Google ID:</label>
+                        <input type="text" class="form-control" id="testGoogleId" value="100299065378631474940" placeholder="Google user ID">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email:</label>
+                        <input type="email" class="form-control" id="testEmail" value="ferreras895@gmail.com" placeholder="Email address">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Full Name:</label>
+                        <input type="text" class="form-control" id="testFullName" value="Geraldine Ferreras" placeholder="Full name">
+                    </div>
+                    <button class="btn btn-primary" onclick="testBackendDirectly()">Test Backend Directly</button>
+                    <button class="btn btn-success ms-2" onclick="testWithRealData()">Test with Real Data</button>
+                </div>
+                <div class="col-md-6">
+                    <div class="response-display" id="directTestResponse">
+                        Response will appear here...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Format Comparison -->
+        <div class="debug-section">
+            <h3>2. Data Format Comparison</h3>
+            <p>Compare what the frontend is sending vs what the backend expects:</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>❌ What Frontend Was Sending (Before Fix):</h5>
+                    <div class="bg-light p-3 rounded">
+                        <pre>{
+  "idToken": "google_id_token_here",
+  "email": "user@example.com",
+  "name": "User Name",
+  "firstName": "User",
+  "lastName": "Name",
+  "imageUrl": "profile_image_url",
+  "id": "google_user_id"
+}</pre>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h5>✅ What Frontend Should Send (After Fix):</h5>
+                    <div class="bg-success text-white p-3 rounded">
+                        <pre>{
+  "google_id": "google_user_id",
+  "email": "user@example.com",
+  "full_name": "User Name"
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backend Response Analysis -->
+        <div class="debug-section">
+            <h3>3. Backend Response Analysis</h3>
+            <p>Check what the backend is actually returning:</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <button class="btn btn-info" onclick="analyzeBackendResponse()">Analyze Backend Response</button>
+                </div>
+                <div class="col-md-6">
+                    <div class="response-display" id="backendAnalysis">
+                        Analysis will appear here...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Format Analysis -->
+        <div class="debug-section">
+            <h3>4. Response Format Analysis</h3>
+            <p>Compare what your backend returns vs what the frontend expects:</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>✅ What Frontend Expects:</h5>
+                    <div class="bg-success text-white p-3 rounded">
+                        <pre>{
+  "success": true,
+  "data": {
+    "token": "jwt_token_here",
+    "user_id": "12345",
+    "email": "user@example.com",
+    "full_name": "User Name",
+    "role": "student",
+    "status": "active"
+  }
+}</pre>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h5>🔍 What Your Backend Returns:</h5>
+                    <div class="bg-info text-white p-3 rounded">
+                        <pre id="backendResponseFormat">
+                            Click "Test with Real Data" to see your backend response format
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Troubleshooting Steps -->
+        <div class="debug-section">
+            <h3>5. Troubleshooting Steps</h3>
+            <div class="alert alert-info">
+                <h6>If you're still getting "Missing required OAuth data" error:</h6>
+                <ol>
+                    <li><strong>Check Backend Logs:</strong> Look at your PHP error logs to see what data is actually received</li>
+                    <li><strong>Verify Endpoint:</strong> Make sure your backend endpoint is at <code>/api/auth/google</code></li>
+                    <li><strong>Check CORS:</strong> Ensure your backend allows requests from <code>http://localhost:3000</code></li>
+                    <li><strong>Data Validation:</strong> Verify your backend is checking for <code>google_id</code>, <code>email</code>, and <code>full_name</code></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+
+        // Test backend directly with correct data format
+        async function testBackendDirectly() {
+            const googleId = document.getElementById('testGoogleId').value;
+            const email = document.getElementById('testEmail').value;
+            const fullName = document.getElementById('testFullName').value;
+            const responseDiv = document.getElementById('directTestResponse');
+            
+            responseDiv.textContent = 'Testing backend with correct data format...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        google_id: googleId,
+                        email: email,
+                        full_name: fullName
+                    })
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Status: ${response.status}\n\nResponse:\n${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Test with the exact data from your Google OAuth
+        async function testWithRealData() {
+            const responseDiv = document.getElementById('directTestResponse');
+            const formatDiv = document.getElementById('backendResponseFormat');
+            
+            responseDiv.textContent = 'Testing with real Google OAuth data...';
+            formatDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        google_id: '100299065378631474940',
+                        email: 'ferreras895@gmail.com',
+                        full_name: 'Geraldine Ferreras'
+                    })
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Status: ${response.status}\n\nResponse:\n${JSON.stringify(data, null, 2)}\n\nThis should match what your frontend receives.`;
+                
+                // Update the format display
+                formatDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+                formatDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Analyze backend response format
+        async function analyzeBackendResponse() {
+            const responseDiv = document.getElementById('backendAnalysis');
+            
+            responseDiv.textContent = 'Analyzing backend response format...';
+            
+            try {
+                // Test with a simple request to see what the backend expects
+                const response = await fetch(`${API_BASE}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        // Send minimal data to see what error we get
+                        email: 'test@example.com'
+                    })
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Backend Response Analysis:\n\nStatus: ${response.status}\n\nResponse:\n${JSON.stringify(data, null, 2)}\n\nThis shows what the backend expects and what it returns.`;
+            } catch (error) {
+                responseDiv.textContent = `Error analyzing backend: ${error.message}`;
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 Google OAuth Debug Test Page Loaded');
+            console.log('📡 API Base URL:', API_BASE);
+        });
+    </script>
+</body>
+</html>

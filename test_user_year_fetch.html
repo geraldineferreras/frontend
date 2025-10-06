@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test User Year Fetch</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test User Year Fetch from API</h1>
+    
+    <div class="section">
+        <h2>API Test</h2>
+        <div class="form-group">
+            <label for="userId">User ID:</label>
+            <input type="text" id="userId" value="STU68A007F28C6F1924" placeholder="Enter User ID">
+        </div>
+        <div class="form-group">
+            <label for="role">Role:</label>
+            <select id="role">
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <button onclick="fetchUser()">Fetch User Data</button>
+        <div id="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>Year Processing Test</h2>
+        <div class="form-group">
+            <label for="testYear">Test Year Value:</label>
+            <input type="text" id="testYear" placeholder="Enter year value (e.g., '1st year', '1', '2nd Year')">
+        </div>
+        <button onclick="testYearProcessing()">Test Year Processing</button>
+        <div id="yearResult"></div>
+    </div>
+
+    <script>
+        async function fetchUser() {
+            const userId = document.getElementById('userId').value;
+            const role = document.getElementById('role').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!userId) {
+                resultDiv.innerHTML = '<div class="error">Please enter a User ID</div>';
+                return;
+            }
+            
+            try {
+                resultDiv.innerHTML = '<div>Fetching user data...</div>';
+                
+                const url = `http://localhost/scms_new_backup/index.php/api/user?role=${role}&user_id=${userId}`;
+                console.log('Fetching from URL:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                // Extract user data
+                const user = data.data || data.user || data;
+                
+                // Test year processing
+                const yearFromAPI = user.year || user.year_level || "";
+                const processedYear = processYearValue(yearFromAPI);
+                
+                const result = `
+API Response:
+${JSON.stringify(data, null, 2)}
+
+Year Data Analysis:
+- Raw year field: "${user.year}"
+- Raw year_level field: "${user.year_level}"
+- Extracted year: "${yearFromAPI}"
+- Processed year: "${processedYear}"
+- Year level from response: "${user.year_level}"
+- Section name: "${user.section_name}"
+
+Full User Object Keys:
+${Object.keys(user).join(', ')}
+                `;
+                
+                resultDiv.innerHTML = `<div class="success">Success!</div><div class="result">${result}</div>`;
+                
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function processYearValue(userYear) {
+            if (!userYear) return "";
+            
+            // Handle different year formats from API
+            const yearStr = userYear.toString().toLowerCase();
+            
+            // If it's already in proper format (case insensitive), normalize the case
+            if (yearStr.includes('year')) {
+                // Convert "1st year" to "1st Year", "2nd year" to "2nd Year", etc.
+                return yearStr.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ');
+            } 
+            // If it's just a number, convert to proper format
+            else if (!isNaN(yearStr)) {
+                const yearNumber = yearStr.toString();
+                const yearMap = {
+                    '1': '1st Year',
+                    '2': '2nd Year', 
+                    '3': '3rd Year',
+                    '4': '4th Year',
+                    '5': '5th Year'
+                };
+                return yearMap[yearNumber] || `${yearNumber}${yearNumber === '1' ? 'st' : yearNumber === '2' ? 'nd' : yearNumber === '3' ? 'rd' : 'th'} Year`;
+            }
+            
+            return userYear;
+        }
+        
+        function testYearProcessing() {
+            const testYear = document.getElementById('testYear').value;
+            const resultDiv = document.getElementById('yearResult');
+            
+            if (!testYear) {
+                resultDiv.innerHTML = '<div class="error">Please enter a year value to test</div>';
+                return;
+            }
+            
+            const processed = processYearValue(testYear);
+            
+            const result = `
+Input: "${testYear}"
+Output: "${processed}"
+Type: ${typeof testYear}
+IsNaN: ${isNaN(testYear)}
+Includes 'year': ${testYear.toString().toLowerCase().includes('year')}
+            `;
+            
+            resultDiv.innerHTML = `<div class="result">${result}</div>`;
+        }
+    </script>
+</body>
+</html>

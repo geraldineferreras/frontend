@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Deployed Notification System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Test Deployed Notification System</h1>
+        <p><strong>Deployed URL:</strong> <a href="https://scmsupdatedbackup.vercel.app" target="_blank">https://scmsupdatedbackup.vercel.app</a></p>
+        
+        <div class="test-section">
+            <h3>Test 1: Check Deployed API Endpoints</h3>
+            <p>Test if the notification endpoints are working on your deployed system.</p>
+            <button onclick="testDeployedAPI()">Test Deployed API</button>
+            <div id="result1" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Test Notification Polling</h3>
+            <p>Test the polling-based notification system that works on Vercel.</p>
+            <button onclick="testNotificationPolling()">Test Polling</button>
+            <div id="result2" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Create Test Notification</h3>
+            <p>Create a test notification to see if it appears in the system.</p>
+            <button onclick="createTestNotification()">Create Test Notification</button>
+            <div id="result3" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Live Polling Results</h3>
+            <p>Notifications will appear here (polling every 10 seconds):</p>
+            <button onclick="startPolling()">Start Polling</button>
+            <button onclick="stopPolling()">Stop Polling</button>
+            <div id="liveNotifications" class="result info" style="min-height: 200px;">
+                Click "Start Polling" to begin monitoring notifications...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEPLOYED_URL = 'https://scmsupdatedbackup.vercel.app';
+        let pollingInterval = null;
+        let pollCount = 0;
+
+        // Helper function to display results
+        function showResult(resultId, content, type = 'info') {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = content;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+
+        // Test 1: Check Deployed API
+        async function testDeployedAPI() {
+            showResult('result1', '🔄 Testing deployed API endpoints...', 'info');
+            
+            try {
+                // Test main API endpoint
+                const apiResponse = await fetch(`${DEPLOYED_URL}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                let apiStatus = 'Unknown';
+                try {
+                    const apiData = await apiResponse.json();
+                    apiStatus = apiResponse.ok ? 'Working' : 'Error';
+                } catch (e) {
+                    apiStatus = apiResponse.ok ? 'Working (no JSON response)' : 'Error';
+                }
+
+                // Test notification endpoints (these might not exist on Vercel)
+                let notificationStatus = 'Not available (expected on Vercel)';
+                try {
+                    const notifResponse = await fetch(`${DEPLOYED_URL}/api/notifications/recent`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    notificationStatus = notifResponse.ok ? 'Working' : 'Not available';
+                } catch (e) {
+                    notificationStatus = 'Not available (expected)';
+                }
+
+                const result = `✅ API Test Results:\n\nMain API: ${apiStatus} (${apiResponse.status})\nNotification API: ${notificationStatus}\n\nNote: Real-time notifications require a separate server (not Vercel).\nUse polling-based notifications instead.`;
+                
+                showResult('result1', result, 'success');
+            } catch (error) {
+                showResult('result1', `❌ API test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 2: Test Notification Polling
+        async function testNotificationPolling() {
+            showResult('result2', '🔄 Testing notification polling...', 'info');
+            
+            try {
+                // Simulate what the frontend does
+                const testUserId = 'TEST_USER_' + Math.random().toString(36).substr(2, 9);
+                
+                // Try to fetch notifications (this will likely fail on Vercel)
+                const response = await fetch(`${DEPLOYED_URL}/api/notifications/recent`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('result2', `✅ Polling test successful!\n\nResponse:\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('result2', `⚠️ Polling endpoint not available (${response.status})\n\nThis is expected on Vercel. You need to:\n1. Deploy notification server separately (Railway, Heroku, etc.)\n2. Or use polling from your main API endpoints`, 'warning');
+                }
+            } catch (error) {
+                showResult('result2', `❌ Polling test failed: ${error.message}\n\nThis confirms that real-time notifications need a separate server.`, 'error');
+            }
+        }
+
+        // Test 3: Create Test Notification
+        async function createTestNotification() {
+            showResult('result3', '🔄 Creating test notification...', 'info');
+            
+            try {
+                // Try to create a notification through your API
+                const notificationData = {
+                    recipient_id: 'TEST_USER_123',
+                    recipient_role: 'student',
+                    message: `Test notification created at ${new Date().toLocaleString()}`,
+                    type: 'test',
+                    data: {
+                        testId: Math.random().toString(36).substr(2, 9),
+                        timestamp: new Date().toISOString()
+                    }
+                };
+
+                const response = await fetch(`${DEPLOYED_URL}/api/notifications`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    },
+                    body: JSON.stringify(notificationData)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('result3', `✅ Test notification created!\n\nResponse:\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('result3', `⚠️ Cannot create notification directly (${response.status})\n\nThis is expected. Notifications should be created through your application's normal flow.`, 'warning');
+                }
+            } catch (error) {
+                showResult('result3', `❌ Failed to create notification: ${error.message}`, 'error');
+            }
+        }
+
+        // Start polling for notifications
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            pollCount = 0;
+            const liveDiv = document.getElementById('liveNotifications');
+            liveDiv.innerHTML = '🔄 Starting notification polling...\n\n';
+            
+            pollingInterval = setInterval(async () => {
+                pollCount++;
+                const timestamp = new Date().toLocaleTimeString();
+                
+                try {
+                    // Try to fetch notifications
+                    const response = await fetch(`${DEPLOYED_URL}/api/notifications/recent`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer test-token'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        liveDiv.innerHTML += `[${timestamp}] Poll #${pollCount}: ✅ Found ${data.notifications?.length || 0} notifications\n`;
+                    } else {
+                        liveDiv.innerHTML += `[${timestamp}] Poll #${pollCount}: ⚠️ No notification endpoint (${response.status})\n`;
+                    }
+                } catch (error) {
+                    liveDiv.innerHTML += `[${timestamp}] Poll #${pollCount}: ❌ Error: ${error.message}\n`;
+                }
+                
+                liveDiv.scrollTop = liveDiv.scrollHeight;
+            }, 10000); // Poll every 10 seconds
+        }
+
+        // Stop polling
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                const liveDiv = document.getElementById('liveNotifications');
+                liveDiv.innerHTML += `\n🛑 Polling stopped after ${pollCount} polls.\n`;
+            }
+        }
+
+        // Initialize
+        window.onload = function() {
+            console.log('Deployed Notification System Test initialized');
+            console.log('Deployed URL:', DEPLOYED_URL);
+            
+            // Auto-test deployed API on load
+            testDeployedAPI();
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            stopPolling();
+        };
+    </script>
+</body>
+</html>

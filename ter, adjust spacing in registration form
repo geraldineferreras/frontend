@@ -1,0 +1,11 @@
+warning: in the working copy of 'src/views/examples/EditSection.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/views/examples/OfferingsManagement.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/views/examples/SectionManagement.js', LF will be replaced by CRLF the next time Git touches it
+src/views/examples/AttendanceLog.js
+src/views/examples/CreateUser.js
+src/views/examples/EditSection.js
+src/views/examples/EditUser.js
+src/views/examples/Login.js
+src/views/examples/OfferingsManagement.js
+src/views/examples/Register.js
+src/views/examples/SectionManagement.js

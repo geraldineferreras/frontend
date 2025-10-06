@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Registration Endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Registration Endpoint</h1>
+    
+    <div class="test-section">
+        <h2>📝 Test Student Registration</h2>
+        <form id="studentForm">
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="studentEmail" value="2021304995@pampangastateu.edu.ph" readonly>
+                <small>Student email pattern: 10 digits + @pampangastateu.edu.ph</small>
+            </div>
+            <div class="form-group">
+                <label>Full Name:</label>
+                <input type="text" id="studentName" value="Test Student" required>
+            </div>
+            <div class="form-group">
+                <label>Student Number:</label>
+                <input type="text" id="studentNumber" value="2021304995" required>
+            </div>
+            <div class="form-group">
+                <label>Program:</label>
+                <select id="studentProgram" required>
+                    <option value="Bachelor of Science in Information Technology">BSIT - Bachelor of Science in Information Technology</option>
+                    <option value="Bachelor of Science in Computer Science">BSCS - Bachelor of Science in Computer Science</option>
+                    <option value="Bachelor of Science in Information Systems">BSIS - Bachelor of Science in Information Systems</option>
+                    <option value="Associate in Computer Technology">ACT - Associate in Computer Technology</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Contact Number:</label>
+                <input type="tel" id="studentContact" value="09123456789" required>
+            </div>
+            <div class="form-group">
+                <label>Address:</label>
+                <input type="text" id="studentAddress" value="Test Address" required>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="studentPassword" value="Test123!@#" required>
+            </div>
+            <button type="submit" class="test-button">Test Student Registration</button>
+        </form>
+        <div id="studentResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>👨‍🏫 Test Teacher Registration</h2>
+        <form id="teacherForm">
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="teacherEmail" value="a.ferrer@pampangastateu.edu.ph" readonly>
+                <small>Teacher email pattern: initials + @pampangastateu.edu.ph</small>
+            </div>
+            <div class="form-group">
+                <label>Full Name:</label>
+                <input type="text" id="teacherName" value="Test Teacher" required>
+            </div>
+            <div class="form-group">
+                <label>Department:</label>
+                <select id="teacherProgram" required>
+                    <option value="Computer Studies Department">Computer Studies Department</option>
+                    <option value="Information Technology">Information Technology</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Information Systems">Information Systems</option>
+                    <option value="Computer Technology">Computer Technology</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Contact Number:</label>
+                <input type="tel" id="teacherContact" value="09123456789" required>
+            </div>
+            <div class="form-group">
+                <label>Address:</label>
+                <input type="text" id="teacherAddress" value="Test Address" required>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="teacherPassword" value="Test123!@#" required>
+            </div>
+            <button type="submit" class="test-button">Test Teacher Registration</button>
+        </form>
+        <div id="teacherResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Test Email Role Detection</h2>
+        <div class="form-group">
+            <label>Test Email:</label>
+            <input type="email" id="testEmail" placeholder="Enter email to test role detection">
+            <button onclick="testRoleDetection()" class="test-button">Detect Role</button>
+        </div>
+        <div id="roleDetectionResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>❌ Test Error Cases</h2>
+        <button onclick="testInvalidEmail()" class="test-button">Test Invalid Email Domain</button>
+        <button onclick="testRoleMismatch()" class="test-button">Test Role Mismatch</button>
+        <button onclick="testMissingFields()" class="test-button">Test Missing Fields</button>
+        <div id="errorTestResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+
+        // Student registration test
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('studentResult');
+            
+            const userData = {
+                role: 'student',
+                full_name: document.getElementById('studentName').value,
+                email: document.getElementById('studentEmail').value,
+                student_num: document.getElementById('studentNumber').value,
+                program: document.getElementById('studentProgram').value,
+                contact_num: document.getElementById('studentContact').value,
+                address: document.getElementById('studentAddress').value,
+                password: document.getElementById('studentPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Student registration successful!\nUser ID: ${result.data?.id}\nResponse: ${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Student registration failed: ${result.message}\nResponse: ${JSON.stringify(result, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        });
+
+        // Teacher registration test
+        document.getElementById('teacherForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('teacherResult');
+            
+            const userData = {
+                role: 'teacher',
+                full_name: document.getElementById('teacherName').value,
+                email: document.getElementById('teacherEmail').value,
+                program: document.getElementById('teacherProgram').value,
+                contact_num: document.getElementById('teacherContact').value,
+                address: document.getElementById('teacherAddress').value,
+                password: document.getElementById('teacherPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Teacher registration successful!\nUser ID: ${result.data?.id}\nResponse: ${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Teacher registration failed: ${result.message}\nResponse: ${JSON.stringify(result, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        });
+
+        // Role detection test
+        function testRoleDetection() {
+            const email = document.getElementById('testEmail').value;
+            const resultDiv = document.getElementById('roleDetectionResult');
+            
+            if (!email) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ Please enter an email address';
+                return;
+            }
+
+            // Simulate the role detection logic
+            const localPart = email.replace('@pampangastateu.edu.ph', '');
+            let detectedRole = 'unknown';
+            
+            if (/^\d{10}$/.test(localPart)) {
+                detectedRole = 'student';
+            } else if (/^[a-z]\.[a-z]+$/i.test(localPart)) {
+                detectedRole = 'teacher';
+            }
+
+            resultDiv.className = 'result success';
+            resultDiv.textContent = `🔍 Email: ${email}\nDetected Role: ${detectedRole}\nLocal Part: ${localPart}`;
+        }
+
+        // Test error cases
+        async function testInvalidEmail() {
+            const resultDiv = document.getElementById('errorTestResult');
+            
+            const userData = {
+                role: 'student',
+                full_name: 'Test User',
+                email: 'test@invalid.com',
+                student_num: '2021304995',
+                program: 'Bachelor of Science in Information Technology',
+                contact_num: '09123456789',
+                address: 'Test Address',
+                password: 'Test123!@#'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Invalid email test result: ${result.message}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testRoleMismatch() {
+            const resultDiv = document.getElementById('errorTestResult');
+            
+            const userData = {
+                role: 'teacher', // Wrong role for student email
+                full_name: 'Test User',
+                email: '2021304995@pampangastateu.edu.ph', // Student email
+                program: 'Computer Studies Department',
+                contact_num: '09123456789',
+                address: 'Test Address',
+                password: 'Test123!@#'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Role mismatch test result: ${result.message}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testMissingFields() {
+            const resultDiv = document.getElementById('errorTestResult');
+            
+            const userData = {
+                role: 'student',
+                // Missing required fields
+                email: '2021304995@pampangastateu.edu.ph',
+                password: 'Test123!@#'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Missing fields test result: ${result.message}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

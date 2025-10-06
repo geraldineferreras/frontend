@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Attachments Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .link-input {
+            margin: 5px 0;
+            padding: 5px;
+            width: 300px;
+        }
+        .link-type-select {
+            margin: 5px;
+            padding: 5px;
+        }
+        .attachment-preview {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Task Attachments Fix Test</h1>
+    <p>This page tests the fixed task attachment functionality to ensure attachments are properly displayed.</p>
+
+    <div class="test-section">
+        <h2>Test Task Creation with Attachments</h2>
+        <p>Create a task with multiple types of attachments to test the fix.</p>
+        
+        <div class="file-input">
+            <label>Select Files:</label><br>
+            <input type="file" id="test-files" multiple>
+        </div>
+        
+        <div class="link-input">
+            <label>YouTube URL:</label><br>
+            <input type="text" id="youtube-url" placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        
+        <div class="link-input">
+            <label>Google Drive URL:</label><br>
+            <input type="text" id="gdrive-url" placeholder="https://drive.google.com/file/d/...">
+        </div>
+        
+        <div class="link-input">
+            <label>External Link:</label><br>
+            <input type="text" id="external-link" placeholder="https://example.com">
+        </div>
+        
+        <button class="test-button" onclick="testTaskWithAttachments()">Test Task Creation</button>
+        <div id="test-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Attachment Display Logic</h2>
+        <p>Test the attachment normalization and display logic.</p>
+        
+        <button class="test-button" onclick="testAttachmentNormalization()">Test Normalization</button>
+        <div id="normalization-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Attachment Rendering</h2>
+        <p>Test how attachments are rendered in the UI.</p>
+        
+        <button class="test-button" onclick="testAttachmentRendering()">Test Rendering</button>
+        <button class="test-button" onclick="testColorPreservation()">Test Color Preservation</button>
+        <div id="rendering-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost/scms_new_backup/index.php/api';
+        
+        function getToken() {
+            return localStorage.getItem('token') || prompt('Enter your JWT token:');
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function testTaskWithAttachments() {
+            const files = document.getElementById('test-files').files;
+            const youtubeUrl = document.getElementById('youtube-url').value.trim();
+            const gdriveUrl = document.getElementById('gdrive-url').value.trim();
+            const externalLink = document.getElementById('external-link').value.trim();
+            
+            if (files.length === 0 && !youtubeUrl && !gdriveUrl && !externalLink) {
+                showResult('test-result', 'Please select files or add at least one link.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            
+            // Add task data
+            formData.append('title', 'Test Task with Attachments');
+            formData.append('type', 'assignment');
+            formData.append('points', '50');
+            formData.append('instructions', 'This is a test task to verify attachment functionality.');
+            formData.append('class_codes', JSON.stringify(['TEST01']));
+            formData.append('allow_comments', '1');
+            formData.append('is_draft', '0');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('due_date', '2025-01-25 23:59:00');
+            formData.append('attachment_type', 'mixed');
+            formData.append('assignment_type', 'classroom');
+            formData.append('assigned_students', JSON.stringify([]));
+            
+            // Add files
+            for (let i = 0; i < files.length; i++) {
+                formData.append(`attachment${i + 1}`, files[i]);
+            }
+            
+            // Add YouTube link
+            if (youtubeUrl) {
+                formData.append('youtube_0', youtubeUrl);
+                formData.append('youtube_title_0', 'Test YouTube Video');
+            }
+            
+            // Add Google Drive link
+            if (gdriveUrl) {
+                formData.append('gdrive_0', gdriveUrl);
+                formData.append('gdrive_title_0', 'Test Google Drive Document');
+            }
+            
+            // Add external link
+            if (externalLink) {
+                formData.append('link_0', externalLink);
+                formData.append('link_title_0', 'Test External Link');
+            }
+
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}:`, value);
+            }
+
+            fetch(`${API_BASE}/tasks/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult('test-result', `Success!\nResponse: ${JSON.stringify(data, null, 2)}`, 'success');
+                
+                // Test the normalization logic
+                if (data.status && data.data) {
+                    testNormalizationWithRealData(data.data);
+                }
+            })
+            .catch(error => {
+                showResult('test-result', `Error: ${error.message}`, 'error');
+            });
+        }
+
+                function testAttachmentNormalization() {
+          // Simulate the normalization logic from the frontend
+          const mockTaskData = [
+            {
+              task_id: 1,
+              title: 'Task with File',
+              attachment_url: 'uploads/tasks/document.pdf',
+              attachment_type: 'file',
+              original_name: 'document.pdf'
+            },
+            {
+              task_id: 2,
+              title: 'Task with YouTube',
+              youtube_url: 'https://www.youtube.com/watch?v=test123',
+              youtube_title: 'Test Video'
+            },
+            {
+              task_id: 3,
+              title: 'Task with Google Drive',
+              gdrive_url: 'https://drive.google.com/file/d/test123/view',
+              gdrive_title: 'Test Document'
+            },
+            {
+              task_id: 4,
+              title: 'Task with External Link',
+              link_url: 'https://example.com',
+              link_title: 'Example Site'
+            },
+            {
+              task_id: 5,
+              title: 'Task with External Links JSON',
+              external_links: JSON.stringify([
+                { type: 'youtube', url: 'https://youtube.com/watch?v=test', title: 'YouTube Test' },
+                { type: 'google_drive', url: 'https://drive.google.com/file/d/test/view', title: 'Drive Test' },
+                { type: 'link', url: 'https://example.com', title: 'Link Test' }
+              ])
+            },
+            {
+              task_id: 6,
+              title: 'Task with Alternative Field Names',
+              youtube: 'https://youtube.com/watch?v=alt123',
+              youtube_name: 'Alternative YouTube',
+              gdrive: 'https://drive.google.com/file/d/alt123/view',
+              gdrive_name: 'Alternative Drive',
+              link: 'https://alternative.com',
+              link_name: 'Alternative Link'
+            }
+          ];
+
+            const normalized = normalizeTasks(mockTaskData);
+            showResult('normalization-result', `Normalized Tasks:\n${JSON.stringify(normalized, null, 2)}`, 'success');
+        }
+
+        function normalizeTasks(rawTasks = []) {
+            const tasks = Array.isArray(rawTasks) ? rawTasks : [];
+            const enriched = tasks.map((t) => {
+                let attachments = Array.isArray(t.attachments) ? [...t.attachments] : [];
+
+                // Handle different attachment formats from the backend
+                if (!attachments || attachments.length === 0) {
+                    // Check for single attachment fields
+                    if (t.attachment_url) {
+                        const att = {
+                            attachment_url: t.attachment_url,
+                            attachment_type: t.attachment_type || 'file',
+                            name: t.original_name || (typeof t.attachment_url === 'string' ? t.attachment_url.split('/').pop() : 'Attachment'),
+                            file_name: t.file_name,
+                            original_name: t.original_name,
+                            type: t.attachment_type || 'file'
+                        };
+                        attachments = [att];
+                    }
+                    
+                    // Check for link attachments (YouTube, Google Drive, external links)
+                    if (t.youtube_url) {
+                        attachments.push({
+                            type: 'YouTube',
+                            url: t.youtube_url,
+                            name: t.youtube_title || 'YouTube Video',
+                            attachment_type: 'youtube'
+                        });
+                    }
+                    
+                    if (t.gdrive_url) {
+                        attachments.push({
+                            type: 'Google Drive',
+                            url: t.gdrive_url,
+                            name: t.gdrive_title || 'Google Drive Document',
+                            attachment_type: 'google_drive'
+                        });
+                    }
+                    
+                    if (t.link_url) {
+                        attachments.push({
+                            type: 'Link',
+                            url: t.link_url,
+                            name: t.link_title || 'External Link',
+                            attachment_type: 'link'
+                        });
+                    }
+                    
+                    // Check for external_links JSON field
+                    if (t.external_links) {
+                        try {
+                            const externalLinks = typeof t.external_links === 'string' ? JSON.parse(t.external_links) : t.external_links;
+                            if (Array.isArray(externalLinks)) {
+                                externalLinks.forEach(link => {
+                                    if (link.url && link.type) {
+                                        attachments.push({
+                                            type: link.type === 'youtube' ? 'YouTube' : 
+                                                   link.type === 'google_drive' ? 'Google Drive' : 
+                                                   link.type === 'link' ? 'Link' : 'Link',
+                                            url: link.url,
+                                            name: link.title || link.name || 'External Link',
+                                            attachment_type: link.type
+                                        });
+                                    }
+                                });
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse external_links:', e);
+                        }
+                    }
+                }
+
+                // Ensure all attachments have proper type and url fields
+                attachments = attachments.map(att => {
+                    if (!att.type && att.attachment_type) {
+                        att.type = att.attachment_type === 'youtube' ? 'YouTube' :
+                                   att.attachment_type === 'google_drive' ? 'Google Drive' :
+                                   att.attachment_type === 'link' ? 'Link' : 'File';
+                    }
+                    
+                    if (!att.url && att.attachment_url) {
+                        att.url = att.attachment_url;
+                    }
+                    
+                    return att;
+                });
+
+                return { ...t, attachments };
+            });
+            return enriched;
+        }
+
+        function testNormalizationWithRealData(realTaskData) {
+            const normalized = normalizeTasks([realTaskData]);
+            console.log('Real task data normalized:', normalized);
+            
+            // Test rendering
+            testAttachmentRenderingWithData(normalized[0]);
+        }
+
+                function testAttachmentRendering() {
+          const mockTask = {
+            task_id: 1,
+            title: 'Test Task',
+            attachments: [
+              {
+                type: 'File',
+                name: 'document.pdf',
+                attachment_type: 'file',
+                attachment_url: 'uploads/tasks/document.pdf'
+              },
+              {
+                type: 'YouTube',
+                name: 'Test Video',
+                url: 'https://youtube.com/watch?v=test',
+                attachment_type: 'youtube'
+              },
+              {
+                type: 'Google Drive',
+                name: 'Test Document',
+                url: 'https://drive.google.com/file/d/test/view',
+                attachment_type: 'google_drive'
+              }
+            ]
+          };
+          
+          testAttachmentRenderingWithData(mockTask);
+        }
+
+        function testColorPreservation() {
+          const mockTask = {
+            task_id: 1,
+            title: 'Test Color Preservation',
+            attachments: [
+              {
+                type: 'YouTube',
+                name: 'YouTube Video',
+                url: 'https://youtube.com/watch?v=test',
+                attachment_type: 'youtube'
+              },
+              {
+                type: 'Google Drive',
+                name: 'Google Drive Doc',
+                url: 'https://drive.google.com/file/d/test/view',
+                attachment_type: 'google_drive'
+              },
+              {
+                type: 'Link',
+                name: 'External Link',
+                url: 'https://example.com',
+                attachment_type: 'link'
+              }
+            ]
+          };
+          
+          let colorOutput = `Task: ${mockTask.title}\nColor Preservation Test:\n\n`;
+          
+          mockTask.attachments.forEach((att, idx) => {
+            const expectedColor = att.attachment_type === 'youtube' ? 'Red (YouTube)' :
+                                 att.attachment_type === 'google_drive' ? 'Blue (Google Drive)' :
+                                 att.attachment_type === 'link' ? 'Blue (Link)' : 'Grey (File)';
+            
+            colorOutput += `${idx + 1}. ${att.type}: ${att.name}\n`;
+            colorOutput += `   Expected Color: ${expectedColor}\n`;
+            colorOutput += `   Attachment Type: ${att.attachment_type}\n\n`;
+          });
+          
+          showResult('rendering-result', colorOutput, 'success');
+        }
+
+        function testAttachmentRenderingWithData(task) {
+            if (!task.attachments || task.attachments.length === 0) {
+                showResult('rendering-result', 'No attachments to render', 'info');
+                return;
+            }
+
+            let renderingOutput = `Task: ${task.title}\nAttachments (${task.attachments.length}):\n\n`;
+            
+            task.attachments.forEach((att, idx) => {
+                const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive" || 
+                              (att.attachment_type && String(att.attachment_type).toLowerCase() !== 'file');
+                
+                const displayName = isLink
+                    ? (att.name || att.url)
+                    : (att.original_name || att.file_name || att.name || (att.attachment_url ? att.attachment_url.split('/').pop() : 'Attachment'));
+                
+                renderingOutput += `${idx + 1}. ${att.type}: ${displayName}\n`;
+                renderingOutput += `   URL: ${att.url || att.attachment_url || 'N/A'}\n`;
+                renderingOutput += `   Attachment Type: ${att.attachment_type || 'N/A'}\n\n`;
+            });
+            
+            showResult('rendering-result', renderingOutput, 'success');
+        }
+    </script>
+</body>
+</html>

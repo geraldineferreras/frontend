@@ -1,0 +1,5 @@
+[33m6c85aaa4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update package dependencies and project files
+[33me923f233[m Enhanced student stream functionality: real comment counts, collapsible comments, profile picture integration, CRUD operations, and improved UI sizing
+[33m2bae12e9[m chore: checkpoint - updates to ClassroomDetail and ClassroomDetailStudent, api.js adjustments, and lockfile changes
+[33m6d3712ee[m Student: block submissions past due date; Teacher: show loading on send and success message on task creation
+[33m8992f670[m Update ClassroomDetail.js with latest changes

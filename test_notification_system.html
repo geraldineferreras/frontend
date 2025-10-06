@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Notification System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Real-Time Notification System Test</h1>
+        
+        <div class="status" id="connectionStatus">
+            <span id="statusText">Checking connection...</span>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 1: Notification Server Health Check</h3>
+            <p>Verify that the notification server is running and accessible.</p>
+            <button onclick="testServerHealth()">Test Server Health</button>
+            <div id="result1" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Socket.IO Connection Test</h3>
+            <p>Test WebSocket connection to the notification server.</p>
+            <button onclick="testSocketConnection()">Test Socket Connection</button>
+            <button onclick="disconnectSocket()">Disconnect</button>
+            <div id="result2" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Send Test Notification</h3>
+            <p>Send a test notification through the socket connection.</p>
+            <button onclick="sendTestNotification()">Send Test Notification</button>
+            <div id="result3" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 4: Notification History</h3>
+            <p>Check notification history and unread count.</p>
+            <button onclick="checkNotificationHistory()">Check History</button>
+            <div id="result4" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Live Notifications</h3>
+            <p>Real-time notifications will appear here:</p>
+            <div id="liveNotifications" class="result info" style="min-height: 100px;">
+                Waiting for notifications...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        const NOTIFICATION_SERVER_URL = 'http://localhost:4000';
+        let socket = null;
+        let testUserId = 'TEST_USER_' + Math.random().toString(36).substr(2, 9);
+        let testUserRole = 'student';
+
+        // Update connection status
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('statusText');
+            statusDiv.className = `status ${status}`;
+            statusText.textContent = message;
+        }
+
+        // Helper function to display results
+        function showResult(resultId, content, type = 'info') {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = content;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+
+        // Test 1: Server Health Check
+        async function testServerHealth() {
+            showResult('result1', '🔄 Testing server health...', 'info');
+            
+            try {
+                const response = await fetch(`${NOTIFICATION_SERVER_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('result1', `✅ Server is healthy!\n\nResponse:\n${JSON.stringify(data, null, 2)}`, 'success');
+                    updateConnectionStatus('connected', '✅ Server is running');
+                } else {
+                    showResult('result1', `❌ Server error: ${response.status}\n\nResponse:\n${JSON.stringify(data, null, 2)}`, 'error');
+                    updateConnectionStatus('disconnected', '❌ Server error');
+                }
+            } catch (error) {
+                showResult('result1', `❌ Connection failed: ${error.message}`, 'error');
+                updateConnectionStatus('disconnected', '❌ Cannot connect to server');
+            }
+        }
+
+        // Test 2: Socket.IO Connection
+        function testSocketConnection() {
+            showResult('result2', '🔄 Connecting to Socket.IO server...', 'info');
+            updateConnectionStatus('connecting', '🔄 Connecting...');
+            
+            try {
+                socket = io(NOTIFICATION_SERVER_URL, {
+                    transports: ['websocket', 'polling']
+                });
+
+                socket.on('connect', () => {
+                    showResult('result2', `✅ Connected to Socket.IO server!\nSocket ID: ${socket.id}`, 'success');
+                    updateConnectionStatus('connected', '✅ Connected to notifications');
+                    
+                    // Join user room
+                    socket.emit('join-room', testUserId, testUserRole);
+                });
+
+                socket.on('disconnect', () => {
+                    showResult('result2', '❌ Disconnected from Socket.IO server', 'warning');
+                    updateConnectionStatus('disconnected', '❌ Disconnected');
+                });
+
+                socket.on('connect_error', (error) => {
+                    showResult('result2', `❌ Connection error: ${error.message}`, 'error');
+                    updateConnectionStatus('disconnected', '❌ Connection failed');
+                });
+
+                socket.on('new-notification', (notification) => {
+                    const liveDiv = document.getElementById('liveNotifications');
+                    const timestamp = new Date().toLocaleTimeString();
+                    liveDiv.innerHTML += `\n[${timestamp}] 🔔 New notification:\n${JSON.stringify(notification, null, 2)}\n\n`;
+                    liveDiv.scrollTop = liveDiv.scrollHeight;
+                });
+
+                socket.on('notification-updated', (data) => {
+                    const liveDiv = document.getElementById('liveNotifications');
+                    const timestamp = new Date().toLocaleTimeString();
+                    liveDiv.innerHTML += `\n[${timestamp}] 📝 Notification updated:\n${JSON.stringify(data, null, 2)}\n\n`;
+                    liveDiv.scrollTop = liveDiv.scrollHeight;
+                });
+
+            } catch (error) {
+                showResult('result2', `❌ Socket connection failed: ${error.message}`, 'error');
+                updateConnectionStatus('disconnected', '❌ Socket connection failed');
+            }
+        }
+
+        // Disconnect socket
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                showResult('result2', '🔌 Disconnected from Socket.IO server', 'warning');
+                updateConnectionStatus('disconnected', '🔌 Disconnected');
+            }
+        }
+
+        // Test 3: Send Test Notification
+        function sendTestNotification() {
+            if (!socket || !socket.connected) {
+                showResult('result3', '❌ Please connect to Socket.IO first', 'error');
+                return;
+            }
+
+            showResult('result3', '🔄 Sending test notification...', 'info');
+
+            const notificationData = {
+                recipientId: testUserId,
+                recipientRole: testUserRole,
+                message: `Test notification sent at ${new Date().toLocaleString()}`,
+                type: 'test',
+                data: {
+                    testId: Math.random().toString(36).substr(2, 9),
+                    timestamp: new Date().toISOString(),
+                    source: 'notification_test'
+                }
+            };
+
+            socket.emit('send-notification', notificationData);
+
+            // Also test role-based notification
+            const roleNotificationData = {
+                role: testUserRole,
+                message: `Role-based test notification for ${testUserRole}s`,
+                type: 'test',
+                data: {
+                    testId: Math.random().toString(36).substr(2, 9),
+                    timestamp: new Date().toISOString(),
+                    source: 'role_notification_test'
+                }
+            };
+
+            socket.emit('send-role-notification', roleNotificationData);
+
+            showResult('result3', `✅ Test notifications sent!\n\nDirect notification:\n${JSON.stringify(notificationData, null, 2)}\n\nRole notification:\n${JSON.stringify(roleNotificationData, null, 2)}`, 'success');
+        }
+
+        // Test 4: Check Notification History
+        async function checkNotificationHistory() {
+            showResult('result4', '🔄 Checking notification history...', 'info');
+
+            try {
+                // Check server status
+                const statusResponse = await fetch(`${NOTIFICATION_SERVER_URL}/api/notifications/status`);
+                const statusData = await statusResponse.json();
+
+                // Check user notifications (this might fail if user doesn't exist in DB)
+                let userNotifications = null;
+                try {
+                    const userResponse = await fetch(`${NOTIFICATION_SERVER_URL}/api/notifications/user/${testUserId}`);
+                    userNotifications = await userResponse.json();
+                } catch (error) {
+                    userNotifications = { error: 'User not found in database (expected for test user)' };
+                }
+
+                const result = `✅ Notification system status:\n\nServer Status:\n${JSON.stringify(statusData, null, 2)}\n\nUser Notifications:\n${JSON.stringify(userNotifications, null, 2)}`;
+                
+                showResult('result4', result, 'success');
+            } catch (error) {
+                showResult('result4', `❌ Error checking notification history: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        window.onload = function() {
+            console.log('Notification System Test initialized');
+            console.log('Test User ID:', testUserId);
+            console.log('Test User Role:', testUserRole);
+            
+            // Auto-test server health on load
+            testServerHealth();
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            if (socket) {
+                socket.disconnect();
+            }
+        };
+    </script>
+</body>
+</html>

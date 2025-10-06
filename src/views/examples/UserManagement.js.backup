@@ -1,0 +1,1427 @@
+/*!
+
+=========================================================
+* Argon Dashboard React - v1.2.4
+=========================================================
+
+* Product Page: https://www.creative-tim.com/product/argon-dashboard-react
+* Copyright 2024 Creative Tim (https://www.creative-tim.com)
+* Licensed under MIT (https://github.com/creativetimofficial/argon-dashboard-react/blob/master/LICENSE.md)
+
+* Coded by Creative Tim
+
+=========================================================
+
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+*/
+import React, { useState, useEffect } from "react";
+import Header from "components/Headers/Header.js";
+import { useNavigate } from "react-router-dom";
+import ApiService from '../../services/api';
+// reactstrap components
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  Col,
+  Container,
+  Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupText,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Nav,
+  NavItem,
+  NavLink,
+  Pagination,
+  PaginationItem,
+  PaginationLink,
+  Row,
+  Table,
+  TabContent,
+  TabPane,
+  UncontrolledDropdown,
+  DropdownToggle,
+  DropdownMenu,
+  DropdownItem,
+  UncontrolledTooltip,
+} from "reactstrap";
+import classnames from "classnames";
+import userDefault from "../../assets/img/theme/user-default.svg";
+
+const defaultCoverPhotoSvg =
+  "data:image/svg+xml;utf8,<svg width='600' height='240' viewBox='0 0 600 240' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='600' height='240' fill='%23f7f7f7'/><path d='M0 180 Q150 120 300 180 T600 180 V240 H0 Z' fill='%23e3eafc'/><path d='M0 200 Q200 140 400 200 T600 200 V240 H0 Z' fill='%23cfd8dc' opacity='0.7'/></svg>";
+
+// Floating effect for content over header
+const userManagementStyles = `
+  .section-content-container {
+    margin-top: -150px;
+    z-index: 2;
+    position: relative;
+  }
+  .section-content-card {
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
+  }
+`;
+
+const UserManagement = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("admin");
+  const [entriesToShow, setEntriesToShow] = useState(10);
+  const [sortBy, setSortBy] = useState("created_at"); // Default to 'Recently Added'
+  const [sortOrder, setSortOrder] = useState("desc"); // Default to most recent first
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [deleteUserId, setDeleteUserId] = useState(null);
+  const [deleteUserName, setDeleteUserName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [viewMode, setViewMode] = useState("table");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    ApiService.getUsersByRole(activeTab)
+      .then((data) => {
+        let usersArr = [];
+        if (Array.isArray(data)) {
+          usersArr = data;
+        } else if (Array.isArray(data.users)) {
+          usersArr = data.users;
+        } else if (Array.isArray(data.data)) {
+          usersArr = data.data;
+        }
+        // Normalize user fields for consistent frontend usage
+        usersArr = usersArr.map(user => ({
+          ...user,
+          full_name: user.full_name || user.name || '',
+          program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+          course_year_section: user.course_year_section || user.section || '',
+          last_login: user.last_login || user.lastLogin || '',
+          profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+          cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+          student_num: user.student_num || user.studentNumber || '',
+        }));
+        setUsers(usersArr);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setUsers([]); // fallback to empty array on error
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [activeTab]);
+
+  // Filter users based on search term
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         ((user.program || user.course_year_section || '').toLowerCase()).includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Sorting
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+    if (sortBy === "last_login" || sortBy === "created_at") {
+      aValue = new Date(aValue);
+      bValue = new Date(bValue);
+    }
+    if (sortOrder === "asc") {
+      return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+    } else {
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+    }
+  });
+
+  // Pagination
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUsers = sortedUsers.slice(startIndex, endIndex);
+
+  const getStatusBadge = (status) => {
+    return status === "active" ? (
+      <Badge color="success">Active</Badge>
+    ) : (
+      <Badge color="secondary">Inactive</Badge>
+    );
+  };
+
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case "admin":
+        return <Badge color="danger" className="badge-dot mr-2">Admin</Badge>;
+      case "teacher":
+        return <Badge color="warning" className="badge-dot mr-2">Teacher</Badge>;
+      case "student":
+        return <Badge color="info" className="badge-dot mr-2">Student</Badge>;
+      default:
+        return <Badge color="secondary" className="badge-dot mr-2">Unknown</Badge>;
+    }
+  };
+
+  const getRoleBadgeForBlock = (role) => {
+    return (
+      <Badge 
+        color="dark" 
+        className="badge-dot mr-2"
+        style={{
+          backgroundColor: '#172b4d',
+          color: '#fff',
+          padding: '0.25rem 0.5rem',
+          borderRadius: '0.375rem',
+          fontSize: '0.7rem',
+          fontWeight: '600'
+        }}
+      >
+        {role.charAt(0).toUpperCase() + role.slice(1)}
+      </Badge>
+    );
+  };
+
+  // Calculate pagination info
+  const getPaginationInfo = () => {
+    const totalItems = users.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    
+    return { totalItems, totalPages, startItem, endItem };
+  };
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  // Handle items per page change
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1); // Reset to first page when switching tabs
+  };
+
+  const handleDeleteUser = (id, name) => {
+    setDeleteUserId(id);
+    setDeleteUserName(name);
+  };
+
+  const cancelDeleteUser = () => {
+    setDeleteUserId(null);
+    setDeleteUserName("");
+  };
+
+  const confirmDeleteUser = async () => {
+    setIsDeleting(true);
+    
+    try {
+      // Call API to delete user
+      await ApiService.deleteUser(deleteUserId);
+      
+      setIsDeleting(false);
+      setShowDeleteSuccess(true);
+      
+      // Refresh the users list
+      const data = await ApiService.getUsersByRole(activeTab);
+      let usersArr = [];
+      if (Array.isArray(data)) {
+        usersArr = data;
+      } else if (Array.isArray(data.users)) {
+        usersArr = data.users;
+      } else if (Array.isArray(data.data)) {
+        usersArr = data.data;
+      }
+      // Normalize user fields for consistent frontend usage
+      usersArr = usersArr.map(user => ({
+        ...user,
+        full_name: user.full_name || user.name || '',
+        program: user.program || (user.role === 'admin' ? 'Administration' : '') || user.department || '',
+        course_year_section: user.course_year_section || user.section || '',
+        last_login: user.last_login || user.lastLogin || '',
+        profile_pic: user.profile_pic || user.profileImageUrl || user.avatar || '',
+        cover_pic: user.cover_pic || user.coverPhotoUrl || '',
+        student_num: user.student_num || user.studentNumber || '',
+      }));
+      setUsers(usersArr);
+      
+      // Hide success message after 1.5 seconds and close modal (faster response)
+      setTimeout(() => {
+        setShowDeleteSuccess(false);
+        cancelDeleteUser();
+        // Restore tab and view mode after delete
+        const params = new URLSearchParams({ tab: activeTab, view: viewMode });
+        window.history.replaceState(null, '', `/admin/user-management?${params.toString()}`);
+      }, 1500);
+    } catch (error) {
+      setIsDeleting(false);
+      setError(error.message || "Failed to delete user. Please try again.");
+      console.error("Error deleting user:", error);
+    }
+  };
+
+  // Generate random avatar for real people
+  const getRandomAvatar = (userId) => {
+    if (userId === undefined || userId === null) return userDefault;
+    const avatarUrls = [
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+      "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=150&h=150&fit=crop&crop=face"
+    ];
+    // Use userId to consistently get the same avatar for the same user
+    const idString = typeof userId === 'string' || typeof userId === 'number' ? userId.toString() : '0';
+    const index = Math.abs(idString.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % avatarUrls.length;
+    return avatarUrls[index];
+  };
+
+  const getAvatarForUser = (user) => {
+    if (!user) return userDefault;
+    
+    // If user has a custom profile image, use it
+    if (user.profile_pic && user.profile_pic !== userDefault) {
+      // Check if it's a server path (not base64)
+      if (user.profile_pic.startsWith('uploads/') || user.profile_pic.startsWith('http')) {
+        // For server paths, construct the full URL
+        if (user.profile_pic.startsWith('uploads/')) {
+          return `http://localhost/scms_new/${user.profile_pic}`;
+        }
+        return user.profile_pic;
+      }
+      // If it's base64, use it directly
+      return user.profile_pic;
+    }
+    
+    // Assign random avatars to specific users based on role
+    if (user.role === 'admin') {
+      const adminUsers = [...users].filter(u => u.role === 'admin').sort((a, b) => a.id - b.id);
+      const adminIndex = adminUsers.findIndex(u => u.id === user.id);
+      if (adminIndex < 2) {
+        return getRandomAvatar(user.id);
+      }
+    } else if (user.role === 'teacher') {
+      const teacherUsers = [...users].filter(u => u.role === 'teacher').sort((a, b) => a.id - b.id);
+      const teacherIndex = teacherUsers.findIndex(u => u.id === user.id);
+      if (teacherIndex < 9) {
+        return getRandomAvatar(user.id);
+      }
+    } else if (user.role === 'student') {
+      const studentUsers = [...users].filter(u => u.role === 'student').sort((a, b) => a.id - b.id);
+      const studentIndex = studentUsers.findIndex(u => u.id === user.id);
+      if (studentIndex < 15) {
+        return getRandomAvatar(user.id);
+      }
+    }
+    // For all other users, use default avatar
+    return userDefault;
+  };
+
+  const getCoverPhotoForUser = (user) => {
+    if (!user || !user.cover_pic) return defaultCoverPhotoSvg;
+    
+    // Check if it's a server path (not base64)
+    if (user.cover_pic.startsWith('uploads/') || user.cover_pic.startsWith('http')) {
+      // For server paths, construct the full URL
+      if (user.cover_pic.startsWith('uploads/')) {
+        return `http://localhost/scms_new/${user.cover_pic}`;
+      }
+      return user.cover_pic;
+    }
+    // If it's base64, use it directly
+    return user.cover_pic;
+  };
+
+  const handleUserRowClick = (user) => {
+    setSelectedUser(user);
+    setShowUserModal(true);
+  };
+  const closeUserModal = () => {
+    setShowUserModal(false);
+    setSelectedUser(null);
+    // Update URL to preserve tab and view
+    const params = new URLSearchParams({ tab: activeTab, view: viewMode });
+    window.history.replaceState(null, '', `/admin/user-management?${params.toString()}`);
+  };
+
+  // Edit user navigation
+  const handleEditUser = (user) => {
+    // Navigate to EditUser page with user ID and role
+    navigate(`/admin/edit-user/${user.id}?role=${user.role}`);
+  };
+
+
+
+
+
+  // Helper to abbreviate course names
+  const getCourseAbbreviation = (course) => {
+    if (!course) return '';
+    const map = {
+      'Bachelor of Science in Information Technology': 'BSIT',
+      'Bachelor of Science in Information Systems': 'BSIS',
+      'Bachelor of Science in Computer Science': 'BSCS',
+      'Associate in Computer Technology': 'ACT',
+      // Add more mappings as needed
+    };
+    return map[course] || course;
+  };
+
+  const getColumnHeader = () => {
+    if (activeTab === 'student') return 'COURSE/YEAR/SECTION';
+    return 'PROGRAM';
+  };
+
+  const renderUserTable = (users, title, color) => {
+    if (users.length === 0) return null;
+    
+    const { totalItems, totalPages, startItem, endItem } = getPaginationInfo();
+    
+    return (
+      <div className="mb-4">
+        <h3 className="text-dark mb-3 pl-4">{title} ({users.length})</h3>
+        <Table className="align-items-center table-flush" responsive>
+          <thead className="thead-light">
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">{getColumnHeader()}</th>
+              <th scope="col">Status</th>
+              <th scope="col">Last Login</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedUsers.map((user) => {
+              let courseYearSection = user.course_year_section;
+              if (user.role === 'student') {
+                const course = getCourseAbbreviation(user.program);
+                const year = user.year ? user.year : '';
+                const section = user.course_year_section ? user.course_year_section.split(' ')[1] : '';
+                courseYearSection = [course, year, section].filter(Boolean).join(' ').replace(/  +/g, ' ');
+              }
+              return (
+                <tr key={user.id} style={{ cursor: 'pointer' }} onClick={e => {
+                  if (e.target.closest('button')) return;
+                  handleUserRowClick(user);
+                }}>
+                  <td>
+                    <div className="d-flex align-items-center">
+                      <div
+                        className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
+                        style={{
+                          width: 40,
+                          height: 40,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: getAvatarForUser(user) !== userDefault ? 'transparent' : '#f8f9fa',
+                          border: getAvatarForUser(user) !== userDefault ? undefined : '1px solid #e9ecef'
+                        }}
+                      >
+                        <img 
+                          src={getAvatarForUser(user)} 
+                          alt={user.full_name} 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            backgroundColor: getAvatarForUser(user) === userDefault ? '#fff' : 'transparent'
+                          }} 
+                        />
+                      </div>
+                      <div>
+                        <span className="font-weight-bold">{user.full_name}</span>
+                        {user.role === 'student' && (<><br /><small className="text-muted">ID: {user.student_num}</small></>)}
+                      </div>
+                    </div>
+                  </td>
+                  <td>{user.email}</td>
+                  <td style={{ textAlign: 'center' }}>{user.role === 'student' ? courseYearSection : user.program}</td>
+                  <td>{getStatusBadge(user.status)}</td>
+                  <td>{user.last_login}</td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <Button
+                      color="primary"
+                      size="sm"
+                      className="mr-2"
+                                              onClick={() => handleEditUser(user)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      color="danger"
+                      size="sm"
+                      onClick={() => handleDeleteUser(user.id, user.full_name)}
+                      disabled={!getAvatarForUser(user) && !users.find(u => String(u.id) === String(user.id))}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
+        
+        {/* Pagination */}
+        <div className="d-flex flex-row justify-content-between align-items-center w-100 mt-3 px-4">
+          <div className="d-flex flex-row align-items-center">
+            <span className="mr-2 text-muted small">Show</span>
+            <Input
+              type="select"
+              value={itemsPerPage}
+              onChange={e => handleItemsPerPageChange(parseInt(e.target.value))}
+              style={{ width: '80px', fontSize: '0.95rem', marginRight: '8px' }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </Input>
+            <span className="text-muted small" style={{ whiteSpace: 'nowrap' }}>
+              of {totalItems} entries
+            </span>
+          </div>
+          <Pagination size="sm" className="mb-0 justify-content-center">
+            <PaginationItem disabled={currentPage === 1}>
+              <PaginationLink
+                previous
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ cursor: currentPage === 1 ? 'default' : 'pointer' }}
+              />
+            </PaginationItem>
+            
+            {/* Mobile-friendly page numbers - show fewer elements on small screens */}
+            {currentPage > 2 && !isMobile && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  1
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage > 3 && !isMobile && (
+              <PaginationItem disabled>
+                <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>...</PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage > 1 && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {currentPage - 1}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            <PaginationItem active>
+              <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>
+                {currentPage}
+              </PaginationLink>
+            </PaginationItem>
+            
+            {currentPage < totalPages && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {currentPage + 1}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage < totalPages - 2 && !isMobile && (
+              <PaginationItem disabled>
+                <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>...</PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage < totalPages - 1 && !isMobile && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(totalPages)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {totalPages}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            <PaginationItem disabled={currentPage === totalPages}>
+              <PaginationLink
+                next
+                onClick={() => handlePageChange(currentPage + 1)}
+                style={{ cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+              />
+            </PaginationItem>
+          </Pagination>
+        </div>
+      </div>
+    );
+  };
+
+  const renderUserBlocks = (users, title, color) => {
+    if (users.length === 0) return null;
+    
+    const { totalItems, totalPages, startItem, endItem } = getPaginationInfo();
+    
+    return (
+      <div className="mb-4">
+        <h3 className="text-dark mb-3 pl-4">{title} ({users.length})</h3>
+        <Row>
+          {paginatedUsers.map((user) => (
+            <Col key={user.id} lg="4" md="6" sm="12" className="mb-3">
+              <Card className="shadow-sm position-relative">
+                <div style={{ position: 'absolute', top: 12, right: 16, zIndex: 2 }} onClick={e => e.stopPropagation()}>
+                  <UncontrolledDropdown>
+                    <DropdownToggle
+                      color="link"
+                      size="sm"
+                      className="text-muted p-0 user-block-menu-toggle"
+                      style={{ border: 'none', background: 'transparent', fontSize: '1.15rem', lineHeight: 1, borderRadius: '50%', transition: 'background 0.15s' }}
+                      aria-label="Actions"
+                    >
+                      <i className="fa fa-ellipsis-h" />
+                    </DropdownToggle>
+                    <DropdownMenu right>
+                      <DropdownItem
+                        onClick={() => handleEditUser(user)}
+                        className="d-flex align-items-center"
+                      >
+                        <i className="ni ni-settings-gear-65 mr-2"></i>
+                        Edit User
+                      </DropdownItem>
+                      <DropdownItem
+                        onClick={() => handleDeleteUser(user.id, user.full_name)}
+                        disabled={!getAvatarForUser(user) && !users.find(u => String(u.id) === String(user.id))}
+                        className="d-flex align-items-center text-danger"
+                      >
+                        <i className="fa fa-trash mr-2"></i>
+                        Delete User
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </UncontrolledDropdown>
+                </div>
+                <CardBody className="p-3" style={{ cursor: 'pointer' }} onClick={() => handleUserRowClick(user)}>
+                  <div className="d-flex align-items-center mb-3">
+                    <div
+                      className="avatar avatar-sm rounded-circle bg-gradient-primary mr-3"
+                      style={{
+                        width: 50,
+                        height: 50,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: getAvatarForUser(user) !== userDefault ? 'transparent' : '#f8f9fa',
+                        border: getAvatarForUser(user) !== userDefault ? undefined : '1px solid #e9ecef'
+                      }}
+                    >
+                      <img 
+                        src={getAvatarForUser(user)} 
+                        alt={user.full_name} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          backgroundColor: getAvatarForUser(user) === userDefault ? '#fff' : 'transparent'
+                        }} 
+                      />
+                    </div>
+                    <div className="flex-grow-1">
+                      <h6 className="mb-0 font-weight-bold">{user.full_name}</h6>
+                      {user.role === 'student' && (<><br /><small className="text-muted">ID: {user.student_num}</small></>)}
+                    </div>
+                  </div>
+                  
+                  <div className="mb-2">
+                    <small className="text-muted d-block">
+                      <i className="ni ni-email-83 mr-1"></i>
+                      {user.email}
+                    </small>
+                    <small className="text-muted d-block">
+                      <i className="ni ni-badge mr-1"></i>
+                      {user.program || 'N/A'}
+                    </small>
+                    <small className="text-muted d-block">
+                      <i className="ni ni-calendar-grid-58 mr-1"></i>
+                      Last Login: {user.last_login}
+                    </small>
+                  </div>
+                  
+                  <div className="d-flex align-items-center">
+                    {getStatusBadge(user.status)}
+                  </div>
+                </CardBody>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+        
+        {/* Pagination */}
+        <div className="d-flex flex-row justify-content-between align-items-center w-100 mt-3 px-4">
+          <div className="d-flex flex-row align-items-center">
+            <span className="mr-2 text-muted small">Show</span>
+            <Input
+              type="select"
+              value={itemsPerPage}
+              onChange={e => handleItemsPerPageChange(parseInt(e.target.value))}
+              style={{ width: '80px', fontSize: '0.95rem', marginRight: '8px' }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </Input>
+            <span className="text-muted small" style={{ whiteSpace: 'nowrap' }}>
+              of {totalItems} entries
+            </span>
+          </div>
+          <Pagination size="sm" className="mb-0 justify-content-center">
+            <PaginationItem disabled={currentPage === 1}>
+              <PaginationLink
+                previous
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ cursor: currentPage === 1 ? 'default' : 'pointer' }}
+              />
+            </PaginationItem>
+            
+            {/* Mobile-friendly page numbers - show fewer elements on small screens */}
+            {currentPage > 2 && !isMobile && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  1
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage > 3 && !isMobile && (
+              <PaginationItem disabled>
+                <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>...</PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage > 1 && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {currentPage - 1}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            <PaginationItem active>
+              <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>
+                {currentPage}
+              </PaginationLink>
+            </PaginationItem>
+            
+            {currentPage < totalPages && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {currentPage + 1}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage < totalPages - 2 && !isMobile && (
+              <PaginationItem disabled>
+                <PaginationLink style={{ textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}>...</PaginationLink>
+              </PaginationItem>
+            )}
+            
+            {currentPage < totalPages - 1 && !isMobile && (
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => handlePageChange(totalPages)}
+                  style={{ cursor: 'pointer', textAlign: 'center', minWidth: '28px', fontSize: '0.875rem' }}
+                >
+                  {totalPages}
+                </PaginationLink>
+              </PaginationItem>
+            )}
+            
+            <PaginationItem disabled={currentPage === totalPages}>
+              <PaginationLink
+                next
+                onClick={() => handlePageChange(currentPage + 1)}
+                style={{ cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+              />
+            </PaginationItem>
+          </Pagination>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <style>{userManagementStyles}</style>
+      <Header compact={false} showStats={false} customClass="pb-8 pt-8" />
+      {/* Header Background */}
+      <div className="header pb-6 pt-4 pt-md-7"></div>
+      <Container className="section-content-container" fluid>
+        {/* Table */}
+        <Row>
+          <div className="col">
+            <Card className="shadow section-content-card">
+              {/* Tabs and Add User Button Row */}
+              <Row className="mb-4 align-items-center">
+                <Col xs="12">
+                  <Nav tabs>
+                    <NavItem>
+                      <NavLink
+                        className={classnames({ active: activeTab === "admin" })}
+                        onClick={() => handleTabChange("admin")}
+                        style={{ 
+                          cursor: "pointer",
+                          borderBottom: activeTab === "admin" ? "3px solid #5e72e4" : "none"
+                        }}
+                      >
+                        Admins
+                      </NavLink>
+                    </NavItem>
+                    <NavItem>
+                      <NavLink
+                        className={classnames({ active: activeTab === "teacher" })}
+                        onClick={() => handleTabChange("teacher")}
+                        style={{ 
+                          cursor: "pointer",
+                          borderBottom: activeTab === "teacher" ? "3px solid #5e72e4" : "none"
+                        }}
+                      >
+                        Teachers
+                      </NavLink>
+                    </NavItem>
+                    <NavItem>
+                      <NavLink
+                        className={classnames({ active: activeTab === "student" })}
+                        onClick={() => handleTabChange("student")}
+                        style={{ 
+                          cursor: "pointer",
+                          borderBottom: activeTab === "student" ? "3px solid #5e72e4" : "none"
+                        }}
+                      >
+                        Students
+                      </NavLink>
+                    </NavItem>
+                  </Nav>
+                </Col>
+              </Row>
+
+              {/* View Mode Tabs */}
+              <Row className="mb-3">
+                <Col xs="12">
+                  <div className="d-flex justify-content-end">
+                    <div className="btn-group" role="group" style={{ marginRight: '1rem' }}>
+                      <Button
+                        color={viewMode === "table" ? "primary" : "secondary"}
+                        outline={viewMode !== "table"}
+                        size="sm"
+                        onClick={() => setViewMode("table")}
+                        className="mr-1"
+                      >
+                        <i className="ni ni-chart-bar-32 mr-1"></i>
+                        Table View
+                      </Button>
+                      <Button
+                        color={viewMode === "block" ? "primary" : "secondary"}
+                        outline={viewMode !== "block"}
+                        size="sm"
+                        onClick={() => setViewMode("block")}
+                      >
+                        <i className="ni ni-app mr-1"></i>
+                        Block View
+                      </Button>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+
+              {/* Search and Show Entries Row */}
+              <Row className="mb-4">
+                <Col md="4" className="pl-4">
+                  <InputGroup>
+                    <InputGroupAddon addonType="prepend">
+                      <InputGroupText>
+                        <i className="ni ni-zoom-split-in" />
+                      </InputGroupText>
+                    </InputGroupAddon>
+                    <Input
+                      placeholder="Search users..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </InputGroup>
+                </Col>
+                <Col md="2">
+                  <Input
+                    type="select"
+                    value={`${sortBy}-${sortOrder}`}
+                    onChange={e => {
+                      const [field, order] = e.target.value.split('-');
+                      setSortBy(field);
+                      setSortOrder(order);
+                    }}
+                    className="text-dark"
+                    style={{ width: '200px', minWidth: '150px' }}
+                  >
+                    <option value="created_at-desc">Recently Added</option>
+                    <option value="full_name-asc">Name A to Z</option>
+                    <option value="full_name-desc">Name Z to A</option>
+                    <option value="email-asc">Email A to Z</option>
+                    <option value="email-desc">Email Z to A</option>
+                    <option value="program-asc">Department A to Z</option>
+                    <option value="program-desc">Department Z to A</option>
+                    <option value="status-asc">Status A to Z</option>
+                    <option value="status-desc">Status Z to A</option>
+                    <option value="last_login-desc">Last Login (Newest First)</option>
+                    <option value="last_login-asc">Last Login (Oldest First)</option>
+                  </Input>
+                </Col>
+                <Col md="6" className="text-right pr-4">
+                  <Button color="info" outline className="mr-2">
+                    <i className="ni ni-chart-bar-32 mr-2"></i>
+                    Export
+                  </Button>
+                  <Button color="primary" onClick={() => navigate(`/admin/create-user?tab=${activeTab}&view=${viewMode}`)}>
+                    <i className="ni ni-fat-add mr-2"></i>
+                    Add New User
+                  </Button>
+                </Col>
+              </Row>
+
+              {/* Error Display */}
+              {error && (
+                <Row className="mb-4">
+                  <Col xs="12">
+                    <Alert color="danger" className="mx-4">
+                      <i className="ni ni-bell-55 mr-2"></i>
+                      {error}
+                    </Alert>
+                  </Col>
+                </Row>
+              )}
+
+              {/* Loading State */}
+              {loading && (
+                <Row className="mb-4">
+                  <Col xs="12" className="text-center">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="sr-only">Loading...</span>
+                    </div>
+                    <p className="mt-2 text-muted">Loading users...</p>
+                  </Col>
+                </Row>
+              )}
+
+              {/* Tabbed User Tables */}
+              <TabContent activeTab={activeTab}>
+                <TabPane tabId="admin">
+                  {viewMode === "table" ? renderUserTable(users, "Administrators", "danger") : renderUserBlocks(users, "Administrators", "danger")}
+                </TabPane>
+                <TabPane tabId="teacher">
+                  {viewMode === "table" ? renderUserTable(users, "Teachers", "warning") : renderUserBlocks(users, "Teachers", "warning")}
+                </TabPane>
+                <TabPane tabId="student">
+                  {viewMode === "table" ? renderUserTable(users, "Students", "info") : renderUserBlocks(users, "Students", "info")}
+                </TabPane>
+              </TabContent>
+            </Card>
+          </div>
+        </Row>
+      </Container>
+      <Modal isOpen={!!deleteUserId} toggle={cancelDeleteUser} centered backdrop>
+        <ModalBody className="text-center">
+          {!isDeleting && !showDeleteSuccess ? (
+            <>
+              <div className="mb-3">
+                <div className="bg-danger rounded-circle d-inline-flex align-items-center justify-content-center" style={{ width: '4rem', height: '4rem' }}>
+                  <i className="fa fa-trash text-white" style={{ fontSize: '2rem' }}></i>
+                </div>
+              </div>
+              <h5>Are you sure you want to delete <span className="text-danger">{deleteUserName}</span>?</h5>
+              <div className="mt-4 d-flex justify-content-center">
+                <Button color="secondary" onClick={cancelDeleteUser} className="mr-2">Cancel</Button>
+                <Button color="danger" onClick={confirmDeleteUser}>Delete</Button>
+              </div>
+            </>
+          ) : isDeleting ? (
+            <>
+              <div className="mb-3">
+                <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
+                  <span className="sr-only">Loading...</span>
+                </div>
+              </div>
+              <h5>Deleting User...</h5>
+              <p className="text-muted mb-0">Please wait while we process your request.</p>
+            </>
+          ) : (
+            <>
+              <div className="mb-3">
+                <div className="bg-success rounded-circle d-inline-flex align-items-center justify-content-center" style={{ width: '4rem', height: '4rem' }}>
+                  <i className="ni ni-check-bold text-white" style={{ fontSize: '2rem' }}></i>
+                </div>
+              </div>
+              <h5>User <span className="text-success">{deleteUserName}</span> has been deleted successfully!</h5>
+            </>
+          )}
+        </ModalBody>
+      </Modal>
+      <Modal isOpen={showUserModal} toggle={closeUserModal} centered size="md" className="user-details-modal">
+        <ModalHeader className="pb-0">
+          <button className="modal-close-btn" onClick={closeUserModal}>
+            <i className="ni ni-fat-remove" />
+          </button>
+        </ModalHeader>
+        <ModalBody className="p-0">
+          {selectedUser && (
+            <div>
+              <div className="cover-photo-container mb-4">
+                <div className={`cover-photo-img-wrapper has-image`}>
+                  <img
+                    alt="Cover Preview"
+                    src={getCoverPhotoForUser(selectedUser)}
+                    className="cover-photo-img"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setPreviewImage({ src: getCoverPhotoForUser(selectedUser), type: 'cover' })}
+                  />
+                  <div className="cover-photo-fade" />
+                </div>
+                <div className="avatar-container has-image">
+                  <img
+                    alt="Profile Preview"
+                    className="avatar-img"
+                    src={getAvatarForUser(selectedUser)}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setPreviewImage({ src: getAvatarForUser(selectedUser), type: 'avatar' })}
+                  />
+                </div>
+              </div>
+              <div className="mx-auto px-4 pb-4" style={{ maxWidth: 480, marginTop: 0 }}>
+                <div className="text-center mb-2" style={{ marginTop: 60, paddingTop: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 24, color: '#222', marginBottom: 2 }}>{selectedUser.full_name}</div>
+                  <div className="d-flex justify-content-center align-items-center mb-1">
+                    {getRoleBadgeForBlock(selectedUser.role)}
+                  </div>
+                  <div style={{ fontSize: 15, color: '#4fd165', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#4fd165', marginRight: 6 }}></span>
+                    Online
+                  </div>
+                </div>
+                <div className="bg-white shadow rounded-lg p-4 mb-3" style={{ border: '1px solid #f0f1f6', boxShadow: '0 2px 16px 0 rgba(44,62,80,.08)' }}>
+                  <div className="mb-3 font-weight-bold" style={{ color: '#222', fontSize: '1.1rem', letterSpacing: '0.01em' }}><i className="ni ni-single-02 mr-2" />Account Info</div>
+                  <div className="row account-info-row">
+                    <div className="col-12 col-md-6 mb-3">
+                      <span className="text-muted small"><i className="ni ni-email-83 mr-1" />Email</span>
+                      <div className="font-weight-bold account-info-value" id={`email-${selectedUser.id}`}>
+                        {selectedUser.email}
+                      </div>
+                      <UncontrolledTooltip placement="top" target={`email-${selectedUser.id}`}>
+                        {selectedUser.email}
+                      </UncontrolledTooltip>
+                    </div>
+                    <div className="col-12 col-md-6 mb-3">
+                      <span className="text-muted small"><i className="ni ni-badge mr-1" />{selectedUser.role === 'student' ? 'Course' : 'Department'}</span>
+                      <div className="font-weight-bold account-info-value" id={`course-${selectedUser.id}`}>
+                        {selectedUser.role === 'student' ? getCourseAbbreviation(selectedUser.program) : (selectedUser.program || 'N/A')}
+                      </div>
+                      <UncontrolledTooltip placement="top" target={`course-${selectedUser.id}`}>
+                        {selectedUser.role === 'student' ? getCourseAbbreviation(selectedUser.program) : (selectedUser.program || 'N/A')}
+                      </UncontrolledTooltip>
+                    </div>
+                    <div className="col-12 col-md-6 mb-3">
+                      <span className="text-muted small"><i className="ni ni-calendar-grid-58 mr-1" />Last Login</span>
+                      <div className="font-weight-bold account-info-value" id={`last_login-${selectedUser.id}`}>
+                        {selectedUser.last_login}
+                      </div>
+                      <UncontrolledTooltip placement="top" target={`last_login-${selectedUser.id}`}>
+                        {selectedUser.last_login}
+                      </UncontrolledTooltip>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </ModalBody>
+      </Modal>
+
+
+
+        <ModalBody>
+          <div style={{ position: 'relative', marginBottom: 80 }}>
+            {/* Cover Photo */}
+            <div style={{
+              width: '100%',
+              height: 140,
+              background: '#f7f7f7',
+              borderRadius: 12,
+              overflow: 'hidden',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <img
+                src={editCoverPhotoPreview || defaultCoverPhotoSvg}
+                alt="Cover Preview"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                id="edit-cover-photo-input"
+                style={{ display: 'none' }}
+                onChange={handleCoverPhotoChange}
+              />
+              <button
+                type="button"
+                onClick={() => document.getElementById('edit-cover-photo-input').click()}
+                style={{
+                  position: 'absolute',
+                  right: 24,
+                  bottom: 16,
+                  background: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Change cover photo"
+              >
+                <i className="fa fa-camera" style={{ color: '#5e72e4', fontSize: 18 }} />
+              </button>
+            </div>
+            {/* Profile Pic */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: 100,
+              transform: 'translate(-50%, 0)',
+              zIndex: 2,
+            }}>
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={editProfilePicPreview || userDefault}
+                  alt="Profile Preview"
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: '50%',
+                    border: '4px solid #fff',
+                    objectFit: 'cover',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    background: '#eee',
+                  }}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="edit-profile-pic-input"
+                  style={{ display: 'none' }}
+                  onChange={handleProfilePicChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('edit-profile-pic-input').click()}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: 0,
+                    background: '#fff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  title="Change profile picture"
+                >
+                  <i className="fa fa-camera" style={{ color: '#5e72e4', fontSize: 16 }} />
+                </button>
+              </div>
+            </div>
+          </div>
+          <form onSubmit={handleEditSubmit}>
+            {editError && (
+              <Alert color="danger" className="mb-3">
+                {editError}
+              </Alert>
+            )}
+            {editSuccess && (
+              <Alert color="success" className="mb-3">
+                {editSuccess}
+              </Alert>
+            )}
+            
+            <Row>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Role</label>
+                  <Input
+                    type="select"
+                    value={editFormData.role}
+                    onChange={(e) => handleEditInputChange('role', e.target.value)}
+                    required
+                  >
+                    <option value="">Select Role</option>
+                    <option value="admin">Admin</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="student">Student</option>
+                  </Input>
+                </div>
+              </Col>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Full Name</label>
+                  <Input
+                    type="text"
+                    value={editFormData.fullName}
+                    onChange={(e) => handleEditInputChange('fullName', e.target.value)}
+                    required
+                  />
+                </div>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Email</label>
+                  <Input
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) => handleEditInputChange('email', e.target.value)}
+                    required
+                  />
+                </div>
+              </Col>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Password (leave blank to keep current)</label>
+                  <Input
+                    type="password"
+                    value={editFormData.password}
+                    onChange={(e) => handleEditInputChange('password', e.target.value)}
+                    placeholder="Enter new password or leave blank"
+                  />
+                </div>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Contact Number</label>
+                  <Input
+                    type="text"
+                    value={editFormData.contactNumber}
+                    onChange={(e) => handleEditInputChange('contactNumber', e.target.value)}
+                  />
+                </div>
+              </Col>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Address</label>
+                  <Input
+                    type="text"
+                    value={editFormData.address}
+                    onChange={(e) => handleEditInputChange('address', e.target.value)}
+                  />
+                </div>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md="6">
+                <div className="form-group">
+                  <label className="form-control-label">Status</label>
+                  <Input
+                    type="select"
+                    value={editFormData.status}
+                    onChange={(e) => handleEditInputChange('status', e.target.value)}
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </Input>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Role-specific fields */}
+            {editFormData.role === 'admin' && (
+              <Row>
+                <Col md="12">
+                  <div className="form-group">
+                    <label className="form-control-label">Department</label>
+                    <Input
+                      type="text"
+                      value="Administration"
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                </Col>
+              </Row>
+            )}
+
+            {editFormData.role === 'teacher' && (
+              <Row>
+                <Col md="12">
+                  <div className="form-group">
+                    <label className="form-control-label">Department</label>
+                    <Input
+                      type="select"
+                      value={editFormData.department}
+                      onChange={(e) => handleEditInputChange('department', e.target.value)}
+                      required
+                    >
+                      <option value="">Select Department</option>
+                      <option value="Information Technology">Information Technology</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Information Systems">Information Systems</option>
+                      <option value="Computer Technology">Computer Technology</option>
+                    </Input>
+                  </div>
+                </Col>
+              </Row>
+            )}
+
+            {editFormData.role === 'student' && (
+              <>
+                <Row>
+                  <Col md="6">
+                    <div className="form-group">
+                      <label className="form-control-label">Student Number</label>
+                      <Input
+                        type="text"
+                        value={editFormData.studentNumber}
+                        onChange={(e) => handleEditInputChange('studentNumber', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </Col>
+                  <Col md="6">
+                    <div className="form-group">
+                      <label className="form-control-label">Program/Course</label>
+                      <Input
+                        type="select"
+                        value={editFormData.department}
+                        onChange={(e) => handleEditInputChange('department', e.target.value)}
+                        required
+                      >
+                        <option value="">Select Program</option>
+                        <option value="Bachelor of Science in Information Technology">BSIT</option>
+                        <option value="Bachelor of Science in Information Systems">BSIS</option>
+                        <option value="Bachelor of Science in Computer Science">BSCS</option>
+                        <option value="Associate in Computer Technology">ACT</option>
+                      </Input>
+                    </div>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md="6">
+                    <div className="form-group">
+                      <label className="form-control-label">Section</label>
+                      <Input
+                        type="select"
+                        value={editFormData.section}
+                        onChange={(e) => handleEditInputChange('section', e.target.value)}
+                      >
+                        <option value="">Select Section</option>
+                        <option value="1">Section A</option>
+                        <option value="2">Section B</option>
+                        <option value="3">Section C</option>
+                        <option value="4">Section D</option>
+                      </Input>
+                    </div>
+                  </Col>
+                  <Col md="6">
+                    <div className="form-group">
+                      <label className="form-control-label">Year Level</label>
+                      <Input
+                        type="select"
+                        value={editFormData.year}
+                        onChange={(e) => handleEditInputChange('year', e.target.value)}
+                      >
+                        <option value="">Select Year</option>
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                      </Input>
+                    </div>
+                  </Col>
+                </Row>
+              </>
+            )}
+          </form>
+        </ModalBody>
+
+    </>
+  );
+};
+
+export default UserManagement;
