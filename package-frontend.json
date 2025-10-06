@@ -1,0 +1,103 @@
+{
+  "name": "scms",
+  "version": "1.2.4",
+  "description": "SCMS - Student Class Management System built with React",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/creativetimofficial/argon-dashboard-react.git"
+  },
+  "keywords": [
+    "react",
+    "reactjs",
+    "scms",
+    "student",
+    "class",
+    "management",
+    "system",
+    "education",
+    "dashboard"
+  ],
+  "author": "SCMS Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/creativetimofficial/argon-dashboard-react/issues"
+  },
+  "homepage": "https://demos.creative-tim.com/argon-dashboard-react/",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "cross-env PUBLIC_URL=/ react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "install:clean": "rm -rf node_modules/ && rm -rf package-lock.json && npm install && npm start",
+    "compile:scss": "sass src/assets/scss/argon-dashboard-react.scss src/assets/css/argon-dashboard-react.css",
+    "minify:scss": "sass src/assets/scss/argon-dashboard-react.scss src/assets/css/argon-dashboard-react.min.css --style compressed",
+    "build:scss": "npm run compile:scss && npm run minify:scss && npm run map:scss",
+    "postinstall": "node -e \"require('fs').copyFileSync('./node_modules/pdfjs-dist/build/pdf.worker.min.mjs', './public/pdf.worker.js')\""
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ],
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "6.5.1",
+    "ajv": "^8.16.0",
+    "axios": "^1.10.0",
+    "bootstrap": "^4.6.2",
+    "chart.js": "2.9.4",
+    "classnames": "2.3.2",
+    "express": "^5.1.0",
+    "html5-qrcode": "^2.3.8",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "jsqr": "^1.4.0",
+    "lottie-react": "^2.4.0",
+    "mammoth": "^1.9.1",
+    "moment": "2.29.4",
+    "mysql2": "^3.15.1",
+    "nouislider": "15.4.0",
+    "opencv.js": "^1.2.1",
+    "pdfjs-dist": "^5.4.54",
+    "qrcode.react": "^4.2.0",
+    "react": "18.2.0",
+    "react-bootstrap": "^2.10.10",
+    "react-chartjs-2": "2.11.2",
+    "react-copy-to-clipboard": "5.1.0",
+    "react-datepicker": "^8.4.0",
+    "react-datetime": "3.2.0",
+    "react-dom": "18.2.0",
+    "react-easy-crop": "^5.5.0",
+    "react-icons": "^5.5.0",
+    "react-pdf": "^10.0.1",
+    "react-qr-reader": "^3.0.0-beta-1",
+    "react-router-dom": "6.21.1",
+    "react-scripts": "5.0.1",
+    "react-select": "^5.10.2",
+    "reactstrap": "8.10.0",
+    "sass": "1.69.5",
+    "simple-peer": "^9.11.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "web-push": "^3.6.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "gulp": "4.0.2",
+    "gulp-append-prepend": "1.0.9"
+  },
+  "optionalDependencies": {
+    "eslint-plugin-flowtype": "8.0.3",
+    "typescript": "5.3.3"
+  },
+  "overrides": {
+    "svgo": "3.0.2",
+    "fsevents": "2.3.2",
+    "chokidar": "3.5.3"
+  }
+}
