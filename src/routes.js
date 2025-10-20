@@ -227,6 +227,13 @@ var routes = [
     layout: "/admin",
   },
   {
+    path: "/notifications",
+    name: "Notifications",
+    icon: "ni ni-notification-70 text-info",
+    component: <Notifications />,
+    layout: "/admin",
+  },
+  {
     path: "/index",
     name: "Dashboard",
     icon: "ni ni-tv-2 text-primary",

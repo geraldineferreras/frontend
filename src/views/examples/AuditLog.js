@@ -35,6 +35,7 @@ import {
 import Header from "components/Headers/Header.js";
 import classnames from "classnames";
 import api from "services/api.js";
+import { formatUserName } from '../../utils/nameUtils';
 
 const AuditLog = () => {
   const [auditData, setAuditData] = useState([]);
@@ -59,6 +60,15 @@ const AuditLog = () => {
   const [selectedAuditLog, setSelectedAuditLog] = useState(null); // Selected audit log for modal
   const [isModalOpen, setIsModalOpen] = useState(false); // Modal open state
   const [selectedRoleTab, setSelectedRoleTab] = useState("all"); // New state for role-specific tabs
+
+  // Helper: map backend role keys to display labels
+  const getRoleDisplay = (role) => {
+    const key = (role || '').toString().toLowerCase();
+    if (key === 'admin') return 'Program Chairperson';
+    if (key === 'teacher') return 'Teacher';
+    if (key === 'student') return 'Student';
+    return role || 'Unknown';
+  };
 
   // Fetch user profile data
   const fetchUserProfile = async (userId, role) => {
@@ -897,8 +907,8 @@ const AuditLog = () => {
                       }}
                     >
                       <i className="ni ni-single-02 mr-1 mr-sm-2" />
-                      <span className="d-none d-sm-inline">Admin</span>
-                      <span className="d-sm-none">Admin</span>
+                      <span className="d-none d-sm-inline">Program Chairperson</span>
+                      <span className="d-sm-none">Chair</span>
                     </NavLink>
                   </NavItem>
                   <NavItem className="flex-fill">
@@ -1105,13 +1115,13 @@ const AuditLog = () => {
                                    </div>
                                  </div>
                                  <div>
-                                   <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.user || 'Unknown User'}</div>
+                                   <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{formatUserName({ full_name: item.user, name: item.user }) || 'Unknown User'}</div>
                                  </div>
                                </div>
                              </td>
-                             <td style={{ width: '10%' }}>
-                               <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{item.role || 'Unknown'}</div>
-                             </td>
+                            <td style={{ width: '10%' }}>
+                              <div className="font-weight-bold" style={{ fontSize: '0.875rem' }}>{getRoleDisplay(item.role)}</div>
+                            </td>
                              <td style={{ width: '15%' }}>{getActionBadge(item.action)}</td>
                              <td style={{ width: '15%' }}>{getModuleBadge(item.module)}</td>
                              <td style={{ width: '20%' }}>
@@ -1350,7 +1360,7 @@ const AuditLog = () => {
                       fontWeight: 500,
                       textTransform: 'uppercase'
                     }}>
-                      {selectedAuditLog.role || 'Unknown'}
+                      {getRoleDisplay(selectedAuditLog.role)}
                     </div>
                   </div>
                 </div>

@@ -22,6 +22,8 @@ import { PropTypes } from "prop-types";
 import { useAuth } from "../../contexts/AuthContext";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 import ApiService from "../../services/api";
+import { useNotificationCount } from "../../hooks/useNotificationCount";
+import NotificationCountBadge from "../NotificationCountBadge";
 import {
   Button,
   Card,
@@ -67,6 +69,7 @@ const TeacherSidebar = (props) => {
   const [collapseOpen, setCollapseOpen] = useState();
   const { user, logout } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
+  const { unreadCount } = useNotificationCount();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -105,6 +108,7 @@ const TeacherSidebar = (props) => {
         >
           <i className={mod.icon} />
           {mod.name}
+          {mod.name === "Notifications" && <NotificationCountBadge count={unreadCount} />}
         </NavLink>
       </NavItem>
     ));

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Validation Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; color: #856404; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: #fff3cd; padding: 2px 4px; border-radius: 3px; }
+        .test-form { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .form-group { margin: 10px 0; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .btn:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; }
+        .log-output { background: #000; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Content Validation Debug Test</h1>
+    
+    <div class="test-section warning">
+        <h2>⚠️ Issue Analysis</h2>
+        <p><strong>Problem:</strong> "Failed to post announcement: content is required" error persists even when text content is provided.</p>
+        
+        <p><strong>Possible Causes:</strong></p>
+        <ul>
+            <li>Content field not being sent properly in FormData</li>
+            <li>Content field being sent but not received by backend</li>
+            <li>Content field containing only whitespace</li>
+            <li>Backend validation logic issue</li>
+            <li>FormData encoding issue</li>
+        </ul>
+    </div>
+
+    <div class="test-section info">
+        <h2>🔧 Debug Improvements Added</h2>
+        <ul>
+            <li><strong>Backend Debug Logging:</strong> Added detailed logging to see what data is received</li>
+            <li><strong>Content Trimming:</strong> Added trim() to handle whitespace-only content</li>
+            <li><strong>Validation Logging:</strong> Added logging to see exactly what validation checks are performed</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        
+        <div class="test-form">
+            <h3>Test Case 1: Normal Text Content</h3>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="title1" value="Test Announcement" />
+            </div>
+            <div class="form-group">
+                <label>Content:</label>
+                <textarea id="content1" rows="3">This is a test announcement with normal text content.</textarea>
+            </div>
+            <button class="btn" onclick="testCase1()">Test Normal Content</button>
+        </div>
+
+        <div class="test-form">
+            <h3>Test Case 2: Content with Whitespace</h3>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="title2" value="Whitespace Test" />
+            </div>
+            <div class="form-group">
+                <label>Content:</label>
+                <textarea id="content2" rows="3">   This content has leading and trailing spaces   </textarea>
+            </div>
+            <button class="btn" onclick="testCase2()">Test Whitespace Content</button>
+        </div>
+
+        <div class="test-form">
+            <h3>Test Case 3: Empty Content with MP4</h3>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="title3" value="MP4 Only Test" />
+            </div>
+            <div class="form-group">
+                <label>Content:</label>
+                <textarea id="content3" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>MP4 File:</label>
+                <input type="file" id="file3" accept=".mp4" />
+            </div>
+            <button class="btn" onclick="testCase3()">Test MP4 Only</button>
+        </div>
+
+        <div class="test-form">
+            <h3>Test Case 4: Content + MP4</h3>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="title4" value="Content + MP4 Test" />
+            </div>
+            <div class="form-group">
+                <label>Content:</label>
+                <textarea id="content4" rows="3">Please watch this important video.</textarea>
+            </div>
+            <div class="form-group">
+                <label>MP4 File:</label>
+                <input type="file" id="file4" accept=".mp4" />
+            </div>
+            <button class="btn" onclick="testCase4()">Test Content + MP4</button>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Debug Log Output</h2>
+        <div id="logOutput" class="log-output">Debug logs will appear here when tests are run...\n</div>
+        <button class="btn btn-warning" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 How to Check Backend Logs</h2>
+        <p>To see the backend debug logs:</p>
+        <ol>
+            <li>Check your server's error log file (usually in <code>/var/log/apache2/error.log</code> or <code>/var/log/nginx/error.log</code>)</li>
+            <li>Look for lines starting with <code>DEBUG -</code></li>
+            <li>The logs will show exactly what data the backend receives</li>
+        </ol>
+        
+        <div class="code">
+# Example log entries you should see:<br>
+DEBUG - POST data received: {"title":"Test Announcement","content":"This is a test...","is_draft":0,...}<br>
+DEBUG - Raw content value: 'This is a test...'<br>
+DEBUG - Content length: 45<br>
+DEBUG - Attachments count: 0<br>
+DEBUG - Validation check - Title: 'Test Announcement' (empty: NO)<br>
+DEBUG - Validation check - Content: 'This is a test...' (empty: NO)
+        </div>
+    </div>
+
+    <div class="test-section success">
+        <h2>✅ Expected Behavior After Fix</h2>
+        <ul>
+            <li><strong>Test Case 1:</strong> Should succeed (normal content)</li>
+            <li><strong>Test Case 2:</strong> Should succeed (trimmed whitespace)</li>
+            <li><strong>Test Case 3:</strong> Should succeed (MP4 only, no content needed)</li>
+            <li><strong>Test Case 4:</strong> Should succeed (content + MP4)</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🚨 If Issue Persists</h2>
+        <p>If you still get the "content is required" error after these fixes, check:</p>
+        <ol>
+            <li><strong>Backend Logs:</strong> Look for the DEBUG entries to see what data is actually received</li>
+            <li><strong>Network Tab:</strong> Check if the FormData is being sent correctly in the browser's developer tools</li>
+            <li><strong>API Endpoint:</strong> Verify which backend controller is being used (enhanced vs regular)</li>
+            <li><strong>Content-Type:</strong> Ensure the request is being sent as multipart/form-data</li>
+        </ol>
+    </div>
+
+    <script>
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            logOutput.textContent += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logOutput').textContent = 'Debug logs cleared...\n';
+        }
+
+        async function testCase1() {
+            log('🧪 Testing Case 1: Normal Text Content');
+            const title = document.getElementById('title1').value;
+            const content = document.getElementById('content1').value;
+            
+            log(`Title: "${title}"`);
+            log(`Content: "${content}"`);
+            log(`Content length: ${content.length}`);
+            log(`Content trimmed: "${content.trim()}"`);
+            log(`Content empty check: ${content.trim() === '' ? 'YES' : 'NO'}`);
+            
+            // Simulate FormData creation
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('is_draft', '0');
+            formData.append('is_scheduled', '0');
+            formData.append('scheduled_at', '');
+            formData.append('allow_comments', '1');
+            formData.append('assignment_type', 'classroom');
+            
+            log('FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                log(`  ${key}: "${value}"`);
+            }
+            
+            log('✅ Test Case 1 completed - Check backend logs for DEBUG entries');
+        }
+
+        async function testCase2() {
+            log('🧪 Testing Case 2: Content with Whitespace');
+            const title = document.getElementById('title2').value;
+            const content = document.getElementById('content2').value;
+            
+            log(`Title: "${title}"`);
+            log(`Content (raw): "${content}"`);
+            log(`Content (trimmed): "${content.trim()}"`);
+            log(`Content length: ${content.length}`);
+            log(`Trimmed length: ${content.trim().length}`);
+            log(`Content empty check (raw): ${content === '' ? 'YES' : 'NO'}`);
+            log(`Content empty check (trimmed): ${content.trim() === '' ? 'YES' : 'NO'}`);
+            
+            log('✅ Test Case 2 completed - Should work with trim() fix');
+        }
+
+        async function testCase3() {
+            log('🧪 Testing Case 3: Empty Content with MP4');
+            const title = document.getElementById('title3').value;
+            const content = document.getElementById('content3').value;
+            const file = document.getElementById('file3').files[0];
+            
+            log(`Title: "${title}"`);
+            log(`Content: "${content}" (empty: ${content === '' ? 'YES' : 'NO'})`);
+            log(`File: ${file ? file.name : 'No file selected'}`);
+            
+            if (file) {
+                log(`File type: ${file.type}`);
+                log(`File size: ${file.size} bytes`);
+            }
+            
+            log('✅ Test Case 3 completed - Should work with attachment validation fix');
+        }
+
+        async function testCase4() {
+            log('🧪 Testing Case 4: Content + MP4');
+            const title = document.getElementById('title4').value;
+            const content = document.getElementById('content4').value;
+            const file = document.getElementById('file4').files[0];
+            
+            log(`Title: "${title}"`);
+            log(`Content: "${content}"`);
+            log(`Content length: ${content.length}`);
+            log(`File: ${file ? file.name : 'No file selected'}`);
+            
+            log('✅ Test Case 4 completed - Should work normally');
+        }
+
+        // Initialize log
+        log('🚀 Content Validation Debug Test initialized');
+        log('📝 Run test cases to see detailed debugging information');
+    </script>
+</body>
+</html>
+

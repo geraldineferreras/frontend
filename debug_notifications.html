@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Notifications</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .debug-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .debug-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Notifications</h1>
+        <p>This page helps debug why notifications aren't showing in your app.</p>
+        
+        <div class="debug-section">
+            <h3>🔐 Step 1: Set Authentication</h3>
+            <div class="form-group">
+                <label>JWT Token:</label>
+                <input type="text" id="jwtToken" placeholder="Enter your JWT token">
+            </div>
+            <div class="form-group">
+                <label>User ID:</label>
+                <input type="text" id="userId" placeholder="Enter user ID (e.g., STU68B7D2257B1C3819)">
+            </div>
+            <button onclick="setAuth()">Set Authentication</button>
+            <div id="authResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🌐 Step 2: Test Backend Connection</h3>
+            <button onclick="testBackendConnection()">Test Backend Connection</button>
+            <div id="backendResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>📋 Step 3: Test Notifications API</h3>
+            <button onclick="testNotificationsAPI()">Test Notifications API</button>
+            <div id="notificationsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔢 Step 4: Test Unread Count</h3>
+            <button onclick="testUnreadCount()">Test Unread Count</button>
+            <div id="unreadResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>📝 Step 5: Create Test Notification</h3>
+            <button onclick="createTestNotification()">Create Test Notification</button>
+            <div id="createResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🧪 Step 6: Full Debug Test</h3>
+            <button onclick="runFullDebug()">Run Full Debug Test</button>
+            <div id="fullDebugResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://scms-backend.up.railway.app';
+        let authToken = '';
+        let currentUserId = '';
+
+        function setAuth() {
+            authToken = document.getElementById('jwtToken').value.trim();
+            currentUserId = document.getElementById('userId').value.trim();
+            
+            if (!authToken || !currentUserId) {
+                showResult('authResult', 'Please enter both JWT token and User ID', 'error');
+                return;
+            }
+            
+            showResult('authResult', `✅ Authentication set successfully!\nToken: ${authToken.substring(0, 20)}...\nUser ID: ${currentUserId}`, 'success');
+        }
+
+        async function makeRequest(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const config = {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                }
+            };
+            
+            if (options.body) {
+                config.body = JSON.stringify(options.body);
+            }
+            
+            try {
+                console.log('Making request to:', url);
+                console.log('Config:', config);
+                
+                const response = await fetch(url, config);
+                const data = await response.json();
+                
+                console.log('Response status:', response.status);
+                console.log('Response data:', data);
+                
+                return { status: response.status, data, headers: response.headers };
+            } catch (error) {
+                console.error('Request error:', error);
+                return { status: 0, error: error.message };
+            }
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        async function testBackendConnection() {
+            if (!authToken || !currentUserId) {
+                showResult('backendResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('backendResult', 'Testing backend connection...', 'info');
+            
+            // Test a simple endpoint first
+            const result = await makeRequest('/api/auth/verify');
+            
+            if (result.status === 200) {
+                showResult('backendResult', '✅ Backend connection successful!\n\nResponse: ' + JSON.stringify(result.data, null, 2), 'success');
+            } else if (result.status === 401) {
+                showResult('backendResult', '❌ Authentication failed. Please check your JWT token.\n\nResponse: ' + JSON.stringify(result.data, null, 2), 'error');
+            } else {
+                showResult('backendResult', `❌ Backend connection failed.\nStatus: ${result.status}\nResponse: ${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testNotificationsAPI() {
+            if (!authToken || !currentUserId) {
+                showResult('notificationsResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('notificationsResult', 'Testing notifications API...', 'info');
+            
+            const result = await makeRequest(`/api/notifications?userId=${currentUserId}`);
+            
+            if (result.status === 200 && result.data.success) {
+                const notifications = result.data.data || [];
+                let displayText = `✅ Notifications API working!\n\nFound ${notifications.length} notifications:\n\n`;
+                
+                if (notifications.length === 0) {
+                    displayText += 'No notifications found. This might be why you can\'t see any in your app.\n\n';
+                    displayText += 'Try creating a test notification in Step 5.';
+                } else {
+                    notifications.forEach((notification, index) => {
+                        displayText += `${index + 1}. [${notification.is_read ? 'READ' : 'UNREAD'}] ${notification.title}\n`;
+                        displayText += `   Type: ${notification.type}\n`;
+                        displayText += `   Message: ${notification.message}\n`;
+                        displayText += `   Created: ${notification.created_at}\n\n`;
+                    });
+                }
+                
+                showResult('notificationsResult', displayText, 'success');
+            } else {
+                showResult('notificationsResult', `❌ Notifications API failed.\nStatus: ${result.status}\nError: ${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testUnreadCount() {
+            if (!authToken || !currentUserId) {
+                showResult('unreadResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('unreadResult', 'Testing unread count API...', 'info');
+            
+            const result = await makeRequest(`/api/notifications/unread-count?userId=${currentUserId}`);
+            
+            if (result.status === 200 && result.data.success) {
+                const count = result.data.data?.count || 0;
+                showResult('unreadResult', `✅ Unread count API working!\n\nUnread notifications: ${count}`, 'success');
+            } else {
+                showResult('unreadResult', `❌ Unread count API failed.\nStatus: ${result.status}\nError: ${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function createTestNotification() {
+            if (!authToken || !currentUserId) {
+                showResult('createResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('createResult', 'Creating test notification...', 'info');
+            
+            const notificationData = {
+                recipient_id: currentUserId,
+                title: 'Test Notification - Debug',
+                message: 'This is a test notification created for debugging purposes',
+                type: 'system',
+                related_id: Math.floor(Math.random() * 1000),
+                related_type: 'debug',
+                class_code: 'DEBUG101',
+                is_urgent: false
+            };
+            
+            const result = await makeRequest('/api/notifications', {
+                method: 'POST',
+                body: notificationData
+            });
+            
+            if (result.status === 200 && result.data.success) {
+                showResult('createResult', `✅ Test notification created successfully!\n\nNotification ID: ${result.data.data?.id || 'Unknown'}\n\nNow try Step 3 again to see if it appears.`, 'success');
+            } else {
+                showResult('createResult', `❌ Failed to create test notification.\nStatus: ${result.status}\nError: ${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function runFullDebug() {
+            if (!authToken || !currentUserId) {
+                showResult('fullDebugResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('fullDebugResult', 'Running full debug test...', 'info');
+            
+            let results = [];
+            let allPassed = true;
+            
+            // Test 1: Backend connection
+            const backendResult = await makeRequest('/api/auth/verify');
+            const backendPassed = backendResult.status === 200;
+            results.push(`1. Backend Connection: ${backendPassed ? '✅ PASS' : '❌ FAIL'}`);
+            if (!backendPassed) allPassed = false;
+            
+            // Test 2: Notifications API
+            const notificationsResult = await makeRequest(`/api/notifications?userId=${currentUserId}`);
+            const notificationsPassed = notificationsResult.status === 200 && notificationsResult.data.success;
+            results.push(`2. Notifications API: ${notificationsPassed ? '✅ PASS' : '❌ FAIL'}`);
+            if (!notificationsPassed) allPassed = false;
+            
+            // Test 3: Unread count
+            const unreadResult = await makeRequest(`/api/notifications/unread-count?userId=${currentUserId}`);
+            const unreadPassed = unreadResult.status === 200 && unreadResult.data.success;
+            results.push(`3. Unread Count API: ${unreadPassed ? '✅ PASS' : '❌ FAIL'}`);
+            if (!unreadPassed) allPassed = false;
+            
+            // Test 4: Create notification
+            const createResult = await makeRequest('/api/notifications', {
+                method: 'POST',
+                body: {
+                    recipient_id: currentUserId,
+                    title: 'Debug Test Notification',
+                    message: 'This notification was created during debugging',
+                    type: 'system',
+                    related_id: 999,
+                    related_type: 'debug',
+                    class_code: 'DEBUG101',
+                    is_urgent: false
+                }
+            });
+            const createPassed = createResult.status === 200 && createResult.data.success;
+            results.push(`4. Create Notification: ${createPassed ? '✅ PASS' : '❌ FAIL'}`);
+            if (!createPassed) allPassed = false;
+            
+            const summary = results.join('\n');
+            const passedTests = results.filter(r => r.includes('✅ PASS')).length;
+            const totalTests = results.length;
+            
+            let finalMessage = `Debug Test Results:\n\n${summary}\n\nOverall: ${passedTests}/${totalTests} tests passed\n\n`;
+            
+            if (allPassed) {
+                finalMessage += '🎉 All tests passed! Your notification system should be working.\n\n';
+                finalMessage += 'If you still can\'t see notifications in your app, the issue might be:\n';
+                finalMessage += '1. Frontend not calling the API correctly\n';
+                finalMessage += '2. UI components not rendering the data\n';
+                finalMessage += '3. Authentication issues in the frontend\n';
+                finalMessage += '4. CORS issues\n\n';
+                finalMessage += 'Check your browser console for any JavaScript errors.';
+            } else {
+                finalMessage += '❌ Some tests failed. This explains why you can\'t see notifications.\n\n';
+                finalMessage += 'Common issues:\n';
+                finalMessage += '1. Invalid JWT token\n';
+                finalMessage += '2. Wrong user ID format\n';
+                finalMessage += '3. Backend API not responding\n';
+                finalMessage += '4. Network connectivity issues\n\n';
+                finalMessage += 'Fix the failing tests first, then try again.';
+            }
+            
+            showResult('fullDebugResult', finalMessage, allPassed ? 'success' : 'error');
+        }
+    </script>
+</body>
+</html>
+
+

@@ -1,14 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/static/(.*)",
@@ -19,16 +10,24 @@
       "dest": "/favicon.ico"
     },
     {
-      "src": "/manifest.json",
-      "dest": "/manifest.json"
+      "src": "/favicon.svg",
+      "dest": "/favicon.svg"
+    },
+    {
+      "src": "/icon-192.png",
+      "dest": "/icon-192.png"
+    },
+    {
+      "src": "/icon-512.png",
+      "dest": "/icon-512.png"
     },
     {
       "src": "/site.webmanifest",
       "dest": "/site.webmanifest"
     },
     {
-      "src": "/scms/site.webmanifest",
-      "dest": "/scms/site.webmanifest"
+      "src": "/scms/(.*)",
+      "dest": "/scms/$1"
     },
     {
       "src": "/pdf.worker.js",
@@ -69,11 +68,5 @@
   ],
   "env": {
     "CI": "false"
-  },
-  "build": {
-    "env": {
-      "REACT_APP_API_BASE_URL": "https://scms-backend.up.railway.app",
-      "REACT_APP_SSE_URL": "https://scms-backend.up.railway.app/api/notifications/stream"
-    }
   }
 }

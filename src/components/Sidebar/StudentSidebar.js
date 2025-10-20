@@ -51,6 +51,8 @@ import {
 import apiService from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import { useNotificationCount } from "../../hooks/useNotificationCount";
+import NotificationCountBadge from "../NotificationCountBadge";
 
 var ps;
 
@@ -63,6 +65,7 @@ const StudentSidebar = (props) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
+  const { unreadCount } = useNotificationCount();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -142,6 +145,7 @@ const StudentSidebar = (props) => {
           >
             <i className={mod.icon} />
             {mod.name}
+            {mod.name === "Notifications" && <NotificationCountBadge count={unreadCount} />}
           </NavLink>
         </NavItem>
       );

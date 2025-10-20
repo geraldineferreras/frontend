@@ -36038,6 +36038,88 @@ textarea[resize="horizontal"] {
 
 }
 
+/* --- Mobile Navbar Collapse Stacking Context Fix --- */
+@media (max-width: 767.98px) {
+  .navbar-collapse {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    z-index: 2000 !important;
+  }
+
+  .navbar-collapse.collapsing,
+  .navbar-collapse.show {
+    z-index: 2000 !important;
+  }
+
+  .navbar {
+    position: relative;
+    z-index: 100;
+  }
+
+  /* Ensure dropdown menus overlay page content on mobile */
+  .dropdown-menu.show,
+  .dropdown-menu-arrow.dropdown-menu.show {
+    position: fixed !important;
+    top: 70px !important; /* below navbar */
+    right: 8px !important;
+    left: auto !important;
+    transform: none !important;
+    width: auto;
+    max-width: 90vw;
+    z-index: 3000 !important;
+  }
+
+  /* Student classroom header: enable horizontal scroll on mobile */
+  .student-classroom-header-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+  }
+  .student-classroom-header-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .student-classroom-header-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 4px;
+  }
+  .student-classroom-header-inner {
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  /* If we need the inner to be the scroller itself (per request) */
+  .student-classroom-header-scroll .student-classroom-header-inner {
+    overflow-x: hidden;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Auto height when items wrap; ensure comfortable vertical spacing */
+  .student-classroom-header-scroll .student-classroom-header-inner {
+    min-height: 56px;
+    row-gap: 8px;
+    column-gap: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* Tabs should lay out horizontally and scroll; do not stretch to full width */
+  .student-classroom-header-inner .student-tab-item {
+    display: inline-block;
+    white-space: nowrap;
+  }
+}
+
 
 
 .popover-header {
@@ -38524,5 +38606,123 @@ html:not([dir="rtl"]) .noUi-horizontal .noUi-handle {
 
   outline: none;
 
+}
+
+/* Notification Count Badge Styles */
+.notification-count-badge {
+  background-color: #f44336 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  font-size: 11px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: bold !important;
+  margin-left: 8px !important;
+  padding: 0 4px !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3) !important;
+  animation: pulse 2s infinite !important;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Notification Modal Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3) translateX(100%);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) translateX(-10%);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(0.9) translateX(5%);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-modal {
+  animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.notification-modal.closing {
+  animation: slideOutRight 0.3s ease-in-out forwards;
+}
+
+.notification-modal:hover {
+  transform: translateX(-5px) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Notification Manager Container */
+.notification-manager {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.notification-manager::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notification-manager::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-manager::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+.notification-manager::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
 

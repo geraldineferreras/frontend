@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import ApiService from '../services/api';
 import ProfilePicture from './ProfilePicture';
+import { formatUserName, sortUsersByName } from '../utils/nameUtils';
 
 const ROLE_LABELS = {
-  admin: 'Admins',
+  admin: 'Program Chairpersons',
   teacher: 'Teachers',
   student: 'Students',
 };
@@ -57,7 +58,9 @@ const UserList = () => {
           setSections(sectionsData);
         }
         
-        setUsers(usersArr);
+        // Sort users by name before setting state
+        const sortedUsers = sortUsersByName(usersArr);
+        setUsers(sortedUsers);
         setLoading(false);
       } catch (err) {
         setError(err.message);
@@ -159,7 +162,7 @@ const UserList = () => {
               showFallback={true}
             />
             <div>
-              <div style={{ fontWeight: 600 }}>{user.name}</div>
+              <div style={{ fontWeight: 600 }}>{formatUserName(user)}</div>
               <div style={{ fontSize: 12, color: '#888' }}>ID: {user.id}</div>
             </div>
           </div>

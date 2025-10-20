@@ -21,6 +21,7 @@ import { Modal, ModalHeader, ModalBody, ModalFooter, Button } from "reactstrap";
 import "assets/plugins/nucleo/css/nucleo.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "assets/scss/argon-dashboard-react.scss";
+import "assets/css/react-select-mobile-fix.css";
 
 import AdminLayout from "layouts/Admin.js";
 import AuthLayout from "layouts/Auth.js";
@@ -32,6 +33,7 @@ import { AuthProvider } from "contexts/AuthContext.js";
 import { NotificationProvider } from "contexts/NotificationContext.js";
 import GlobalRouteLoader from "components/GlobalRouteLoader";
 import NotificationToaster from "components/NotificationToaster";
+import NotificationManager from "components/NotificationManager";
 
 function SessionTimeoutModal() {
   const [open, setOpen] = useState(false);
@@ -78,6 +80,7 @@ root.render(
           <Route path="*" element={<Navigate to="/auth/login" replace />} />
         </Routes>
         <NotificationToaster />
+        <NotificationManager />
       </NotificationProvider>
     </BrowserRouter>
   </AuthProvider>

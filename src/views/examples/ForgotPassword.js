@@ -51,15 +51,20 @@ const ForgotPassword = () => {
         return;
       }
 
-      // Call the forgot password API
-      const response = await ApiService.post("/auth/forgot-password", { email: email.trim() }, false);
+      // Call the forgot password API (backend expects snake_case endpoint)
+      const response = await ApiService.forgotPassword(email.trim());
       
-      if (response && response.status === "success") {
+      const responseMessage = response?.message || "";
+      const isSuccess =
+        (response && (response.status === "success" || response.success === true)) ||
+        /reset (password )?link has been sent|check your email/i.test(responseMessage);
+
+      if (isSuccess) {
         setSuccess(true);
-        setMessage(response.message || "If an account with that email exists, a password reset link has been sent.");
+        setMessage(responseMessage || "If an account with that email exists, a password reset link has been sent.");
         setEmail(""); // Clear the form
       } else {
-        setError(response?.message || "Something went wrong. Please try again.");
+        setError(responseMessage || "Something went wrong. Please try again.");
       }
     } catch (error) {
       console.error("Forgot password error:", error);
@@ -89,10 +94,10 @@ const ForgotPassword = () => {
             {success ? (
               // Success state
               <div className="text-center">
-                <Alert color="success" className="mb-3">
+                <div className="alert alert-success mb-3" role="alert" style={{ backgroundColor: '#62bf45', borderColor: '#62bf45', color: '#fff' }}>
                   <i className="ni ni-check-bold mr-2"></i>
                   {message}
-                </Alert>
+                </div>
                 <div className="mb-3">
                   <i className="ni ni-check-bold text-success" style={{ fontSize: "3rem" }}></i>
                 </div>

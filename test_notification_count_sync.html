@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Count Synchronization Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .sidebar-mockup {
+            display: flex;
+            gap: 40px;
+            margin: 20px 0;
+        }
+        .sidebar {
+            width: 250px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .sidebar h4 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .nav-item:hover {
+            background-color: #f9f9f9;
+        }
+        .nav-item.active {
+            background-color: #e3f0ff;
+            color: #007bff;
+        }
+        .nav-item i {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .notification-count-badge {
+            background-color: #f44336 !important;
+            color: white !important;
+            border-radius: 50% !important;
+            min-width: 18px !important;
+            height: 18px !important;
+            font-size: 11px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-weight: bold !important;
+            margin-left: 8px !important;
+            padding: 0 4px !important;
+            line-height: 1 !important;
+            box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3) !important;
+            animation: pulse 2s infinite !important;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .notifications-page {
+            flex: 1;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .notifications-page h4 {
+            margin-top: 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .notification-card {
+            background: #e3f0ff;
+            border: 1px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .notification-card.read {
+            background: #fff;
+            border-color: #ddd;
+            opacity: 0.7;
+        }
+        .notification-content {
+            flex: 1;
+        }
+        .notification-title {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        .notification-message {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .notification-time {
+            font-size: 12px;
+            color: #666;
+        }
+        .mark-read-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .mark-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .mark-all-read-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .mark-all-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .test-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .test-controls button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-controls button:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .count-display {
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Notification Count Synchronization Test</h1>
+        <p>This test demonstrates how the notification count badge in the sidebar updates in real-time when notifications are marked as read in the notifications page.</p>
+
+        <div class="test-section">
+            <h3>📱 Live Demo</h3>
+            <p>Click "Mark as Read" on individual notifications or "Mark All as Read" to see the sidebar count update immediately.</p>
+            
+            <div class="sidebar-mockup">
+                <!-- Student Sidebar -->
+                <div class="sidebar">
+                    <h4>👨‍🎓 Student Sidebar</h4>
+                    <div class="nav-item">
+                        <i>📺</i>
+                        Dashboard
+                    </div>
+                    <div class="nav-item">
+                        <i>➕</i>
+                        Join Class
+                    </div>
+                    <div class="nav-item">
+                        <i>🎓</i>
+                        Classroom
+                    </div>
+                    <div class="nav-item">
+                        <i>✅</i>
+                        Attendance
+                    </div>
+                    <div class="nav-item">
+                        <i>📄</i>
+                        Excuse Letters
+                    </div>
+                    <div class="nav-item active">
+                        <i>🔔</i>
+                        Notifications
+                        <span class="notification-count-badge" id="student-count">7</span>
+                    </div>
+                    <div class="count-display">Unread Count: <strong id="student-count-text">7</strong></div>
+                </div>
+
+                <!-- Teacher Sidebar -->
+                <div class="sidebar">
+                    <h4>👨‍🏫 Teacher Sidebar</h4>
+                    <div class="nav-item">
+                        <i>📺</i>
+                        Dashboard
+                    </div>
+                    <div class="nav-item">
+                        <i>🏢</i>
+                        Classroom
+                    </div>
+                    <div class="nav-item">
+                        <i>✅</i>
+                        Attendance
+                    </div>
+                    <div class="nav-item">
+                        <i>📄</i>
+                        Excuse Management
+                    </div>
+                    <div class="nav-item active">
+                        <i>🔔</i>
+                        Notifications
+                        <span class="notification-count-badge" id="teacher-count">3</span>
+                    </div>
+                    <div class="count-display">Unread Count: <strong id="teacher-count-text">3</strong></div>
+                </div>
+
+                <!-- Admin Sidebar -->
+                <div class="sidebar">
+                    <h4>👨‍💼 Admin Sidebar</h4>
+                    <div class="nav-item">
+                        <i>📺</i>
+                        Dashboard
+                    </div>
+                    <div class="nav-item">
+                        <i>👤</i>
+                        User Management
+                    </div>
+                    <div class="nav-item">
+                        <i>🏷️</i>
+                        Section Management
+                    </div>
+                    <div class="nav-item">
+                        <i>📚</i>
+                        Subject Management
+                    </div>
+                    <div class="nav-item">
+                        <i>📦</i>
+                        Offerings Management
+                    </div>
+                    <div class="nav-item">
+                        <i>📁</i>
+                        Reports & Logs
+                    </div>
+                    <div class="nav-item active">
+                        <i>🔔</i>
+                        Notifications
+                        <span class="notification-count-badge" id="admin-count">5</span>
+                    </div>
+                    <div class="count-display">Unread Count: <strong id="admin-count-text">5</strong></div>
+                </div>
+            </div>
+
+            <!-- Notifications Page Mockup -->
+            <div class="notifications-page">
+                <h4>🔔 Notifications Page</h4>
+                <button class="mark-all-read-btn" onclick="markAllAsRead()" id="mark-all-btn">
+                    Mark All as Read
+                </button>
+                
+                <div id="notifications-list">
+                    <div class="notification-card" data-id="1">
+                        <div class="notification-content">
+                            <div class="notification-title">Announcement</div>
+                            <div class="notification-message">New assignment posted for Mathematics class</div>
+                            <div class="notification-time">2 minutes ago</div>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAsRead(1)">Mark as Read</button>
+                    </div>
+                    
+                    <div class="notification-card" data-id="2">
+                        <div class="notification-content">
+                            <div class="notification-title">Grade Update</div>
+                            <div class="notification-message">Your grade for Assignment #3 has been posted</div>
+                            <div class="notification-time">15 minutes ago</div>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAsRead(2)">Mark as Read</button>
+                    </div>
+                    
+                    <div class="notification-card" data-id="3">
+                        <div class="notification-content">
+                            <div class="notification-title">Attendance Alert</div>
+                            <div class="notification-message">You have been marked absent for today's class</div>
+                            <div class="notification-time">1 hour ago</div>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAsRead(3)">Mark as Read</button>
+                    </div>
+                    
+                    <div class="notification-card" data-id="4">
+                        <div class="notification-content">
+                            <div class="notification-title">Excuse Letter</div>
+                            <div class="notification-message">Your excuse letter has been approved</div>
+                            <div class="notification-time">2 hours ago</div>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAsRead(4)">Mark as Read</button>
+                    </div>
+                    
+                    <div class="notification-card" data-id="5">
+                        <div class="notification-content">
+                            <div class="notification-title">Class Stream</div>
+                            <div class="notification-message">New post in Mathematics class stream</div>
+                            <div class="notification-time">3 hours ago</div>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAsRead(5)">Mark as Read</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Controls</h3>
+            <div class="test-controls">
+                <button onclick="resetDemo()">Reset Demo</button>
+                <button onclick="addNotification()">Add New Notification</button>
+                <button onclick="simulateRealTime()">Simulate Real-time Update</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Implementation Features</h3>
+            <div class="status success">
+                <strong>✅ Real-time Synchronization:</strong> The sidebar notification count updates immediately when notifications are marked as read.
+            </div>
+            <div class="status success">
+                <strong>✅ Global State Management:</strong> Uses React Context to share notification state between sidebar and notifications page.
+            </div>
+            <div class="status success">
+                <strong>✅ Multiple User Roles:</strong> Works for Student, Teacher, and Admin sidebars with the same implementation.
+            </div>
+            <div class="status success">
+                <strong>✅ Individual & Bulk Actions:</strong> Supports both individual "Mark as Read" and "Mark All as Read" functionality.
+            </div>
+            <div class="status success">
+                <strong>✅ Visual Feedback:</strong> Badge disappears when count reaches 0, and animations provide clear visual feedback.
+            </div>
+            <div class="status success">
+                <strong>✅ Error Handling:</strong> Gracefully handles API failures and maintains consistent state.
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Technical Implementation</h3>
+            <div class="status info">
+                <strong>📁 Key Files Modified:</strong><br>
+                • <code>src/contexts/NotificationContext.js</code> - Added functions to update global notification count<br>
+                • <code>src/hooks/useNotificationCount.js</code> - Updated to use global context instead of local state<br>
+                • <code>src/views/examples/Notifications.js</code> - Added calls to update global count when marking as read<br>
+                • <code>src/views/examples/StudentNotifications.js</code> - Added calls to update global count<br>
+                • <code>src/views/examples/TeacherNotifications.js</code> - Added calls to update global count<br>
+                • All sidebar components - Now use the global notification count from context
+            </div>
+            <div class="status info">
+                <strong>🔄 Data Flow:</strong><br>
+                1. User clicks "Mark as Read" or "Mark All as Read"<br>
+                2. API call is made to mark notifications as read<br>
+                3. Local notifications state is updated<br>
+                4. Global notification context count is decremented/reset<br>
+                5. Sidebar badge count updates immediately<br>
+                6. Badge disappears when count reaches 0
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let unreadCounts = {
+            student: 7,
+            teacher: 3,
+            admin: 5
+        };
+
+        function updateBadge(role, count) {
+            const badge = document.getElementById(`${role}-count`);
+            const text = document.getElementById(`${role}-count-text`);
+            
+            if (count === 0) {
+                badge.style.display = 'none';
+                badge.textContent = '';
+            } else {
+                badge.style.display = 'inline-flex';
+                badge.textContent = count > 99 ? '99+' : count;
+            }
+            
+            text.textContent = count;
+            unreadCounts[role] = count;
+        }
+
+        function markAsRead(notificationId) {
+            const card = document.querySelector(`[data-id="${notificationId}"]`);
+            if (card && !card.classList.contains('read')) {
+                card.classList.add('read');
+                card.querySelector('.mark-read-btn').disabled = true;
+                card.querySelector('.mark-read-btn').textContent = 'Read';
+                
+                // Update all sidebar counts
+                Object.keys(unreadCounts).forEach(role => {
+                    updateBadge(role, Math.max(0, unreadCounts[role] - 1));
+                });
+                
+                showStatus(`Notification ${notificationId} marked as read`, 'success');
+                
+                // Update mark all button state
+                updateMarkAllButton();
+            }
+        }
+
+        function markAllAsRead() {
+            const unreadCards = document.querySelectorAll('.notification-card:not(.read)');
+            unreadCards.forEach(card => {
+                card.classList.add('read');
+                card.querySelector('.mark-read-btn').disabled = true;
+                card.querySelector('.mark-read-btn').textContent = 'Read';
+            });
+            
+            // Reset all sidebar counts to 0
+            Object.keys(unreadCounts).forEach(role => {
+                updateBadge(role, 0);
+            });
+            
+            showStatus('All notifications marked as read', 'success');
+            updateMarkAllButton();
+        }
+
+        function updateMarkAllButton() {
+            const unreadCards = document.querySelectorAll('.notification-card:not(.read)');
+            const markAllBtn = document.getElementById('mark-all-btn');
+            
+            if (unreadCards.length === 0) {
+                markAllBtn.disabled = true;
+                markAllBtn.textContent = 'All Read';
+            } else {
+                markAllBtn.disabled = false;
+                markAllBtn.textContent = `Mark All as Read (${unreadCards.length})`;
+            }
+        }
+
+        function resetDemo() {
+            // Reset all notifications to unread
+            document.querySelectorAll('.notification-card').forEach(card => {
+                card.classList.remove('read');
+                card.querySelector('.mark-read-btn').disabled = false;
+                card.querySelector('.mark-read-btn').textContent = 'Mark as Read';
+            });
+            
+            // Reset counts
+            updateBadge('student', 7);
+            updateBadge('teacher', 3);
+            updateBadge('admin', 5);
+            
+            updateMarkAllButton();
+            showStatus('Demo reset to initial state', 'info');
+        }
+
+        function addNotification() {
+            const notificationsList = document.getElementById('notifications-list');
+            const newId = Date.now();
+            const newCard = document.createElement('div');
+            newCard.className = 'notification-card';
+            newCard.setAttribute('data-id', newId);
+            newCard.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-title">New Notification</div>
+                    <div class="notification-message">This is a new notification added at ${new Date().toLocaleTimeString()}</div>
+                    <div class="notification-time">Just now</div>
+                </div>
+                <button class="mark-read-btn" onclick="markAsRead(${newId})">Mark as Read</button>
+            `;
+            
+            notificationsList.insertBefore(newCard, notificationsList.firstChild);
+            
+            // Update all sidebar counts
+            Object.keys(unreadCounts).forEach(role => {
+                updateBadge(role, unreadCounts[role] + 1);
+            });
+            
+            updateMarkAllButton();
+            showStatus('New notification added', 'info');
+        }
+
+        function simulateRealTime() {
+            // Simulate receiving a new notification
+            addNotification();
+            
+            setTimeout(() => {
+                showStatus('Real-time notification simulation completed', 'success');
+            }, 1000);
+        }
+
+        function showStatus(message, type) {
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(status, container.firstChild.nextSibling);
+            
+            setTimeout(() => {
+                status.remove();
+            }, 3000);
+        }
+
+        // Initialize the demo
+        updateMarkAllButton();
+    </script>
+</body>
+</html>
+

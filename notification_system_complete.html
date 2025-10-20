@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Notification System</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Navbar Simulation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .navbar-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .navbar-link {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .navbar-link:hover {
+            color: #667eea;
+        }
+
+        /* Notification Badge */
+        .notification-count-badge {
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            color: white;
+            border-radius: 50%;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+            box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+            animation: pulse 2s infinite;
+            transition: all 0.3s ease;
+        }
+
+        .notification-count-badge.hidden {
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 80px;
+            padding: 2rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .demo-section {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Demo Controls */
+        .demo-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #00b894, #00a085);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(253, 203, 110, 0.4);
+        }
+
+        .btn-info {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(116, 185, 255, 0.4);
+        }
+
+        /* Notification Manager Container */
+        .notification-manager {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 9999;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+        }
+
+        .notification-manager::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .notification-manager::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .notification-manager::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 2px;
+        }
+
+        .notification-manager::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Notification Modal */
+        .notification-modal {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            width: 320px;
+            max-width: 90vw;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transition: all 0.3s ease;
+        }
+
+        .notification-modal:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .notification-modal.closing {
+            animation: slideOutRight 0.3s ease-in-out forwards;
+        }
+
+        /* Notification Modal Animations */
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0.3) translateX(100%);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05) translateX(-10%);
+                opacity: 0.8;
+            }
+            70% {
+                transform: scale(0.9) translateX(5%);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1) translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Notification Header */
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .notification-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: white;
+            font-weight: bold;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #999;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .notification-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: #333;
+        }
+
+        /* Notification Content */
+        .notification-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .notification-message {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .notification-time {
+            font-size: 11px;
+            color: #999;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Notification Types */
+        .notification-type-announcement .notification-icon {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+
+        .notification-type-grade .notification-icon {
+            background: linear-gradient(45deg, #00b894, #00a085);
+        }
+
+        .notification-type-assignment .notification-icon {
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+        }
+
+        .notification-type-system .notification-icon {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+        }
+
+        /* Progress Bar */
+        .notification-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 0 0 12px 12px;
+            animation: shrink 5s linear forwards;
+        }
+
+        @keyframes shrink {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+        /* Notification Module */
+        .notification-module {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-top: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .notification-module.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .notification-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .notification-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .notification-card:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .notification-card.is-read {
+            background: #fff;
+            border-color: #dee2e6;
+            opacity: 0.7;
+        }
+
+        .notification-card.is-read::after {
+            content: "✓ Read";
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .notification-manager {
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+
+            .notification-modal {
+                width: 100%;
+            }
+
+            .navbar {
+                padding: 1rem;
+            }
+
+            .navbar-links {
+                gap: 1rem;
+            }
+
+            .demo-controls {
+                flex-direction: column;
+            }
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online { background: #00b894; }
+        .status-offline { background: #ddd; }
+        .status-error { background: #ff4757; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-brand">SCMS Dashboard</div>
+        <div class="navbar-links">
+            <a href="#" class="navbar-link" id="notifications-link">
+                Notifications
+                <span class="notification-count-badge" id="notification-badge">0</span>
+            </a>
+            <a href="#" class="navbar-link">Profile</a>
+            <a href="#" class="navbar-link">Settings</a>
+        </div>
+    </nav>
+
+    <!-- Notification Manager (Fixed Position) -->
+    <div class="notification-manager" id="notification-manager"></div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Demo Controls -->
+        <div class="demo-section">
+            <h2 class="demo-title">🎮 Notification System Demo</h2>
+            <p style="margin-bottom: 2rem; color: #666;">
+                Test the real-time notification system with different types of notifications. 
+                Each notification will appear as a modal popup with sound and auto-close after 5 seconds.
+            </p>
+            
+            <div class="demo-controls">
+                <button class="btn btn-primary" onclick="triggerNotification('announcement')">
+                    📢 New Announcement
+                </button>
+                <button class="btn btn-success" onclick="triggerNotification('grade')">
+                    📊 Grade Update
+                </button>
+                <button class="btn btn-warning" onclick="triggerNotification('assignment')">
+                    📝 New Assignment
+                </button>
+                <button class="btn btn-info" onclick="triggerNotification('system')">
+                    ⚙️ System Alert
+                </button>
+                <button class="btn btn-primary" onclick="triggerMultipleNotifications()">
+                    🎯 Multiple Notifications
+                </button>
+                <button class="btn btn-success" onclick="clearAllNotifications()">
+                    🧹 Clear All
+                </button>
+                <button class="btn btn-info" onclick="testSound()">
+                    🔊 Test Sound
+                </button>
+                <button class="btn btn-success" onclick="enableAudio()">
+                    🎵 Enable Audio
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <span class="status-indicator status-online"></span>
+                    <strong>Active Notifications:</strong> <span id="active-count">0</span>
+                </div>
+                <div>
+                    <span class="status-indicator status-online"></span>
+                    <strong>Total Sent:</strong> <span id="total-sent">0</span>
+                </div>
+                <div>
+                    <span class="status-indicator status-online"></span>
+                    <strong>Sound:</strong> <span id="sound-status">Enabled</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Module -->
+        <div class="notification-module" id="notification-module">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3>📋 Notification History</h3>
+                <button class="btn btn-primary" onclick="openNotificationModule()">
+                    🔄 Refresh
+                </button>
+            </div>
+            
+            <div class="notification-list" id="notification-list">
+                <!-- Notifications will be populated here -->
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="demo-section">
+            <h2 class="demo-title">📖 How It Works</h2>
+            <div style="line-height: 1.6; color: #666;">
+                <h4>✨ Features:</h4>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li><strong>Modal Popups:</strong> Notifications appear as beautiful modals in the top-right corner</li>
+                    <li><strong>Auto-Close:</strong> Each notification automatically closes after 5 seconds</li>
+                    <li><strong>Manual Close:</strong> Click the × button to close immediately</li>
+                    <li><strong>Click to Open:</strong> Click anywhere on the notification to open the full module</li>
+                    <li><strong>Sound Effects:</strong> Each notification plays a sound (if enabled)</li>
+                    <li><strong>Stacking:</strong> Multiple notifications stack neatly without overlapping</li>
+                    <li><strong>Instant Read:</strong> Opening the notification module marks all as read instantly</li>
+                    <li><strong>Badge Counter:</strong> The notification badge updates in real-time</li>
+                </ul>
+
+                <h4>🎯 Integration:</h4>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li>Copy the CSS and JavaScript sections to your existing app</li>
+                    <li>Update the notification sound path to match your file structure</li>
+                    <li>Adapt the selectors to match your DOM elements</li>
+                    <li>Connect to your real notification data source</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== NOTIFICATION SYSTEM CORE =====
+        class NotificationSystem {
+            constructor() {
+                this.notifications = [];
+                this.activeModals = [];
+                this.notificationIdCounter = 1;
+                this.totalSent = 0;
+                this.audio = null;
+                
+                console.log('🚀 NotificationSystem constructor called');
+                this.init();
+            }
+
+            init() {
+                console.log('🔧 Initializing notification system...');
+                this.setupAudio();
+                this.bindEvents();
+                this.updateUI();
+                console.log('✅ Notification system initialized');
+            }
+
+            setupAudio() {
+                console.log('🎵 setupAudio() method called');
+                try {
+                    // Try multiple paths in order of preference
+                    const audioPaths = [
+                        './public/sounds/notification.mp3',           // Relative path (most likely to work)
+                        '/public/sounds/notification.mp3',            // Root relative path
+                        'public/sounds/notification.mp3',             // Direct path
+                        'sounds/notification.mp3',                   // Sounds folder only
+                        'notification.mp3'                           // Just the filename
+                    ];
+
+                    console.log('📁 Audio paths to try:', audioPaths);
+                    this.audio = null;
+                    let currentPathIndex = 0;
+
+                    const tryNextPath = () => {
+                        if (currentPathIndex >= audioPaths.length) {
+                            console.warn('All audio paths failed. Trying fallback sound...');
+                            this.tryFallbackSound();
+                            return;
+                        }
+
+                        const currentPath = audioPaths[currentPathIndex];
+                        console.log(`🔊 Trying audio path: ${currentPath}`);
+                        
+                        this.audio = new Audio(currentPath);
+                        this.audio.preload = 'auto';
+                        this.audio.volume = 0.8;
+                        
+                        this.audio.addEventListener('canplaythrough', () => {
+                            console.log(`✅ Notification sound loaded successfully from: ${currentPath}`);
+                            document.getElementById('sound-status').textContent = `Enabled (${currentPath})`;
+                            document.getElementById('sound-status').style.color = '#00b894';
+                        });
+
+                        this.audio.addEventListener('error', (e) => {
+                            console.warn(`❌ Failed to load audio from: ${currentPath}`, e);
+                            currentPathIndex++;
+                            tryNextPath();
+                        });
+
+                        // Try to load the audio
+                        this.audio.load();
+                    };
+
+                    tryNextPath();
+                    
+                } catch (error) {
+                    console.warn('Audio not supported. Sound disabled.', error);
+                    this.audio = null;
+                    document.getElementById('sound-status').textContent = 'Disabled (not supported)';
+                    document.getElementById('sound-status').style.color = '#ff4757';
+                }
+            }
+
+            tryFallbackSound() {
+                console.log('🔄 Trying fallback sound (beep)');
+                try {
+                    // Create a simple beep sound using Web Audio API
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    
+                    console.log('✅ Fallback beep sound created');
+                    document.getElementById('sound-status').textContent = 'Enabled (fallback beep)';
+                    document.getElementById('sound-status').style.color = '#00b894';
+                    
+                    // Store fallback method
+                    this.playFallbackSound = () => {
+                        this.tryFallbackSound();
+                    };
+                    
+                } catch (error) {
+                    console.warn('Fallback sound failed:', error);
+                    document.getElementById('sound-status').textContent = 'Disabled (all methods failed)';
+                    document.getElementById('sound-status').style.color = '#ff4757';
+                }
+            }
+
+            bindEvents() {
+                // Notification link click handler
+                document.getElementById('notifications-link').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.openNotificationModule();
+                });
+
+                // Listen for custom events
+                window.addEventListener('notificationsCleared', () => {
+                    console.log('🎉 Notifications cleared event received');
+                });
+            }
+
+            createNotification(type, title, message) {
+                const notification = {
+                    id: this.notificationIdCounter++,
+                    type: type,
+                    title: title,
+                    message: message,
+                    timestamp: new Date(),
+                    isRead: false
+                };
+
+                this.notifications.unshift(notification); // Add to beginning
+                this.totalSent++;
+                
+                // Show modal first
+                this.showModal(notification);
+                
+                // Update UI (this will increment the notification count)
+                this.updateUI();
+                
+                // Play sound when notification count is added
+                console.log('🔔 New notification added, playing sound...');
+                this.playSound();
+
+                return notification;
+            }
+
+            showModal(notification) {
+                const modal = this.createModalElement(notification);
+                const manager = document.getElementById('notification-manager');
+                
+                manager.appendChild(modal);
+                this.activeModals.push(modal);
+
+                // Auto-close after 5 seconds
+                const timer = setTimeout(() => {
+                    this.closeModal(modal);
+                }, 5000);
+
+                // Store timer reference for manual close
+                modal._timer = timer;
+
+                // Update active count
+                this.updateActiveCount();
+            }
+
+            createModalElement(notification) {
+                const modal = document.createElement('div');
+                modal.className = 'notification-modal';
+                modal.dataset.notificationId = notification.id;
+
+                const iconMap = {
+                    announcement: '📢',
+                    grade: '📊',
+                    assignment: '📝',
+                    system: '⚙️'
+                };
+
+                const timeAgo = this.getTimeAgo(notification.timestamp);
+
+                modal.innerHTML = `
+                    <div class="notification-header">
+                        <div class="notification-icon notification-type-${notification.type}">
+                            ${iconMap[notification.type] || '📢'}
+                        </div>
+                        <button class="notification-close" onclick="notificationSystem.closeModal(this.parentElement.parentElement)">×</button>
+                    </div>
+                    <div class="notification-title">${notification.title}</div>
+                    <div class="notification-message">${notification.message}</div>
+                    <div class="notification-time">
+                        <span>🕒</span>
+                        <span>${timeAgo}</span>
+                    </div>
+                    <div class="notification-progress"></div>
+                `;
+
+                // Click handler to open notification module
+                modal.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('notification-close')) return;
+                    this.openNotificationModule();
+                });
+
+                return modal;
+            }
+
+            closeModal(modal) {
+                if (!modal || !modal.parentNode) return;
+
+                modal.classList.add('closing');
+                
+                setTimeout(() => {
+                    if (modal.parentNode) {
+                        modal.parentNode.removeChild(modal);
+                    }
+                    
+                    // Remove from active modals
+                    const index = this.activeModals.indexOf(modal);
+                    if (index > -1) {
+                        this.activeModals.splice(index, 1);
+                    }
+
+                    this.updateActiveCount();
+                }, 300);
+            }
+
+            playSound() {
+                console.log('🔔 Attempting to play notification sound...');
+                
+                // Check if audio is enabled (user has interacted with page)
+                if (typeof audioEnabled !== 'undefined' && !audioEnabled) {
+                    console.log('🔇 Audio not enabled yet - user needs to interact with page first');
+                    console.log('💡 Click anywhere on the page to enable audio playback');
+                    return;
+                }
+                
+                if (this.audio) {
+                    try {
+                        // Reset audio to beginning and play
+                        this.audio.currentTime = 0;
+                        this.audio.volume = 0.8;
+                        
+                        const playPromise = this.audio.play();
+                        
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log('🔊 Notification sound played successfully!');
+                            }).catch(error => {
+                                console.warn('❌ Could not play notification sound:', error);
+                                console.log('💡 This might be due to browser autoplay policies. Try clicking on the page first.');
+                                
+                                // Try fallback sound
+                                if (this.playFallbackSound) {
+                                    console.log('🔄 Trying fallback sound instead...');
+                                    this.playFallbackSound();
+                                } else {
+                                    this.tryPlayWithUserInteraction();
+                                }
+                            });
+                        } else {
+                            console.log('🔊 Notification sound played (legacy browser)');
+                        }
+                    } catch (error) {
+                        console.warn('❌ Error playing notification sound:', error);
+                        // Try fallback sound
+                        if (this.playFallbackSound) {
+                            console.log('🔄 Trying fallback sound after error...');
+                            this.playFallbackSound();
+                        }
+                    }
+                } else {
+                    console.log('🔇 No audio file loaded, trying fallback sound...');
+                    if (this.playFallbackSound) {
+                        this.playFallbackSound();
+                    } else {
+                        document.getElementById('sound-status').textContent = 'No audio available';
+                        document.getElementById('sound-status').style.color = '#ff4757';
+                    }
+                }
+            }
+
+            tryPlayWithUserInteraction() {
+                // Add a click listener to play sound on next user interaction
+                const playOnClick = () => {
+                    if (this.audio) {
+                        this.audio.play().then(() => {
+                            console.log('🔊 Sound played after user interaction');
+                        }).catch(error => {
+                            console.warn('Still cannot play audio:', error);
+                        });
+                    }
+                    document.removeEventListener('click', playOnClick);
+                };
+                
+                document.addEventListener('click', playOnClick);
+                console.log('💡 Click anywhere on the page to enable sound playback');
+            }
+
+            openNotificationModule() {
+                // Mark all notifications as read instantly
+                this.notifications.forEach(n => n.isRead = true);
+                
+                // Clear all active modals
+                this.activeModals.forEach(modal => {
+                    if (modal._timer) clearTimeout(modal._timer);
+                    this.closeModal(modal);
+                });
+
+                // Update UI
+                this.updateUI();
+                this.updateNotificationList();
+                
+                // Show the module
+                const module = document.getElementById('notification-module');
+                module.classList.add('active');
+
+                // Dispatch custom event
+                this.dispatchClearedEvent();
+            }
+
+            updateNotificationList() {
+                const list = document.getElementById('notification-list');
+                list.innerHTML = '';
+
+                if (this.notifications.length === 0) {
+                    list.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;">No notifications yet</div>';
+                    return;
+                }
+
+                this.notifications.forEach(notification => {
+                    const card = document.createElement('div');
+                    card.className = `notification-card ${notification.isRead ? 'is-read' : ''}`;
+                    
+                    const iconMap = {
+                        announcement: '📢',
+                        grade: '📊',
+                        assignment: '📝',
+                        system: '⚙️'
+                    };
+
+                    const timeAgo = this.getTimeAgo(notification.timestamp);
+
+                    card.innerHTML = `
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <div class="notification-icon notification-type-${notification.type}" style="flex-shrink: 0;">
+                                ${iconMap[notification.type] || '📢'}
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="notification-title">${notification.title}</div>
+                                <div class="notification-message">${notification.message}</div>
+                                <div class="notification-time">
+                                    <span>🕒</span>
+                                    <span>${timeAgo}</span>
+                                    ${notification.isRead ? '<span style="color: #28a745; margin-left: 8px;">✓ Read</span>' : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    list.appendChild(card);
+                });
+            }
+
+            updateUI() {
+                const unreadCount = this.notifications.filter(n => !n.isRead).length;
+                const badge = document.getElementById('notification-badge');
+                
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+
+                // Update counters
+                document.getElementById('total-sent').textContent = this.totalSent;
+            }
+
+            updateActiveCount() {
+                document.getElementById('active-count').textContent = this.activeModals.length;
+            }
+
+            dispatchClearedEvent() {
+                const event = new CustomEvent('notificationsCleared', {
+                    detail: { 
+                        timestamp: Date.now(), 
+                        totalNotifications: this.notifications.length,
+                        unreadCount: 0
+                    }
+                });
+                window.dispatchEvent(event);
+            }
+
+            getTimeAgo(timestamp) {
+                const now = new Date();
+                const diff = now - timestamp;
+                const seconds = Math.floor(diff / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
+
+                if (seconds < 60) return 'Just now';
+                if (minutes < 60) return `${minutes}m ago`;
+                if (hours < 24) return `${hours}h ago`;
+                return `${days}d ago`;
+            }
+
+            clearAllNotifications() {
+                // Clear all active modals
+                this.activeModals.forEach(modal => {
+                    if (modal._timer) clearTimeout(modal._timer);
+                    this.closeModal(modal);
+                });
+
+                // Clear notification history
+                this.notifications = [];
+                this.updateUI();
+                this.updateNotificationList();
+                
+                // Hide module if open
+                document.getElementById('notification-module').classList.remove('active');
+            }
+        }
+
+        // ===== DEMO FUNCTIONS =====
+        const notificationSystem = new NotificationSystem();
+        
+        // Add user interaction to enable audio
+        let audioEnabled = false;
+        
+        function enableAudio() {
+            if (!audioEnabled && notificationSystem.audio) {
+                // Try to play and immediately pause to enable audio
+                notificationSystem.audio.play().then(() => {
+                    notificationSystem.audio.pause();
+                    notificationSystem.audio.currentTime = 0;
+                    audioEnabled = true;
+                    console.log('🔊 Audio enabled for future notifications!');
+                    document.getElementById('sound-status').textContent = 'Enabled (./public/sounds/notification.mp3) - Audio Ready';
+                    document.getElementById('sound-status').style.color = '#00b894';
+                }).catch(error => {
+                    console.log('🔇 Audio still blocked by browser policy');
+                });
+            }
+        }
+        
+        // Enable audio on first user interaction
+        document.addEventListener('click', enableAudio, { once: true });
+        document.addEventListener('keydown', enableAudio, { once: true });
+
+        function triggerNotification(type) {
+            console.log('🎯 triggerNotification called with type:', type);
+            
+            const notifications = {
+                announcement: {
+                    title: 'New Announcement',
+                    message: 'Welcome to the new semester! Check out the updated course materials and important dates.'
+                },
+                grade: {
+                    title: 'Grade Update',
+                    message: 'Your grade for Quiz 1 has been posted. You scored 95%! Great job!'
+                },
+                assignment: {
+                    title: 'New Assignment',
+                    message: 'Assignment 3: Research Paper is now available. Due date: March 15th, 2024.'
+                },
+                system: {
+                    title: 'System Maintenance',
+                    message: 'Scheduled maintenance will occur tonight from 11 PM to 1 AM. Some features may be unavailable.'
+                }
+            };
+
+            const notification = notifications[type];
+            if (notification) {
+                console.log('📝 Creating notification:', notification);
+                notificationSystem.createNotification(type, notification.title, notification.message);
+            } else {
+                console.error('❌ No notification found for type:', type);
+            }
+        }
+
+        function triggerMultipleNotifications() {
+            const types = ['announcement', 'grade', 'assignment', 'system'];
+            const titles = [
+                'Multiple Notifications Test',
+                'Batch Update Available',
+                'New Messages Received',
+                'System Alert'
+            ];
+            const messages = [
+                'This is the first notification in the batch.',
+                'This is the second notification with different content.',
+                'This is the third notification showing stacking behavior.',
+                'This is the fourth notification demonstrating the system.'
+            ];
+
+            types.forEach((type, index) => {
+                setTimeout(() => {
+                    notificationSystem.createNotification(type, titles[index], messages[index]);
+                }, index * 500); // Stagger by 500ms
+            });
+        }
+
+        function clearAllNotifications() {
+            notificationSystem.clearAllNotifications();
+        }
+
+        function openNotificationModule() {
+            notificationSystem.openNotificationModule();
+        }
+
+        function testSound() {
+            console.log('🧪 Testing sound directly...');
+            if (notificationSystem.audio) {
+                notificationSystem.playSound();
+            } else {
+                console.log('❌ No audio loaded. Reinitializing...');
+                notificationSystem.setupAudio();
+                setTimeout(() => {
+                    if (notificationSystem.audio) {
+                        notificationSystem.playSound();
+                    }
+                }, 1000);
+            }
+        }
+
+        // ===== INTEGRATION HELPERS =====
+        // These functions can be used to integrate with your existing app
+        
+        // Listen for notifications cleared event (for other components)
+        window.addEventListener('notificationsCleared', (event) => {
+            console.log('📢 Notifications cleared:', event.detail);
+            // You can add additional logic here for other components
+        });
+
+        // Export for global access
+        window.notificationSystem = notificationSystem;
+
+        // ===== AUTO-DEMO (Optional) =====
+        // Uncomment the lines below to automatically trigger notifications on page load
+        /*
+        setTimeout(() => {
+            triggerNotification('announcement');
+        }, 2000);
+
+        setTimeout(() => {
+            triggerNotification('grade');
+        }, 4000);
+
+        setTimeout(() => {
+            triggerNotification('assignment');
+        }, 6000);
+        */
+    </script>
+</body>
+</html>

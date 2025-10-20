@@ -35,7 +35,19 @@ const Profile = () => {
         const response = await ApiService.getProfile();
         if (response && response.status && response.data) {
           setUserProfile(response.data);
-          setFormData(response.data); // Initialize form with current data
+          // Parse address into atomic fields (assuming format: "street, barangay, city, zip")
+          const addressParts = (response.data.address || "").split(',').map(part => part.trim());
+          // Parse contact number (remove +63 prefix)
+          const contactNumber = (response.data.contact_number || "").replace(/^\+63/, "");
+          const parsedData = {
+            ...response.data,
+            address: addressParts[0] || "",
+            barangay: addressParts[1] || "",
+            cityMunicipality: addressParts[2] || "",
+            zipCode: addressParts[3] || "",
+            contact_number: contactNumber
+          };
+          setFormData(parsedData); // Initialize form with parsed data
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -148,7 +160,14 @@ const Profile = () => {
     setSuccess("");
 
     try {
-      const response = await ApiService.updateProfile(formData);
+      // Combine atomic address fields into single address field for backend
+      const combinedFormData = {
+        ...formData,
+        address: `${formData.address || ""}, ${formData.barangay || ""}, ${formData.cityMunicipality || ""}, ${formData.zipCode || ""}`.trim(),
+        contact_number: `+63${formData.contact_number || ""}`
+      };
+      
+      const response = await ApiService.updateProfile(combinedFormData);
       
       if (response && response.status) {
         setSuccess("Profile updated successfully!");
@@ -330,12 +349,17 @@ const Profile = () => {
                 className="form-control-alternative"
                 id="department"
                 name="department"
-                placeholder="Enter department"
-                type="text"
+                type="select"
                 value={formData.department || ""}
                 onChange={handleInputChange}
                 required
-              />
+              >
+                <option value="">Select Department</option>
+                <option value="Information Technology">Information Technology</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Information System">Information System</option>
+                <option value="Computer Technology">Computer Technology</option>
+              </Input>
             </FormGroup>
           </Col>
         </Row>
@@ -570,9 +594,77 @@ const Profile = () => {
                             value={formData.address || ""}
                             onChange={handleInputChange}
                             required
+                            autoComplete="street-address"
+                            autoCapitalize="words"
                           />
                         </FormGroup>
                       </Col>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="cityMunicipality">
+                            City/Municipality *
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="cityMunicipality"
+                            name="cityMunicipality"
+                            placeholder="Enter city or municipality"
+                            type="text"
+                            value={formData.cityMunicipality || ""}
+                            onChange={handleInputChange}
+                            required
+                            pattern="^[A-Za-zÑñ\s\-\.]+$"
+                            title="Letters, spaces, hyphens and periods only"
+                            autoComplete="address-level2"
+                          />
+                        </FormGroup>
+                      </Col>
+                    </Row>
+                    <Row>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="barangay">
+                            Barangay *
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="barangay"
+                            name="barangay"
+                            placeholder="Enter barangay"
+                            type="text"
+                            value={formData.barangay || ""}
+                            onChange={handleInputChange}
+                            required
+                            pattern="^[A-Za-zÑñ\s\-\.]+$"
+                            title="Letters, spaces, hyphens and periods only"
+                            autoComplete="address-line2"
+                          />
+                        </FormGroup>
+                      </Col>
+                      <Col lg="6">
+                        <FormGroup>
+                          <label className="form-control-label" htmlFor="zipCode">
+                            ZIP Code *
+                          </label>
+                          <Input
+                            className="form-control-alternative"
+                            id="zipCode"
+                            name="zipCode"
+                            placeholder="Enter ZIP code"
+                            type="text"
+                            value={formData.zipCode || ""}
+                            onChange={handleInputChange}
+                            onInput={e => e.target.value = e.target.value.replace(/[^\d]/g, '')}
+                            required
+                            inputMode="numeric"
+                            pattern="^\d{4}$"
+                            maxLength={4}
+                            title="4-digit ZIP code"
+                          />
+                        </FormGroup>
+                      </Col>
+                    </Row>
+                    <Row>
                       <Col lg="6">
                         <FormGroup>
                           <label className="form-control-label" htmlFor="contact_number">
@@ -582,12 +674,18 @@ const Profile = () => {
                             className="form-control-alternative"
                             id="contact_number"
                             name="contact_number"
-                            placeholder="Enter contact number"
-                            type="text"
+                            placeholder="Enter 10-digit contact number"
+                            type="tel"
                             value={formData.contact_number || ""}
                             onChange={handleInputChange}
+                            onInput={e => e.target.value = e.target.value.replace(/[^\d]/g, '')}
                             required
+                            inputMode="numeric"
+                            pattern="^\d{10}$"
+                            maxLength={10}
+                            title="Format: 9XXXXXXXXX"
                           />
+                          <small className="text-muted">Starts with 9 and 10 digits (e.g., 9123456789)</small>
                         </FormGroup>
                       </Col>
                     </Row>
@@ -641,7 +739,7 @@ const Profile = () => {
                                 id="department"
                                 name="department"
                                 type="text"
-                                value={formData.department || "Administration"}
+                                value={formData.department || "Program Chairperson"}
                                 onChange={handleInputChange}
                                 readOnly
                               />

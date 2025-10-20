@@ -57,6 +57,7 @@ import classnames from "classnames";
 import userDefault from "../../assets/img/theme/user-default.svg";
 import scmsLogo from "../../assets/img/brand/logo-scms.png";
 import useMinDelay from "utils/useMinDelay";
+import { formatUserName, sortUsersByName } from '../../utils/nameUtils';
 
 // Import jsPDF for PDF export
 import jsPDF from 'jspdf';
@@ -182,8 +183,8 @@ const UserManagement = () => {
   });
   
   const [entriesToShow, setEntriesToShow] = useState(10);
-  const [sortBy, setSortBy] = useState("created_at"); // Default to 'Recently Added'
-  const [sortOrder, setSortOrder] = useState("desc"); // Default to most recent first
+  const [sortBy, setSortBy] = useState("full_name"); // Default to 'Name'
+  const [sortOrder, setSortOrder] = useState("asc"); // Default to alphabetical order
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isMobile, setIsMobile] = useState(false);
@@ -335,7 +336,9 @@ const UserManagement = () => {
         }
       }
       
-      setUsers(usersArr);
+      // Sort users by name before setting state
+      const sortedUsers = sortUsersByName(usersArr);
+      setUsers(sortedUsers);
       setLoading(false);
     } catch (err) {
       setUsers([]); // fallback to empty array on error
@@ -498,6 +501,12 @@ const UserManagement = () => {
 
   // Sorting
   const sortedUsers = [...filteredUsers].sort((a, b) => {
+    // Use nameUtils sorting for full_name field
+    if (sortBy === "full_name") {
+      const sortedByName = sortUsersByName([a, b]);
+      return sortOrder === "asc" ? sortedByName[0] === a ? -1 : 1 : sortedByName[0] === a ? 1 : -1;
+    }
+    
     let aValue = a[sortBy];
     let bValue = b[sortBy];
     if (sortBy === "last_login" || sortBy === "created_at") {
@@ -535,7 +544,7 @@ const UserManagement = () => {
       student: "warning"
     };
     const roleNames = {
-      admin: "Admin",
+      admin: "Program Chairperson",
       teacher: "Teacher",
       student: "Student"
     };
@@ -553,7 +562,7 @@ const UserManagement = () => {
       student: "warning"
     };
     const roleNames = {
-      admin: "Admin",
+      admin: "Program Chairperson",
       teacher: "Teacher",
       student: "Student"
     };
@@ -644,7 +653,9 @@ const UserManagement = () => {
         cover_pic: user.cover_pic || user.coverPhotoUrl || '',
         student_num: user.student_num || user.studentNumber || '',
       }));
-      setUsers(usersArr);
+      // Sort users by name before setting state
+      const sortedUsers = sortUsersByName(usersArr);
+      setUsers(sortedUsers);
       
       setTimeout(() => {
         setShowDeleteSuccess(false);
@@ -970,7 +981,7 @@ const UserManagement = () => {
     ];
 
     const csvData = usersToExport.map(user => [
-      user.full_name || '',
+      formatUserName(user),
       user.email || '',
       user.role || '',
       getCourseAndSectionDisplay(user),
@@ -1098,7 +1109,7 @@ const UserManagement = () => {
     ];
 
     const tableData = usersToExport.map(user => [
-      user.full_name || '',
+      formatUserName(user),
       user.email || '',
       user.role || '',
       getCourseAndSectionDisplay(user),
@@ -1246,7 +1257,7 @@ const UserManagement = () => {
                         </div>
                         <div className="media-body ml-4">
                           <span className="mb-0 text-sm font-weight-bold">
-                            {user.full_name}
+                            {formatUserName(user)}
                           </span>
                         </div>
                       </div>
@@ -1361,7 +1372,7 @@ const UserManagement = () => {
                 </div>
               </div>
               <CardBody className="pt-5">
-                <h6 className="card-title mb-1">{user.full_name}</h6>
+                <h6 className="card-title mb-1">{formatUserName(user)}</h6>
                 <p className="text-muted small mb-2">{user.email}</p>
                 <div className="mb-2">
                   {getRoleBadgeForBlock(user.role)}
@@ -1439,23 +1450,6 @@ const UserManagement = () => {
                   <i className="fas fa-users mr-3"></i>
                   User Management
                 </h1>
-                <p className="text-muted mb-0 fs-5">
-                  Manage administrators, teachers, and students across the system
-                </p>
-                <div className="mt-3">
-                  <Badge color="info" className="mr-2">
-                    <i className="fas fa-users mr-1"></i>
-                    Total: {users.length} users
-                  </Badge>
-                  <Badge color="success" className="mr-2">
-                    <i className="fas fa-check-circle mr-1"></i>
-                    Active: {users.filter(u => u.status === 'active').length}
-                  </Badge>
-                  <Badge color="warning">
-                    <i className="fas fa-clock mr-1"></i>
-                    Inactive: {users.filter(u => u.status === 'inactive').length}
-                  </Badge>
-                </div>
               </div>
             </div>
           </div>
@@ -1658,7 +1652,7 @@ const UserManagement = () => {
                     style={{ cursor: "pointer" }}
                   >
                     <i className="fas fa-user-shield mr-2" />
-                    Admins
+                    Program Chairpersons
                   </NavLink>
                 </NavItem>
                 <NavItem>
@@ -1856,7 +1850,7 @@ const UserManagement = () => {
                </div>
                
                <div style={{ marginTop: '60px' }}>
-                 <h3 className="mb-2">{selectedUser.full_name}</h3>
+                 <h3 className="mb-2">{formatUserName(selectedUser)}</h3>
                  <p className="text-muted mb-3">{selectedUser.email}</p>
                </div>
               

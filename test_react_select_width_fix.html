@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Select Width Fix Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-select@5.8.0/dist/react-select.css">
+    <style>
+        /* Include the React Select Mobile Width Fix CSS */
+        .react-select--is-disabled .react-select__control,
+        .react-select__control {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+
+        .input-group-alternative .react-select__control {
+            width: 100% !important;
+            min-width: 100% !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .input-group-alternative .react-select--is-disabled .react-select__control {
+            width: 100% !important;
+            min-width: 100% !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .react-select__control {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .react-select--is-disabled .react-select__control {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .react-select__container {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .input-group-alternative .react-select__control {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                border: 0 !important;
+                box-shadow: none !important;
+            }
+            
+            .input-group-alternative .react-select--is-disabled .react-select__control {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                border: 0 !important;
+                box-shadow: none !important;
+            }
+        }
+
+        .test-container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .test-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-container">
+            <h2 class="text-center mb-4">React Select Width Fix Test</h2>
+            <p class="text-center text-muted">Test the React Select dropdown width fix on mobile devices</p>
+            
+            <div class="test-section">
+                <div class="test-label">Test 1: Province Selection (Regular Input)</div>
+                <div class="input-group input-group-alternative mb-2">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">
+                            <i class="ni ni-square-pin"></i>
+                        </span>
+                    </div>
+                    <select class="form-control" name="province">
+                        <option value="">Select Province</option>
+                        <option value="Pampanga">Pampanga</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <div class="test-label">Test 2: City/Municipality Selection (Disabled React Select)</div>
+                <div class="input-group input-group-alternative mb-2">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">
+                            <i class="ni ni-building"></i>
+                        </span>
+                    </div>
+                    <div class="react-select-container">
+                        <div class="react-select react-select--is-disabled css-3iigni-container">
+                            <div class="react-select__control react-select__control--is-disabled">
+                                <div class="react-select__value-container react-select__value-container--has-value">
+                                    <div class="react-select__placeholder">Select Province first</div>
+                                </div>
+                                <div class="react-select__indicators">
+                                    <span class="react-select__indicator-separator"></span>
+                                    <div class="react-select__dropdown-indicator">
+                                        <span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <div class="test-label">Test 3: Enabled React Select</div>
+                <div class="input-group input-group-alternative mb-2">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">
+                            <i class="ni ni-building"></i>
+                        </span>
+                    </div>
+                    <div class="react-select-container">
+                        <div class="react-select css-3iigni-container">
+                            <div class="react-select__control">
+                                <div class="react-select__value-container">
+                                    <div class="react-select__placeholder">Select City/Municipality</div>
+                                </div>
+                                <div class="react-select__indicators">
+                                    <span class="react-select__indicator-separator"></span>
+                                    <div class="react-select__dropdown-indicator">
+                                        <span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <div class="alert alert-info">
+                    <strong>Instructions:</strong>
+                    <ul class="mb-0">
+                        <li>Open this page on a mobile device or use browser dev tools to simulate mobile view</li>
+                        <li>Check that both the regular select input and React Select dropdowns have the same width</li>
+                        <li>The disabled React Select should align perfectly with the enabled inputs above it</li>
+                        <li>All dropdowns should reach 100% width of their containers on mobile</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add some basic styling to simulate React Select appearance
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add some basic icons using Unicode
+            const pinIcon = document.querySelector('.ni.ni-square-pin');
+            const buildingIcon = document.querySelector('.ni.ni-building');
+            
+            if (pinIcon) pinIcon.innerHTML = '📍';
+            if (buildingIcon) buildingIcon.innerHTML = '🏢';
+        });
+    </script>
+</body>
+</html>

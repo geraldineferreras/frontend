@@ -1,0 +1,219 @@
+/* React Select Mobile Width Fix */
+/* Fix for React Select dropdown not reaching full width on mobile devices */
+
+/* Target the specific React Select container with disabled state */
+.react-select--is-disabled .react-select__control,
+.react-select__control {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Additional fix for disabled react-select components */
+.react-select__control--is-disabled {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Ensure the React Select container itself takes full width */
+.react-select__control {
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+/* Fix for React Select within input-group-alternative containers */
+.input-group-alternative .react-select__control {
+  width: 100% !important;
+  min-width: 100% !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.input-group-alternative .react-select--is-disabled .react-select__control {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Additional specific targeting for disabled controls in input groups */
+.input-group-alternative .react-select__control--is-disabled {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Fix for mobile view specifically */
+@media (max-width: 768px) {
+  /* Target all React Select containers */
+  .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Target the specific disabled container mentioned in the issue */
+  .react-select--is-disabled .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ensure the container wrapper also takes full width */
+  .react-select__container {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Fix for InputGroup containing React Select */
+  .input-group .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Fix for InputGroup-alternative containing React Select */
+  .input-group-alternative .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .input-group-alternative .react-select--is-disabled .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Ensure the React Select value container takes full width */
+  .react-select__value-container {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+  
+  /* Fix placeholder and single value display */
+  .react-select__placeholder,
+  .react-select__single-value {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+}
+
+/* Additional fix for very small screens */
+@media (max-width: 480px) {
+  .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .react-select--is-disabled .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .react-select__container {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Fix for InputGroup-alternative on very small screens */
+  .input-group-alternative .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .input-group-alternative .react-select--is-disabled .react-select__control {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Critical fix for disabled react-select width consistency */
+.react-select__control--is-disabled,
+.react-select--is-disabled .react-select__control,
+.input-group-alternative .react-select__control--is-disabled,
+.input-group-alternative .react-select--is-disabled .react-select__control {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+}
+
+/* Fix icon alignment with react-select components */
+.input-group-alternative .input-group-text {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 48px !important;
+  min-height: 48px !important;
+}
+
+.input-group-alternative .react-select__control {
+  height: 48px !important;
+  min-height: 48px !important;
+}
+
+/* Ensure input group addon aligns properly with react-select */
+.input-group-alternative .input-group-addon {
+  display: flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+}
+
+/* Specific fixes for disabled react-select icon alignment */
+.input-group-alternative .react-select--is-disabled + .input-group-addon .input-group-text,
+.input-group-alternative .react-select--is-disabled ~ .input-group-addon .input-group-text,
+.input-group-alternative .input-group-addon .input-group-text {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  vertical-align: middle !important;
+}
+
+/* Fix for disabled react-select control height consistency */
+.input-group-alternative .react-select--is-disabled .react-select__control,
+.input-group-alternative .react-select__control--is-disabled {
+  height: 48px !important;
+  min-height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Ensure the entire input group has consistent alignment */
+.input-group-alternative {
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+.input-group-alternative .input-group-addon {
+  display: flex !important;
+  align-items: stretch !important;
+  height: 48px !important;
+}
+
+.input-group-alternative .input-group-addon .input-group-text {
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}

@@ -2787,7 +2787,7 @@ const Index = (props) => {
                             <h3 className="text-primary mb-1">
                               {adminDashboardStats?.user_statistics?.admins || 0}
                             </h3>
-                            <p className="text-muted mb-0">Total Admins</p>
+                            <p className="text-muted mb-0">Total Program Chairpersons</p>
                           </div>
                         </div>
                         <div className="col-6">

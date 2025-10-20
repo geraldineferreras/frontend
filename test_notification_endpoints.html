@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Endpoints Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .test-controls input, .test-controls button {
+            margin: 5px;
+            padding: 8px 12px;
+        }
+        .test-controls input {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .test-controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-controls button:hover {
+            background: #0056b3;
+        }
+        .test-controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .endpoint-info {
+            background: #e9ecef;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Notification Endpoints Test</h1>
+        <p>This page tests the backend notification endpoints to ensure they're working properly.</p>
+
+        <div class="test-section">
+            <h3>⚙️ Configuration</h3>
+            <div class="test-controls">
+                <label>API Base URL:</label>
+                <input type="text" id="apiBaseUrl" value="http://localhost:4000" placeholder="http://localhost:4000">
+                <br>
+                <label>User ID:</label>
+                <input type="text" id="userId" placeholder="Enter user ID" value="STU68B7D2257B1C3819">
+                <br>
+                <label>JWT Token:</label>
+                <input type="text" id="jwtToken" placeholder="Enter JWT token">
+                <br>
+                <button onclick="loadFromLocalStorage()">Load from localStorage</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Endpoints</h3>
+            <div class="test-controls">
+                <button onclick="testGetNotifications()">Get Notifications</button>
+                <button onclick="testGetUnreadCount()">Get Unread Count</button>
+                <button onclick="testMarkAsRead()">Mark as Read (Single)</button>
+                <button onclick="testMarkAllAsRead()">Mark All as Read</button>
+                <button onclick="runAllTests()">Run All Tests</button>
+                <button onclick="clearLog()">Clear Log</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Endpoint Information</h3>
+            <div class="endpoint-info">
+                <strong>GET /api/notifications</strong> - Get all notifications for user
+            </div>
+            <div class="endpoint-info">
+                <strong>GET /api/notifications/unread-count</strong> - Get unread notification count
+            </div>
+            <div class="endpoint-info">
+                <strong>PUT /api/notifications/:id/read</strong> - Mark single notification as read
+            </div>
+            <div class="endpoint-info">
+                <strong>PUT /api/notifications/mark-all-read</strong> - Mark all notifications as read
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="log" class="log">Ready to run tests...\n</div>
+        </div>
+    </div>
+
+    <script>
+        let testNotificationId = null;
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        }
+
+        function loadFromLocalStorage() {
+            const user = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    document.getElementById('userId').value = userData.user_id || userData.id || '';
+                    log('Loaded user ID from localStorage', 'success');
+                } catch (e) {
+                    log('Failed to parse user data from localStorage', 'error');
+                }
+            }
+            
+            if (token) {
+                document.getElementById('jwtToken').value = token;
+                log('Loaded JWT token from localStorage', 'success');
+            }
+        }
+
+        async function makeRequest(endpoint, options = {}) {
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            const url = `${baseUrl}${endpoint}`;
+            
+            const defaultOptions = {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+
+            const token = document.getElementById('jwtToken').value;
+            if (token) {
+                defaultOptions.headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            log(`Making ${finalOptions.method} request to: ${url}`);
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Response (${response.status}): ${JSON.stringify(data, null, 2)}`, 'success');
+                    return { success: true, data };
+                } else {
+                    log(`❌ Error (${response.status}): ${JSON.stringify(data, null, 2)}`, 'error');
+                    return { success: false, error: data };
+                }
+            } catch (error) {
+                log(`❌ Network Error: ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testGetNotifications() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                log('Please enter a user ID', 'error');
+                return;
+            }
+
+            const result = await makeRequest(`/api/notifications?userId=${userId}`);
+            
+            if (result.success && result.data && Array.isArray(result.data)) {
+                log(`Found ${result.data.length} notifications`);
+                
+                // Find an unread notification for testing
+                const unreadNotification = result.data.find(n => !n.is_read);
+                if (unreadNotification) {
+                    testNotificationId = unreadNotification.id;
+                    log(`Test notification ID set to: ${testNotificationId}`);
+                } else {
+                    log('No unread notifications found for testing', 'info');
+                }
+            }
+        }
+
+        async function testGetUnreadCount() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                log('Please enter a user ID', 'error');
+                return;
+            }
+
+            const result = await makeRequest(`/api/notifications/unread-count?userId=${userId}`);
+            
+            if (result.success && result.data) {
+                log(`Unread count: ${result.data.count}`);
+            }
+        }
+
+        async function testMarkAsRead() {
+            if (!testNotificationId) {
+                log('No test notification ID available. Run "Get Notifications" first.', 'error');
+                return;
+            }
+
+            const result = await makeRequest(`/api/notifications/${testNotificationId}/read`, {
+                method: 'PUT'
+            });
+            
+            if (result.success) {
+                log(`Successfully marked notification ${testNotificationId} as read`);
+                testNotificationId = null; // Reset for next test
+            }
+        }
+
+        async function testMarkAllAsRead() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                log('Please enter a user ID', 'error');
+                return;
+            }
+
+            const result = await makeRequest(`/api/notifications/mark-all-read?userId=${userId}`, {
+                method: 'PUT'
+            });
+            
+            if (result.success) {
+                log(`Successfully marked all notifications as read. Affected rows: ${result.data.affectedRows || 0}`);
+            }
+        }
+
+        async function runAllTests() {
+            log('🚀 Starting comprehensive test suite...');
+            
+            try {
+                // Test 1: Get notifications
+                log('\n--- Test 1: Get Notifications ---');
+                await testGetNotifications();
+                
+                // Test 2: Get unread count
+                log('\n--- Test 2: Get Unread Count ---');
+                await testGetUnreadCount();
+                
+                // Test 3: Mark single as read (if we have a notification)
+                if (testNotificationId) {
+                    log('\n--- Test 3: Mark Single as Read ---');
+                    await testMarkAsRead();
+                    
+                    // Test 4: Verify count decreased
+                    log('\n--- Test 4: Verify Count Decreased ---');
+                    await testGetUnreadCount();
+                }
+                
+                // Test 5: Mark all as read
+                log('\n--- Test 5: Mark All as Read ---');
+                await testMarkAllAsRead();
+                
+                // Test 6: Verify count is 0
+                log('\n--- Test 6: Verify Count is 0 ---');
+                await testGetUnreadCount();
+                
+                log('\n🎉 Test suite completed!');
+                
+            } catch (error) {
+                log(`❌ Test suite failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-load from localStorage on page load
+        window.addEventListener('load', () => {
+            loadFromLocalStorage();
+        });
+    </script>
+</body>
+</html>
+

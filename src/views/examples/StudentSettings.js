@@ -904,8 +904,8 @@ const StudentSettings = () => {
 
                 <NavItem>
                   <NavLink
-                    className={classnames({ active: activeTab === '3' })}
-                    onClick={() => toggleTab('3')}
+                    className={classnames({ active: activeTab === '2' })}
+                    onClick={() => toggleTab('2')}
                   >
                     <i className="ni ni-lock-circle-open mr-2" />
                     Security

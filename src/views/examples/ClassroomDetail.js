@@ -48,6 +48,7 @@ import "./Classroom.css";
 import apiService from "../../services/api";
 import { FaEllipsisV, FaClipboardList, FaQuestionCircle, FaBook, FaRedo, FaFolder, FaPlus, FaPaperclip, FaSmile, FaRegThumbsUp, FaThumbsUp, FaUserPlus, FaRegFileAlt, FaCheck, FaTimes, FaSearch, FaRegCalendarAlt, FaTrash, FaCamera } from 'react-icons/fa';
 import userDefault from '../../assets/img/theme/user-default.svg';
+import { formatUserName, sortUsersByName } from '../../utils/nameUtils';
 
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -290,23 +291,41 @@ const getFileTypeIconOrPreview = (att) => {
   const ext = fileName.split('.').pop().toLowerCase();
   const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
 
+  // Check MIME type first for more accurate detection
+  const mimeType = att.mime_type || '';
+  
+  // Video files (including MP4)
+  if (mimeType.startsWith('video/') || ext === 'mp4' || ext === 'avi' || ext === 'mov' || ext === 'wmv' || ext === 'flv' || ext === 'webm') {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#8e24aa" strokeWidth="2"/><polygon points="13,14 25,20 13,26" fill="#8e24aa"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#8e24aa" fontWeight="bold">MP4</text></svg>, type: 'MP4', color: '#8e24aa' };
+  }
+  
+  // Audio files (including MP3)
+  if (mimeType.startsWith('audio/') || ext === 'mp3' || ext === 'wav' || ext === 'ogg' || ext === 'aac') {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/><circle cx="16" cy="20" r="7" fill="#43a047"/><rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text></svg>, type: 'MP3', color: '#43a047' };
+  }
+  
+  // PDF files
+  if (mimeType === 'application/pdf' || ext === 'pdf') {
+    return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text></svg>, type: 'PDF', color: '#F44336' };
+  }
+
   // Microsoft Word
   const wordExts = ['doc', 'docx', 'dot', 'dotx', 'docm', 'dotm'];
-  if (wordExts.includes(ext)) {
+  if (wordExts.includes(ext) || mimeType.includes('wordprocessingml') || mimeType.includes('msword')) {
     return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#1976D2" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#1976D2" fontWeight="bold">WORD</text></svg>, type: 'WORD', color: '#1976D2' };
   }
   // Microsoft Excel (including CSV)
   const excelExts = ['xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'xltm', 'csv'];
-  if (excelExts.includes(ext)) {
+  if (excelExts.includes(ext) || mimeType.includes('spreadsheetml') || mimeType.includes('ms-excel')) {
     return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#388E3C" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#388E3C" fontWeight="bold">EXCEL</text></svg>, type: 'EXCEL', color: '#388E3C' };
   }
   // Microsoft PowerPoint
   const pptExts = ['ppt', 'pptx', 'pps', 'ppsx', 'pptm', 'potx', 'potm', 'ppsm'];
-  if (pptExts.includes(ext)) {
+  if (pptExts.includes(ext) || mimeType.includes('presentationml') || mimeType.includes('ms-powerpoint')) {
     return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#FF9800" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#FF9800" fontWeight="bold">PPT</text></svg>, type: 'PPT', color: '#FF9800' };
   }
   // TXT
-  if (ext === 'txt') {
+  if (ext === 'txt' || mimeType === 'text/plain') {
     return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#607d8b" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#607d8b" fontWeight="bold">TXT</text></svg>, type: 'TXT', color: '#607d8b' };
   }
 
@@ -314,9 +333,6 @@ const getFileTypeIconOrPreview = (att) => {
     const url = URL.createObjectURL(att.file);
     return { preview: <img src={url} alt={fileName} style={{ width: 32, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #e9ecef' }} />, type: ext.toUpperCase(), color: '#90A4AE' };
   }
-  if (ext === 'mp4') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#8e24aa" strokeWidth="2"/><polygon points="13,14 25,20 13,26" fill="#8e24aa"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#8e24aa" fontWeight="bold">MP4</text></svg>, type: 'MP4', color: '#8e24aa' };
-  if (ext === 'mp3') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#43a047" strokeWidth="2"/><circle cx="16" cy="20" r="7" fill="#43a047"/><rect x="22" y="13" width="3" height="14" rx="1.5" fill="#43a047"/><text x="16" y="36" textAnchor="middle" fontSize="10" fill="#43a047" fontWeight="bold">MP3</text></svg>, type: 'MP3', color: '#43a047' };
-  if (ext === 'pdf') return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#F44336" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#F44336" fontWeight="bold">PDF</text></svg>, type: 'PDF', color: '#F44336' };
   return { preview: <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="40" rx="6" fill="#fff" stroke="#90A4AE" strokeWidth="2"/><path d="M8 8h16v24H8z" fill="#fff"/><text x="16" y="28" textAnchor="middle" fontSize="10" fill="#90A4AE" fontWeight="bold">FILE</text></svg>, type: ext.toUpperCase(), color: '#90A4AE' };
 };
 
@@ -2098,6 +2114,7 @@ useEffect(() => {
 
   // 3. In handlePostAnnouncement, save both title and content
   const [postLoading, setPostLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const handlePostAnnouncement = async (e) => {
     e.preventDefault();
 
@@ -2118,9 +2135,10 @@ useEffect(() => {
     console.log("Posting announcement with data:", postData);
     console.log("Attachments:", attachments);
     
-    // Check if any required fields are missing or invalid
-    if (!newAnnouncement.trim()) {
-      alert('Please enter announcement content');
+    // Validation: allow posting if there is text OR at least one file attachment
+    const hasFile = (attachments || []).some(att => !!att.file);
+    if (!newAnnouncement.trim() && !hasFile) {
+      alert('Please enter announcement content or attach a file');
       return;
     }
 
@@ -2135,11 +2153,34 @@ useEffect(() => {
       if (fileAttachments.length > 0 && linkAttachments.length > 0) {
         // Mixed attachments: files + links
         const files = fileAttachments.map(att => att.file);
-        response = await apiService.createTeacherStreamPostWithMixedAttachments(code, postData, files, linkAttachments);
+        response = await apiService.createTeacherStreamPostWithMixedAttachments(
+          code,
+          postData,
+          files,
+          linkAttachments,
+          {
+            onUploadProgress: (evt) => {
+              if (evt && evt.total) {
+                setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+              }
+            }
+          }
+        );
       } else if (fileAttachments.length > 0) {
         // Files only: backend expects keys: attachment_0, attachment_1, ...
         const files = fileAttachments.map(att => att.file);
-        response = await apiService.createTeacherStreamPostWithFiles(code, postData, files);
+        response = await apiService.createTeacherStreamPostWithFiles(
+          code,
+          postData,
+          files,
+          {
+            onUploadProgress: (evt) => {
+              if (evt && evt.total) {
+                setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+              }
+            }
+          }
+        );
       } else if (linkAttachments.length > 0) {
         // Links only: use new API method for multiple link attachments
         response = await apiService.createTeacherStreamPostWithLinks(code, postData, linkAttachments);
@@ -2155,11 +2196,33 @@ useEffect(() => {
       
       // Note: Draft removal is now handled in the backend update section below
       
+      // Optimistically insert the new post with local attachments so media previews appear immediately
+      try {
+        const fileAttachments = (attachments || []).filter(att => att && att.file);
+        const linkAttachments = (attachments || []).filter(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+        const newPost = {
+          id: response?.data?.stream_id || Date.now(),
+          title: newAnnouncementTitle,
+          content: newAnnouncement,
+          author: (currentUserProfile?.full_name || currentUserProfile?.name || 'You'),
+          date: new Date().toISOString(),
+          comments: [],
+          attachments: [
+            ...fileAttachments.map(a => ({ name: a.name, file: a.file, type: 'file', mime_type: a.file?.type })),
+            ...linkAttachments.map(a => ({ name: a.name || a.url, url: a.url, type: a.type || 'Link' }))
+          ]
+        };
+        setAnnouncements(prev => [newPost, ...prev]);
+      } catch (_e) {
+        // best-effort optimistic insert; ignore errors
+      }
+
       setNewAnnouncement("");
       setNewAnnouncementTitle("");
       setAttachments([]);
       setSelectedAnnouncementStudents([]);
       setPostDropdownOpen(false);
+      setUploadProgress(0);
       
       // If this was posted from a draft, update the backend to mark it as posted
       if (currentDraftId) {
@@ -2617,6 +2680,7 @@ useEffect(() => {
           // Normalize multiple attachments from either `attachments` array or JSON string in `attachment_url`
           let normalizedAttachments = [];
 
+          // CASE 1: attachments already an array
           if (Array.isArray(post.attachments) && post.attachments.length > 0) {
             normalizedAttachments = post.attachments.map(att => {
               let attachmentType = att.attachment_type || att.file_type || 'file';
@@ -2636,8 +2700,30 @@ useEffect(() => {
                 // Prefer direct uploaded path to avoid redirect links
                 url: attachmentUrl,
                 type: attachmentType,
+                mime_type: att.mime_type || att.file_type,
+                download_url: att.download_url || attachmentUrl
               };
             }).filter(a => a.url);
+          // CASE 2: backend returns a concatenated JSON string field `attachments_json` (enhanced PHP controller)
+          } else if (typeof post.attachments_json === 'string' && post.attachments_json.length > 0) {
+            const parts = post.attachments_json.split('||').filter(Boolean);
+            normalizedAttachments = parts.map(p => {
+              let parsed;
+              try { parsed = JSON.parse(p); } catch (_) { return null; }
+              if (!parsed) return null;
+              const urlPath = parsed.url || parsed.attachment_url || parsed.file_path || '';
+              const fullUrl = urlPath.startsWith('http') ? urlPath : `${base}/${urlPath}`;
+              let attachmentType = parsed.type || parsed.attachment_type || 'file';
+              if ((fullUrl || '').includes('youtube.com') || (fullUrl || '').includes('youtu.be')) attachmentType = 'YouTube';
+              if ((fullUrl || '').includes('drive.google.com')) attachmentType = 'Google Drive';
+              return {
+                name: parsed.original_name || parsed.file_name || (urlPath || '').split('/').pop(),
+                url: fullUrl,
+                type: attachmentType,
+                mime_type: parsed.mime_type,
+                download_url: parsed.download_url || fullUrl,
+              };
+            }).filter(Boolean);
           } else if (
             (post.attachment_type === 'multiple' || (typeof post.attachment_url === 'string' && post.attachment_url.trim().startsWith('['))) &&
             typeof post.attachment_url === 'string'
@@ -2662,6 +2748,8 @@ useEffect(() => {
                   name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
                   url: attachmentUrl,
                   type: attachmentType,
+                  mime_type: att.mime_type || att.file_type,
+                  download_url: att.download_url || attachmentUrl
                 };
               }).filter(a => a.url);
             } catch (e) {
@@ -2690,6 +2778,8 @@ useEffect(() => {
                 ? `${base}/${attachmentUrl}`
                 : attachmentUrl,
               type: attachmentType,
+              mime_type: post.mime_type || post.file_type,
+              download_url: post.download_url || ((attachmentUrl && !attachmentUrl.startsWith('http')) ? `${base}/${attachmentUrl}` : attachmentUrl)
             }].filter(a => a.url);
           }
 
@@ -2707,8 +2797,21 @@ useEffect(() => {
           };
         });
 
-        // Set initial posts quickly
-        setAnnouncements(transformedPosts);
+        // Merge with any optimistic announcements so attachments aren't lost
+        // Merge with any optimistic announcements stored in state using functional update
+        setAnnouncements(prev => {
+          const merged = transformedPosts.map(p => {
+            const existing = (prev || []).find(x => (
+              (x.id && p.id && String(x.id) === String(p.id)) ||
+              (x.title === p.title && x.content === p.content)
+            ));
+            if ((!p.attachments || p.attachments.length === 0) && existing && Array.isArray(existing.attachments) && existing.attachments.length > 0) {
+              return { ...p, attachments: existing.attachments };
+            }
+            return p;
+          });
+          return merged;
+        });
 
         // Fetch comments for each post to get accurate counts upfront
         try {
@@ -6686,7 +6789,7 @@ useEffect(() => {
               onClick={() => setActiveTab("stream")}
               style={{ cursor: "pointer", fontWeight: 600, fontSize: 16 }}
             >
-              <i className="ni ni-chat-round mr-2 text-info"></i> Stream
+              <i className="ni ni-chat-round mr-2 text-info"></i> Class Feed
             </NavLink>
           </NavItem>
           <NavItem>
@@ -6704,7 +6807,7 @@ useEffect(() => {
               onClick={() => setActiveTab("grades")}
               style={{ cursor: "pointer", fontWeight: 600, fontSize: 16 }}
             >
-              <i className="ni ni-hat-3 mr-2 text-primary"></i> Grades
+              <i className="ni ni-hat-3 mr-2 text-primary"></i> Records
             </NavLink>
           </NavItem>
           <NavItem>
@@ -6713,7 +6816,7 @@ useEffect(() => {
               onClick={() => setActiveTab("people")}
               style={{ cursor: "pointer", fontWeight: 600, fontSize: 16 }}
             >
-              <i className="ni ni-single-02 mr-2 text-success"></i> People
+              <i className="ni ni-single-02 mr-2 text-success"></i> Participants
             </NavLink>
           </NavItem>
         </Nav>
@@ -6838,7 +6941,8 @@ useEffect(() => {
                                   } else if (att.url) {
                                     url = att.url;
                                   }
-                                  const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
+                                  // Treat as link ONLY when there is no File object and the type explicitly indicates a link-like attachment
+                                  const isLink = (!att.file) && (att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive");
                                   // Ensure link URLs are absolute external URLs and remove localhost prefixes
                                   let linkUrl = att.url;
                                   
@@ -6883,10 +6987,10 @@ useEffect(() => {
                                         cursor: 'pointer',
                                         transition: 'all 0.2s ease'
                                       }}
-                                      onClick={() => {
+                                    onClick={() => {
                                         if (isLink && linkUrl) {
                                           window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                                        } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                      } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
                                           // For YouTube, Google Drive, and Link types, always open in new tab
                                           if (linkUrl) {
                                             window.open(linkUrl, '_blank', 'noopener,noreferrer');
@@ -6894,7 +6998,7 @@ useEffect(() => {
                                             console.warn('Cannot open link: invalid URL');
                                           }
                                         } else {
-                                          handlePreviewAttachment(att);
+                                        handlePreviewAttachment({ ...att, url: att.download_url || url || att.url });
                                         }
                                       }}
                                     >
@@ -6903,7 +7007,7 @@ useEffect(() => {
                                         <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
                                         <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                           {type}
-                                          {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                          {url && <>&bull; <a href={att.download_url || url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
                                           {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                         </div>
                                       </div>
@@ -7428,8 +7532,9 @@ useEffect(() => {
                                     url = att.url;
                                   }
                                   const typeStr = String(att.type || att.attachment_type || '').toLowerCase();
-                                  const isLink = (!!url && (!att.file || typeStr !== 'file')) && (
-                                    typeStr === 'link' || typeStr === 'youtube' || typeStr === 'google drive' || typeStr === 'google_drive' || typeStr === 'drive' || typeStr === '' // treat empty type with URL as link in composer
+                                  // Treat as link ONLY when there is no File object and the type explicitly indicates a link-like attachment
+                                  const isLink = (!att.file) && (
+                                    typeStr === 'link' || typeStr === 'youtube' || typeStr === 'google drive' || typeStr === 'google_drive' || typeStr === 'drive'
                                   );
                                   const displayName = isLink ? url : att.name;
                                   return (
@@ -7441,11 +7546,11 @@ useEffect(() => {
                                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
-                                        <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
+                                      <div style={{ fontSize: 13, color: '#90A4AE', marginTop: 2 }}>
                                           {type}
                                           {url && (<>
                                             <span style={{ margin: '0 6px', color: '#b0b0b0' }}>•</span>
-                                            <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a>
+                                            <a href={att.download_url || url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a>
                                           </>)}
                                           {isLink && url && (<>
                                             <span style={{ margin: '0 6px', color: '#b0b0b0' }}>•</span>
@@ -7453,6 +7558,11 @@ useEffect(() => {
                                           </>)}
                                         </div>
                                       </div>
+                                      {postLoading && att.file && (
+                                        <div style={{ position: 'absolute', left: 12, right: 44, bottom: 8, height: 3, background: '#eef2ff', borderRadius: 2, overflow: 'hidden' }}>
+                                          <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#7B8CFF', transition: 'width 0.2s ease' }}></div>
+                                        </div>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={e => { e.stopPropagation(); handleRemoveAttachment(idx); }}
@@ -7522,7 +7632,7 @@ useEffect(() => {
                               {postLoading ? (
                                 <>
                                   <i className="fa fa-spinner fa-spin" style={{ marginRight: 6 }}></i>
-                                  Posting...
+                                  {uploadProgress > 0 ? `Uploading ${uploadProgress}%` : 'Posting...'}
                                 </>
                               ) : (
                                 <>
@@ -7897,6 +8007,20 @@ useEffect(() => {
                             <>
                               <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{announcement.title}</div>
                               <div style={{ color: '#444', fontSize: 15, marginBottom: 12 }}>{announcement.content}</div>
+                              {/* If backend failed to attach files yet but we posted one, still show local file preview */}
+                              {(!announcement.attachments || announcement.attachments.length === 0) && Array.isArray(attachments) && attachments.length > 0 && (
+                                <div style={{ marginTop: 8, marginBottom: 8 }}>
+                                  {attachments.filter(a => a.file).map((att, idx) => (
+                                    <div key={`inline-local-${idx}`} style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e9ecef', padding: '0.5rem 1.25rem' }}>
+                                      {(att.file?.type.startsWith('video/') || (att.name || '').toLowerCase().endsWith('.mp4')) ? (
+                                        <video controls style={{ width: '100%', maxWidth: 520, borderRadius: 6 }} src={URL.createObjectURL(att.file)} />
+                                      ) : (att.file?.type.startsWith('audio/') || (att.name || '').toLowerCase().endsWith('.mp3')) ? (
+                                        <audio controls style={{ width: '100%' }} src={URL.createObjectURL(att.file)} />
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </>
                           )}
                           {/* Attachments preview for announcement post */}
@@ -7910,7 +8034,8 @@ useEffect(() => {
                                 } else if (att.url) {
                                   url = att.url;
                                 }
-                                const isLink = att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive";
+                                // Treat as link ONLY when there is no File object and the type explicitly indicates a link-like attachment
+                                const isLink = (!att.file) && (att.type === "Link" || att.type === "YouTube" || att.type === "Google Drive");
                                 // Ensure link URLs are absolute external URLs and remove localhost prefixes
                                 let linkUrl = att.url;
                                 console.log('Processing attachment:', { type: att.type, url: att.url, isLink });
@@ -7972,16 +8097,16 @@ useEffect(() => {
                                           console.warn('Cannot open link: invalid URL');
                                         }
                                       } else {
-                                        handlePreviewAttachment(att);
+                                        handlePreviewAttachment({ ...att, url: att.download_url || url || att.url });
                                       }
                                     }}
                                   >
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 600, fontSize: 16, color: '#232b3b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={displayName}>{displayName}</div>
-                                                                              <div style={{ fontSize: 13, color: color || '#90A4AE', marginTop: 2 }}>
+                                      <div style={{ fontSize: 13, color: color || '#90A4AE', marginTop: 2 }}>
                                           {type}
-                                          {url && <>&bull; <a href={url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
+                                          {url && <>&bull; <a href={att.download_url || url} download={att.name} style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Download</a></>}
                                           {isLink && <>&bull; <a href={linkUrl || att.url} target="_blank" rel="noopener noreferrer" style={{ color: color, fontWeight: 600, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>View Link</a></>}
                                         </div>
                                     </div>
@@ -9348,7 +9473,7 @@ useEffect(() => {
                                       console.warn('Cannot open link: invalid URL');
                                     }
                                   } else {
-                                    handlePreviewAttachment(att);
+                                    handlePreviewAttachment({ ...att, url: att.download_url || url || att.url });
                                   }
                                 }}
                                     >
@@ -9678,16 +9803,15 @@ useEffect(() => {
                                       cursor: 'pointer',
                                       transition: 'all 0.2s ease'
                                     }}
-                                    onClick={() => {
-                                      if (isLink && att.url) {
-                                        window.open(att.url, '_blank', 'noopener,noreferrer');
-                                      } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
-                                        // For YouTube, Google Drive, and Link types, always open in new tab
-                                        window.open(att.url, '_blank', 'noopener,noreferrer');
-                                      } else {
-                                        handlePreviewAttachment(att);
-                                      }
-                                    }}
+                                     onClick={() => {
+                                       if (isLink && att.url) {
+                                         window.open(att.url, '_blank', 'noopener,noreferrer');
+                                       } else if (att.type === "YouTube" || att.type === "Google Drive" || att.type === "Link") {
+                                         window.open(att.url, '_blank', 'noopener,noreferrer');
+                                       } else {
+                                         handlePreviewAttachment({ ...att, url: att.download_url || url || att.url });
+                                       }
+                                     }}
                                   >
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 8 }}>{preview}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -10041,7 +10165,7 @@ useEffect(() => {
                                     </div>
                                   );
                                 })()}
-                                <span style={{ fontWeight: 600, color: '#232b3b', fontSize: '14px' }}>{student.name}</span>
+                                <span style={{ fontWeight: 600, color: '#232b3b', fontSize: '14px' }}>{formatUserName(student)}</span>
                               </div>
                             </td>
                             <td style={{ fontWeight: 500, color: '#232b3b', fontSize: '14px', verticalAlign: 'middle', paddingTop: '6px', paddingBottom: '6px' }}>{student.email}</td>
@@ -11324,7 +11448,7 @@ useEffect(() => {
                     })()}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
-                        {student.name}
+                        {formatUserName(student)}
                       </div>
                       <div style={{ fontSize: 12, color: '#666' }}>
                         {student.email}

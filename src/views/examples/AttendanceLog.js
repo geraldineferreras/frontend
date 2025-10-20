@@ -34,6 +34,7 @@ import Header from "components/Headers/Header.js";
 import classnames from "classnames";
 import api from "services/api.js";
 import { getProfilePictureUrl, getUserInitials } from "utils/profilePictureUtils.js";
+import { formatUserName, sortUsersByName } from '../../utils/nameUtils';
 
 const AttendanceLog = () => {
   // State management
@@ -265,6 +266,12 @@ const AttendanceLog = () => {
 
     // Sort data
     filtered.sort((a, b) => {
+      // Use nameUtils sorting for name fields
+      if (sortKey === 'studentName' || sortKey === 'teacherName') {
+        const sortedByName = sortUsersByName([a, b]);
+        return sortDirection === 'asc' ? sortedByName[0] === a ? -1 : 1 : sortedByName[0] === a ? 1 : -1;
+      }
+      
       let aVal = a[sortKey];
       let bVal = b[sortKey];
       
@@ -1123,7 +1130,7 @@ const AttendanceLog = () => {
                           </Badge>
                         </div>
                       <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#32325d' }}>
-                        {activeCourseTab === "all" ? "Attendance log" : courses.find(c => c.id === activeCourseTab)?.name || "Admin Attendance Log"} ({filteredData.length})
+                        {activeCourseTab === "all" ? "Attendance log" : courses.find(c => c.id === activeCourseTab)?.name || "Program Chairperson Attendance Log"} ({filteredData.length})
                         {loading && <Spinner size="sm" className="ml-2" />}
                       </div>
                       <div className="d-flex align-items-center" style={{ gap: 12 }}>
@@ -1264,7 +1271,7 @@ const AttendanceLog = () => {
                                  </div>
                                </div>
                                <div>
-                                 <div className="font-weight-bold">{item.studentName}</div>
+                                 <div className="font-weight-bold">{formatUserName({ full_name: item.studentName, name: item.studentName })}</div>
                                </div>
                              </div>
                            </td>

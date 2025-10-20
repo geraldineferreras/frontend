@@ -26,12 +26,6 @@ import {
   DropdownItem,
   UncontrolledDropdown,
   DropdownToggle,
-  Form,
-  FormGroup,
-  InputGroupAddon,
-  InputGroupText,
-  Input,
-  InputGroup,
   Navbar,
   Nav,
   Container,
@@ -94,7 +88,7 @@ const AdminNavbar = (props) => {
           position: 'sticky',
           top: 0,
           width: '100%',
-          zIndex: 1030,
+          zIndex: 100,
           background: 'linear-gradient(90deg, #1cb5e0 0%, #2096ff 100%)',
           minHeight: 70,
           boxShadow: '0 2px 8px rgba(44,62,80,0.07)'
@@ -108,18 +102,7 @@ const AdminNavbar = (props) => {
           >
             {props.brandText}
           </Link>
-          <Form className="navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto">
-            <FormGroup className="mb-0">
-              <InputGroup className="input-group-alternative">
-                <InputGroupAddon addonType="prepend">
-                  <InputGroupText>
-                    <i className="fas fa-search" />
-                  </InputGroupText>
-                </InputGroupAddon>
-                <Input placeholder="Search" type="text" />
-              </InputGroup>
-            </FormGroup>
-          </Form>
+          {/* Search bar removed as requested */}
           <Nav className="align-items-center d-none d-md-flex" navbar>
             <UncontrolledDropdown nav>
               <DropdownToggle className="pr-0" nav>
@@ -171,7 +154,7 @@ const AdminNavbar = (props) => {
                   </span>
                   <Media className="d-none d-lg-block">
                     <span className="mb-0 text-sm font-weight-bold">
-                      {currentUser?.full_name || currentUser?.name || 'Admin User'}
+                      {currentUser?.full_name || currentUser?.name || 'Program Chairperson'}
                     </span>
                   </Media>
                 </Media>

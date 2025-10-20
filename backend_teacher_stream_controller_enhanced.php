@@ -27,12 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Only allow POST and PUT requests
-if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT'])) {
+// Allow POST, PUT, and GET requests
+if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'GET'])) {
     http_response_code(405);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Method not allowed. Use POST to create or PUT to edit.',
+        'message' => 'Method not allowed. Use GET to retrieve, POST to create, or PUT to edit.',
         'data' => null
     ]);
     exit();
@@ -91,7 +91,10 @@ try {
         throw new Exception('Classroom not found');
     }
     
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        // GET STREAM POSTS
+        handleGetStreamPosts($userId, $classroomId, $classCode);
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // CREATE NEW STREAM POST
         handleCreateStreamPost($userId, $classroomId, $classCode);
     } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') {
@@ -125,8 +128,8 @@ function handleCreateStreamPost($userId, $classroomId, $classCode) {
     if (strpos($contentType, 'multipart/form-data') !== false) {
         // Handle multipart/form-data (files + form fields)
         $postData = [
-            'title' => $_POST['title'] ?? '',
-            'content' => $_POST['content'] ?? '',
+            'title' => trim($_POST['title'] ?? ''),
+            'content' => trim($_POST['content'] ?? ''),
             'is_draft' => $_POST['is_draft'] ?? 0,
             'is_scheduled' => $_POST['is_scheduled'] ?? 0,
             'scheduled_at' => $_POST['scheduled_at'] ?? '',
@@ -134,6 +137,11 @@ function handleCreateStreamPost($userId, $classroomId, $classCode) {
             'assignment_type' => $_POST['assignment_type'] ?? 'classroom',
             'student_ids' => $_POST['student_ids'] ?? null
         ];
+        
+        // Debug logging to help troubleshoot content issues
+        error_log("DEBUG - POST data received: " . json_encode($postData));
+        error_log("DEBUG - Raw content value: '" . ($_POST['content'] ?? 'NOT_SET') . "'");
+        error_log("DEBUG - Content length: " . strlen($postData['content']));
         
         // Process file attachments (up to 5 files)
         for ($i = 0; $i < 5; $i++) {
@@ -167,8 +175,18 @@ function handleCreateStreamPost($userId, $classroomId, $classCode) {
     }
     
     // Validate required fields
-    if (empty($postData['title']) || empty($postData['content'])) {
-        throw new Exception('Title and content are required');
+    // Title is always required, but content can be empty if there are file attachments
+    error_log("DEBUG - Validation check - Title: '" . $postData['title'] . "' (empty: " . (empty($postData['title']) ? 'YES' : 'NO') . ")");
+    error_log("DEBUG - Validation check - Content: '" . $postData['content'] . "' (empty: " . (empty($postData['content']) ? 'YES' : 'NO') . ")");
+    error_log("DEBUG - Validation check - Attachments count: " . count($attachments));
+    
+    if (empty($postData['title'])) {
+        throw new Exception('Title is required');
+    }
+    
+    // Content is required only if there are no file attachments
+    if (empty($postData['content']) && empty($attachments)) {
+        throw new Exception('Content is required when no attachments are provided');
     }
     
     // Create the stream post
@@ -255,8 +273,14 @@ function handleEditStreamPost($userId, $classroomId, $classCode, $streamId) {
     }
     
     // Validate required fields
-    if (empty($updateData['title']) || empty($updateData['content'])) {
-        throw new Exception('Title and content are required');
+    // Title is always required, but content can be empty if there are file attachments
+    if (empty($updateData['title'])) {
+        throw new Exception('Title is required');
+    }
+    
+    // Content is required only if there are no file attachments
+    if (empty($updateData['content']) && empty($attachments)) {
+        throw new Exception('Content is required when no attachments are provided');
     }
     
     // Update the stream post
@@ -407,20 +431,20 @@ function processFileAttachment($streamId, $attachment) {
     
     // Save to database
     $sql = "INSERT INTO stream_attachments (
-        stream_id, file_name, original_name, file_path, 
-        file_size, file_type, attachment_order, created_at
+        stream_id, attachment_type, attachment_url, file_name, original_name, 
+        file_size, mime_type, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
     
     $stmt = $conn->prepare($sql);
     $stmt->bind_param(
-        "isssssi",
+        "issssss",
         $streamId,
+        'file',
+        $filePath,
         $fileName,
         $file['name'],
-        $filePath,
         $file['size'],
-        $file['type'],
-        $attachment['index']
+        $file['type']
     );
     
     if (!$stmt->execute()) {
@@ -434,12 +458,20 @@ function processFileAttachment($streamId, $attachment) {
 function processLinkAttachment($streamId, $attachment) {
     global $conn;
     
+    // Determine attachment type based on URL
+    $attachmentType = 'link';
+    if (strpos($attachment['url'], 'youtube.com') !== false || strpos($attachment['url'], 'youtu.be') !== false) {
+        $attachmentType = 'youtube';
+    } elseif (strpos($attachment['url'], 'drive.google.com') !== false) {
+        $attachmentType = 'google_drive';
+    }
+    
     $sql = "INSERT INTO stream_attachments (
-        stream_id, link_url, attachment_order, created_at
+        stream_id, attachment_type, attachment_url, created_at
     ) VALUES (?, ?, ?, NOW())";
     
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("isi", $streamId, $attachment['url'], $attachment['index']);
+    $stmt->bind_param("iss", $streamId, $attachmentType, $attachment['url']);
     
     if (!$stmt->execute()) {
         throw new Exception('Failed to save link attachment: ' . $stmt->error);
@@ -453,8 +485,8 @@ function deleteStreamAttachments($streamId) {
     global $conn;
     
     // Get file attachments to delete physical files
-    $sql = "SELECT file_path FROM stream_attachments 
-            WHERE stream_id = ? AND file_path IS NOT NULL";
+    $sql = "SELECT attachment_url FROM stream_attachments 
+            WHERE stream_id = ? AND attachment_type = 'file' AND attachment_url IS NOT NULL";
     
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $streamId);
@@ -462,8 +494,8 @@ function deleteStreamAttachments($streamId) {
     
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
-        if (file_exists($row['file_path'])) {
-            unlink($row['file_path']);
+        if (file_exists($row['attachment_url'])) {
+            unlink($row['attachment_url']);
         }
     }
     
@@ -540,5 +572,114 @@ function validateJWTToken($token) {
         'role' => 'teacher',
         'exp' => time() + 3600
     ];
+}
+
+/**
+ * Handle GET request to retrieve stream posts with attachments
+ */
+function handleGetStreamPosts($userId, $classroomId, $classCode) {
+    try {
+        $pdo = getDatabaseConnection();
+        
+        // Get stream posts with their attachments
+        $sql = "
+            SELECT 
+                cs.id,
+                cs.title,
+                cs.content,
+                cs.is_draft,
+                cs.is_scheduled,
+                cs.scheduled_at,
+                cs.allow_comments,
+                cs.assignment_type,
+                cs.student_ids,
+                cs.created_at,
+                cs.updated_at,
+                u.full_name as author_name,
+                u.profile_picture,
+                GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'id', sa.id,
+                        'type', sa.attachment_type,
+                        'url', sa.attachment_url,
+                        'file_name', sa.file_name,
+                        'original_name', sa.original_name,
+                        'file_size', sa.file_size,
+                        'mime_type', sa.mime_type,
+                        'title', sa.title,
+                        'description', sa.description
+                    ) SEPARATOR '||'
+                ) as attachments_json
+            FROM classroom_stream cs
+            LEFT JOIN users u ON cs.user_id = u.id
+            LEFT JOIN stream_attachments sa ON cs.id = sa.stream_id
+            WHERE cs.class_code = ? AND cs.is_draft = 0
+            GROUP BY cs.id
+            ORDER BY cs.created_at DESC
+        ";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$classCode]);
+        
+        $posts = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            // Parse attachments
+            $attachments = [];
+            if ($row['attachments_json']) {
+                $attachmentStrings = explode('||', $row['attachments_json']);
+                foreach ($attachmentStrings as $attachmentJson) {
+                    if ($attachmentJson) {
+                        $attachment = json_decode($attachmentJson, true);
+                        if ($attachment) {
+                            $attachments[] = $attachment;
+                        }
+                    }
+                }
+            }
+            
+            // Build full URLs for file attachments
+            foreach ($attachments as &$attachment) {
+                if ($attachment['type'] === 'file' && $attachment['url']) {
+                    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
+                               '://' . $_SERVER['HTTP_HOST'];
+                    $attachment['download_url'] = $baseUrl . '/' . $attachment['url'];
+                }
+            }
+            
+            $posts[] = [
+                'id' => $row['id'],
+                'title' => $row['title'],
+                'content' => $row['content'],
+                'is_draft' => (bool)$row['is_draft'],
+                'is_scheduled' => (bool)$row['is_scheduled'],
+                'scheduled_at' => $row['scheduled_at'],
+                'allow_comments' => (bool)$row['allow_comments'],
+                'assignment_type' => $row['assignment_type'],
+                'student_ids' => $row['student_ids'] ? json_decode($row['student_ids'], true) : null,
+                'created_at' => $row['created_at'],
+                'updated_at' => $row['updated_at'],
+                'author' => [
+                    'name' => $row['author_name'],
+                    'profile_picture' => $row['profile_picture']
+                ],
+                'attachments' => $attachments
+            ];
+        }
+        
+        http_response_code(200);
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Stream posts retrieved successfully',
+            'data' => $posts
+        ]);
+        
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Failed to retrieve stream posts: ' . $e->getMessage(),
+            'data' => null
+        ]);
+    }
 }
 ?>

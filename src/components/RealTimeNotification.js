@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../services/api";
+import { getCurrentUserId } from "../utils/userUtils";
+import { timeAgo } from "../utils/timeUtils";
 
 // Notification type mapping
 const typeMap = {
@@ -14,17 +16,6 @@ const typeMap = {
   stream_post: { icon: "💬", color: "#00bcd4", title: "Stream Post" },
 };
 
-// Time formatting helper
-function timeAgo(dateStr) {
-  const now = new Date();
-  const date = new Date(dateStr.replace(/-/g, "/"));
-  const diff = (now - date) / 1000;
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-  if (diff < 172800) return "Yesterday";
-  return date.toLocaleDateString();
-}
 
 const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, maxNotifications = 5 }) => {
   const [notifications, setNotifications] = useState([]);
@@ -33,16 +24,23 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch notifications from API
+  // Fetch notifications from API using new methods
   const fetchNotifications = useCallback(async () => {
     try {
-      const response = await api.get('/api/notifications/recent');
+      const userId = getCurrentUserId();
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+      
+      const response = await api.getRecentNotifications(userId, 5);
       if (response.success && response.data) {
-        const recentNotifications = response.data.notifications || [];
+        // The new backend returns data directly as an array
+        const recentNotifications = Array.isArray(response.data) ? response.data : [];
         setNotifications(recentNotifications);
         
         // Get unread count
-        const unreadResponse = await api.get('/api/notifications/unread-count');
+        const unreadResponse = await api.getUnreadNotificationCount(userId);
         if (unreadResponse.success && unreadResponse.data) {
           setUnreadCount(unreadResponse.data.count || 0);
         }
@@ -58,11 +56,13 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      await api.put(`/api/notifications/${notificationId}/read`);
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      const response = await api.markNotificationAsRead(notificationId);
+      if (response.success) {
+        setNotifications(prev => 
+          prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -71,9 +71,14 @@ const RealTimeNotification = ({ onNotificationClick, showUnreadCount = true, max
   // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
-      await api.put('/api/notifications/mark-all-read');
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      const userId = getCurrentUserId();
+      if (!userId) return;
+      
+      const response = await api.markAllNotificationsAsRead(userId);
+      if (response.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Modal Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar {
+            background: #1976d2;
+            color: white;
+            padding: 16px 20px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .test-btn {
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .test-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .test-btn.secondary {
+            background: #666;
+        }
+        .test-btn.secondary:hover {
+            background: #555;
+        }
+        .notification-modal {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            background: #ffffff;
+            border: 2px solid #1976d2;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            min-width: 320px;
+            max-width: 400px;
+            z-index: 1000;
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            backdrop-filter: blur(10px);
+        }
+        .notification-modal:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        .notification-modal.closing {
+            animation: slideOutRight 0.3s ease-in-out forwards;
+        }
+        .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+        .close-btn:hover {
+            background: rgba(0, 0, 0, 0.2);
+            color: #333;
+        }
+        .notification-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: #1976d215;
+            border-radius: 8px;
+        }
+        .notification-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .notification-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1976d2;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        .notification-message {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.4;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notification-time {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #1976d230;
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #1976d2;
+            width: 100%;
+            animation: shrink 5s linear forwards;
+            transform-origin: left;
+        }
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0.3) translateX(100%);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05) translateX(-10%);
+                opacity: 0.8;
+            }
+            70% {
+                transform: scale(0.9) translateX(5%);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1) translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        @keyframes shrink {
+            from {
+                width: 100%;
+            }
+            to {
+                width: 0%;
+            }
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="navbar">
+            <h1>📱 SCMS Notification Modal Test</h1>
+            <div>Navbar Area</div>
+        </div>
+
+        <h2>🔔 Notification Modal System</h2>
+        <p>This page demonstrates the notification modal popup system that appears in the top-right corner.</p>
+
+        <div class="test-section">
+            <h3>🧪 Test Different Notification Types</h3>
+            <div class="test-controls">
+                <button class="test-btn" onclick="showNotification('general', 'Hello! You have a new notification.')">
+                    📢 General Notification
+                </button>
+                <button class="test-btn" onclick="showNotification('grade', 'Your grade for Assignment 3 has been posted.')">
+                    📝 Grade Update
+                </button>
+                <button class="test-btn" onclick="showNotification('attendance', 'Your attendance has been recorded for today.')">
+                    ✅ Attendance Update
+                </button>
+                <button class="test-btn" onclick="showNotification('assignment', 'New assignment posted in Object Oriented Programming.')">
+                    📋 New Assignment
+                </button>
+                <button class="test-btn" onclick="showNotification('enrollment', 'Alyssa Batumbakal has enrolled in your class.')">
+                    👨‍🎓 Student Enrollment
+                </button>
+                <button class="test-btn" onclick="showNotification('stream_post', 'New stream post from your teacher.')">
+                    💬 Stream Post
+                </button>
+            </div>
+
+            <div class="test-controls">
+                <button class="test-btn secondary" onclick="showMultipleNotifications()">
+                    🔄 Show Multiple Notifications
+                </button>
+                <button class="test-btn secondary" onclick="clearAllNotifications()">
+                    🗑️ Clear All
+                </button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Log</h3>
+            <div id="log" class="log">Ready to test notifications...\n</div>
+        </div>
+
+        <div class="test-section">
+            <h3>✨ Features Demonstrated</h3>
+            <div class="status info">
+                <strong>🎯 Modal Features:</strong>
+                <ul>
+                    <li>✅ <strong>Position:</strong> Top-right corner, below navbar</li>
+                    <li>✅ <strong>Auto-close:</strong> Automatically closes after 5 seconds</li>
+                    <li>✅ <strong>Manual close:</strong> Click the × button to close</li>
+                    <li>✅ <strong>Click to navigate:</strong> Click modal to open notifications page</li>
+                    <li>✅ <strong>Stacking:</strong> Multiple notifications stack properly</li>
+                    <li>✅ <strong>Animations:</strong> Smooth bounce-in and slide-out animations</li>
+                    <li>✅ <strong>Progress bar:</strong> Visual countdown for auto-close</li>
+                    <li>✅ <strong>Hover effects:</strong> Subtle hover animations</li>
+                    <li>✅ <strong>Modern styling:</strong> Rounded corners, shadows, clean design</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let notificationCounter = 1;
+        let activeNotifications = [];
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function getNotificationIcon(type) {
+            const iconMap = {
+                general: '📢',
+                announcement: '📢',
+                grade: '📝',
+                attendance: '✅',
+                assignment: '📋',
+                stream_post: '💬',
+                enrollment: '👨‍🎓',
+                task: '📋'
+            };
+            return iconMap[type] || '📢';
+        }
+
+        function getNotificationColor(type) {
+            const colorMap = {
+                general: '#1976d2',
+                announcement: '#1976d2',
+                grade: '#ff9800',
+                attendance: '#4caf50',
+                assignment: '#9c27b0',
+                stream_post: '#00bcd4',
+                enrollment: '#4caf50',
+                task: '#795548'
+            };
+            return colorMap[type] || '#1976d2';
+        }
+
+        function getNotificationTitle(type) {
+            const titleMap = {
+                general: 'Notification',
+                announcement: 'Announcement',
+                grade: 'Grade Update',
+                attendance: 'Attendance Update',
+                assignment: 'Assignment',
+                stream_post: 'New Stream Post',
+                enrollment: 'Student Enrollment',
+                task: 'Task Update'
+            };
+            return titleMap[type] || 'Notification';
+        }
+
+        function showNotification(type, message) {
+            const notification = {
+                id: notificationCounter++,
+                type: type,
+                message: message,
+                created_at: new Date().toISOString()
+            };
+
+            const modal = createNotificationModal(notification);
+            document.body.appendChild(modal);
+            activeNotifications.push({ id: notification.id, element: modal });
+
+            log(`🔔 Showing ${type} notification: ${message.substring(0, 50)}...`);
+        }
+
+        function createNotificationModal(notification) {
+            const modal = document.createElement('div');
+            modal.className = 'notification-modal';
+            modal.id = `notification-${notification.id}`;
+
+            const icon = getNotificationIcon(notification.type);
+            const color = getNotificationColor(notification.type);
+            const title = getNotificationTitle(notification.type);
+
+            modal.innerHTML = `
+                <button class="close-btn" onclick="closeNotification(${notification.id})">×</button>
+                <div class="notification-content">
+                    <div class="notification-icon" style="color: ${color};">${icon}</div>
+                    <div class="notification-text">
+                        <div class="notification-title" style="color: ${color};">${title}</div>
+                        <div class="notification-message">${notification.message}</div>
+                        <div class="notification-time">
+                            <span>🕒</span>
+                            <span>Just now</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" style="background: ${color};"></div>
+                </div>
+            `;
+
+            // Handle click to navigate
+            modal.addEventListener('click', () => {
+                log(`🔗 Notification ${notification.id} clicked - would navigate to notifications page`);
+                closeNotification(notification.id);
+            });
+
+            // Auto-close after 5 seconds
+            setTimeout(() => {
+                closeNotification(notification.id);
+            }, 5000);
+
+            return modal;
+        }
+
+        function closeNotification(id) {
+            const notificationIndex = activeNotifications.findIndex(n => n.id === id);
+            if (notificationIndex === -1) return;
+
+            const notification = activeNotifications[notificationIndex];
+            const modal = notification.element;
+
+            modal.classList.add('closing');
+            log(`❌ Closing notification ${id}`);
+
+            setTimeout(() => {
+                if (modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+                activeNotifications.splice(notificationIndex, 1);
+            }, 300);
+        }
+
+        function showMultipleNotifications() {
+            const notifications = [
+                { type: 'general', message: 'Welcome to SCMS! You have new notifications.' },
+                { type: 'grade', message: 'Your grade for Math Quiz has been posted.' },
+                { type: 'assignment', message: 'New homework assigned in Science class.' },
+                { type: 'attendance', message: 'Your attendance for today has been marked.' }
+            ];
+
+            notifications.forEach((notification, index) => {
+                setTimeout(() => {
+                    showNotification(notification.type, notification.message);
+                }, index * 500); // 500ms delay between each
+            });
+
+            log(`🔄 Showing ${notifications.length} notifications with staggered timing`);
+        }
+
+        function clearAllNotifications() {
+            activeNotifications.forEach(notification => {
+                closeNotification(notification.id);
+            });
+            log('🗑️ Cleared all notifications');
+        }
+
+        // Initialize
+        log('🚀 Notification modal test loaded. Try the buttons above!');
+    </script>
+</body>
+</html>
+

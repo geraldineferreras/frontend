@@ -22,6 +22,8 @@ import { PropTypes } from "prop-types";
 import { useAuth } from "../../contexts/AuthContext";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
 import ApiService from "../../services/api";
+import { useNotificationCount } from "../../hooks/useNotificationCount";
+import NotificationCountBadge from "../NotificationCountBadge";
 import {
   Button,
   Card,
@@ -87,6 +89,7 @@ const AdminSidebar = (props) => {
   const [collapseOpen, setCollapseOpen] = useState();
   const { user, logout } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
+  const { unreadCount } = useNotificationCount();
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -118,6 +121,7 @@ const AdminSidebar = (props) => {
     { name: "Subject Management", icon: "ni ni-books text-info", path: "/subject-management" },
     { name: "Offerings Management", icon: "ni ni-collection text-orange", path: "/offerings-management" },
     { name: "Reports & Logs", icon: "ni ni-archive-2 text-warning", path: "/reports-logs", dropdown: true },
+    { name: "Notifications", icon: "ni ni-notification-70 text-info", path: "/notifications" },
   ];
   const createLinks = () => {
     return adminModules.map((mod, key) => {
@@ -202,6 +206,7 @@ const AdminSidebar = (props) => {
           >
             <i className={mod.icon} />
             {mod.name}
+            {mod.name === "Notifications" && <NotificationCountBadge count={unreadCount} />}
           </NavLink>
         </NavItem>
       );

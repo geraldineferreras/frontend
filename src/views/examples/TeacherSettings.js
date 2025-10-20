@@ -468,7 +468,7 @@ const TeacherSettings = () => {
                              <Label for="department" className="font-weight-bold text-dark">Department</Label>
                           <Input
                             id="department"
-                            type="text"
+                            type="select"
                             value={profileData.department}
                             onChange={(e) => setProfileData({...profileData, department: e.target.value})}
                                 className="border-0"
@@ -480,7 +480,13 @@ const TeacherSettings = () => {
                                   color: '#333',
                                   backgroundColor: '#f8f9fa'
                                 }}
-                              />
+                              >
+                                <option value="">Select Department</option>
+                                <option value="Information Technology">Information Technology</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Information System">Information System</option>
+                                <option value="Computer Technology">Computer Technology</option>
+                              </Input>
                            </div>
                       </Col>
                     </Row>

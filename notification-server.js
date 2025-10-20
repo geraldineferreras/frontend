@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
           message,
           type,
           data: notificationData,
-          created_at: new Date().toISOString(),
+          created_at: new Date().toISOString().replace('T', ' ').replace('Z', '').split('.')[0],
           is_read: false
         });
         
@@ -139,7 +139,7 @@ io.on('connection', (socket) => {
           message,
           type,
           data: notificationData,
-          created_at: new Date().toISOString(),
+          created_at: new Date().toISOString().replace('T', ' ').replace('Z', '').split('.')[0],
           is_read: false,
           is_broadcast: true
         });
@@ -230,6 +230,158 @@ app.get('/api/notifications/status', (req, res) => {
       Array.from(roleRooms.entries()).map(([role, users]) => [role, users.size])
     )
   });
+});
+
+// General notifications endpoint (for current user)
+app.get('/api/notifications', async (req, res) => {
+  try {
+    // Get user ID from query parameter or headers
+    const userId = req.query.userId || req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+    
+    if (dbPool) {
+      const [notifications] = await dbPool.execute(
+        'SELECT * FROM notifications WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 50',
+        [userId]
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          notifications: notifications
+        }
+      });
+    } else {
+      res.status(500).json({ error: 'Database not connected' });
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// Recent notifications endpoint
+app.get('/api/notifications/recent', async (req, res) => {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+    
+    if (dbPool) {
+      const [notifications] = await dbPool.execute(
+        'SELECT * FROM notifications WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 10',
+        [userId]
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          notifications: notifications
+        }
+      });
+    } else {
+      res.status(500).json({ error: 'Database not connected' });
+    }
+  } catch (error) {
+    console.error('Error fetching recent notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch recent notifications' });
+  }
+});
+
+// Unread count endpoint
+app.get('/api/notifications/unread-count', async (req, res) => {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+    
+    if (dbPool) {
+      const [result] = await dbPool.execute(
+        'SELECT COUNT(*) as count FROM notifications WHERE recipient_id = ? AND is_read = false',
+        [userId]
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          count: result[0].count
+        }
+      });
+    } else {
+      res.status(500).json({ error: 'Database not connected' });
+    }
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Mark single notification as read
+app.put('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Notification ID required' });
+    }
+    
+    if (dbPool) {
+      const [result] = await dbPool.execute(
+        'UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = ?',
+        [id]
+      );
+      
+      if (result.affectedRows > 0) {
+        res.json({
+          success: true,
+          message: 'Notification marked as read'
+        });
+      } else {
+        res.status(404).json({ error: 'Notification not found' });
+      }
+    } else {
+      res.status(500).json({ error: 'Database not connected' });
+    }
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// Mark all notifications as read for a user
+app.put('/api/notifications/mark-all-read', async (req, res) => {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+    
+    if (dbPool) {
+      const [result] = await dbPool.execute(
+        'UPDATE notifications SET is_read = true, read_at = NOW() WHERE recipient_id = ? AND is_read = false',
+        [userId]
+      );
+      
+      res.json({
+        success: true,
+        message: 'All notifications marked as read',
+        affectedRows: result.affectedRows
+      });
+    } else {
+      res.status(500).json({ error: 'Database not connected' });
+    }
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: 'Failed to mark all notifications as read' });
+  }
 });
 
 app.get('/api/notifications/user/:userId', async (req, res) => {

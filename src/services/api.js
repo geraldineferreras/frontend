@@ -721,8 +721,8 @@ class ApiService {
       console.error('Full admin update error:', error);
       console.error('Error response data:', error.response?.data);
       console.error('Error response status:', error.response?.status);
-      const message = error.response?.data?.message || error.message || 'Admin update failed';
-      console.error('Admin update error:', message);
+      const message = error.response?.data?.message || error.message || 'Program Chairperson update failed';
+      console.error('Program Chairperson update error:', message);
       throw new Error(message);
     }
   }
@@ -1054,8 +1054,8 @@ class ApiService {
       console.error('Full admin delete error:', error);
       console.error('Error response data:', error.response?.data);
       console.error('Error response status:', error.response?.status);
-      const message = error.response?.data?.message || error.message || 'Admin delete failed';
-      console.error('Admin delete error:', message);
+      const message = error.response?.data?.message || error.message || 'Program Chairperson delete failed';
+      console.error('Program Chairperson delete error:', message);
       throw new Error(message);
     }
   }
@@ -1308,7 +1308,7 @@ class ApiService {
   }
 
   // Teacher Create Classroom Stream Post with multiple files using attachment_0, attachment_1, ...
-  async createTeacherStreamPostWithFiles(classCode, baseData = {}, files = []) {
+  async createTeacherStreamPostWithFiles(classCode, baseData = {}, files = [], { onUploadProgress } = {}) {
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Authentication token not found. Please log in again.');
@@ -1341,6 +1341,10 @@ class ApiService {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
         },
+        // Allow very large uploads and report progress
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        onUploadProgress: typeof onUploadProgress === 'function' ? onUploadProgress : undefined,
       });
       return response.data;
     } catch (error) {
@@ -1396,6 +1400,8 @@ class ApiService {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
         },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       });
       return response.data;
     } catch (error) {
@@ -1406,7 +1412,7 @@ class ApiService {
   }
 
   // Teacher Create Classroom Stream Post with mixed attachments (files + links)
-  async createTeacherStreamPostWithMixedAttachments(classCode, baseData = {}, files = [], links = []) {
+  async createTeacherStreamPostWithMixedAttachments(classCode, baseData = {}, files = [], links = [], { onUploadProgress } = {}) {
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('Authentication token not found. Please log in again.');
@@ -1456,6 +1462,9 @@ class ApiService {
           Authorization: `Bearer ${token}`,
           // No explicit Content-Type so browser sets multipart boundary
         },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        onUploadProgress: typeof onUploadProgress === 'function' ? onUploadProgress : undefined,
       });
       return response.data;
     } catch (error) {
@@ -2771,6 +2780,87 @@ class ApiService {
     }
   }
 
+  // ===== NOTIFICATION API METHODS =====
+  
+  // Get all notifications for a user
+  async getNotifications(userId) {
+    try {
+      return await this.makeRequest(`/api/notifications?userId=${userId}`, {
+        method: 'GET',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      throw error;
+    }
+  }
+
+  // Get recent notifications for a user
+  async getRecentNotifications(userId, limit = 10) {
+    try {
+      return await this.makeRequest(`/api/notifications/recent?userId=${userId}&limit=${limit}`, {
+        method: 'GET',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error fetching recent notifications:', error);
+      throw error;
+    }
+  }
+
+  // Get unread notification count
+  async getUnreadNotificationCount(userId) {
+    try {
+      return await this.makeRequest(`/api/notifications/unread-count?userId=${userId}`, {
+        method: 'GET',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      throw error;
+    }
+  }
+
+  // Mark notification as read
+  async markNotificationAsRead(notificationId) {
+    try {
+      return await this.makeRequest(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  // Mark all notifications as read
+  async markAllNotificationsAsRead(userId) {
+    try {
+      return await this.makeRequest(`/api/notifications/mark-all-read?userId=${userId}`, {
+        method: 'PUT',
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  // Create a new notification
+  async createNotification(notificationData) {
+    try {
+      return await this.makeRequest('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify(notificationData),
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      throw error;
+    }
+  }
+
   // Get classroom members for notification logic
   async getClassroomMembers(classCode) {
     try {
@@ -2795,7 +2885,7 @@ class ApiService {
 
   // Forgot Password
   async forgotPassword(email) {
-    return this.makeRequest('/api/auth/forgot-password', {
+    return this.makeRequest('/api/auth/forgot_password', {
       method: 'POST',
       body: JSON.stringify({ email }),
       requireAuth: false,
@@ -2804,7 +2894,7 @@ class ApiService {
 
   // Reset Password
   async resetPassword(token, newPassword) {
-    return this.makeRequest('/api/auth/reset-password', {
+    return this.makeRequest('/api/auth/reset_password', {
       method: 'POST',
       body: JSON.stringify({ token, new_password: newPassword }),
       requireAuth: false,
@@ -3580,7 +3670,7 @@ class ApiService {
     }
   }
 
-  // 📊 NEW: Admin Dashboard Statistics
+  // 📊 NEW: Program Chairperson Dashboard Statistics
   async getAdminDashboardStats() {
     try {
       const response = await this.get('/api/admin/dashboard/stats', true);
@@ -3595,7 +3685,7 @@ class ApiService {
     }
   }
 
-  // 👥 NEW: Admin User Count Summary
+  // 👥 NEW: Program Chairperson User Count Summary
   async getAdminUserCount() {
     try {
       const response = await this.get('/api/admin/users/count', true);
@@ -3610,7 +3700,7 @@ class ApiService {
     }
   }
 
-  // 📚 NEW: Admin Section Count Summary
+  // 📚 NEW: Program Chairperson Section Count Summary
   async getAdminSectionCount() {
     try {
       const response = await this.get('/api/admin/sections/count', true);

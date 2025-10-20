@@ -136,9 +136,20 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const maybePlaySound = (type) => {
-    if (!preferences.soundEnabled) return;
+    console.log('🔔 [Notifications] maybePlaySound called for type:', type);
+    console.log('🔔 [Notifications] Sound enabled:', preferences.soundEnabled);
+    
+    if (!preferences.soundEnabled) {
+      console.log('🔇 [Notifications] Sound disabled in preferences');
+      return;
+    }
+    
     const soundKey = type === 'error' ? 'error' : 'notification';
     const audio = soundRefs.current[soundKey];
+    
+    console.log('🔔 [Notifications] Audio element for', soundKey, ':', audio);
+    console.log('🔔 [Notifications] Audio src:', audio?.src);
+    console.log('🔔 [Notifications] Audio readyState:', audio?.readyState);
     
     if (!audio) {
       console.warn('[Notifications] Audio element missing for key:', soundKey);
@@ -156,10 +167,13 @@ export const NotificationProvider = ({ children }) => {
     }
     
     try {
-      audio.volume = 0.5; // Lower volume to be less intrusive
+      audio.volume = 0.8; // Increase volume for better audibility
       audio.currentTime = 0;
+      console.log('🔊 [Notifications] Attempting to play sound for type:', type);
       audio.play()
-        .then(() => console.debug('[Notifications] Played sound for type:', type))
+        .then(() => {
+          console.log('✅ [Notifications] Sound played successfully for type:', type);
+        })
         .catch((err) => {
           console.warn('[Notifications] Audio play blocked or failed:', err);
           // Fallback to browser beep
@@ -193,7 +207,7 @@ export const NotificationProvider = ({ children }) => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.2);
       
-      console.debug('[Notifications] Played fallback sound for type:', type);
+      console.log('✅ [Notifications] Fallback beep played successfully for type:', type);
     } catch (err) {
       console.warn('[Notifications] Fallback sound failed:', err);
       // Last resort: try to play a system beep (this might not work in all browsers)
@@ -252,12 +266,59 @@ export const NotificationProvider = ({ children }) => {
     // expose only in non-production or when debugging
     // eslint-disable-next-line no-underscore-dangle
     window._testNotifSound = () => {
+      console.log('🧪 [Notifications] Testing notification sounds...');
       maybePlaySound('info');
-      maybePlaySound('error');
+      setTimeout(() => maybePlaySound('error'), 1000);
     };
+    
+    // Also expose a function to test the MP3 file directly
+    // eslint-disable-next-line no-underscore-dangle
+    window._testNotifSoundFile = () => {
+      console.log('🧪 [Notifications] Testing notification.mp3 file directly...');
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.volume = 0.8;
+      audio.play().then(() => {
+        console.log('✅ [Notifications] Direct MP3 test successful!');
+      }).catch(err => {
+        console.error('❌ [Notifications] Direct MP3 test failed:', err);
+        console.log('🔍 [Notifications] Trying fallback paths...');
+        
+        // Try multiple fallback paths
+        const fallbackPaths = [
+          '/notification.mp3',
+          './sounds/notification.mp3',
+          './notification.mp3',
+          'notification.mp3'
+        ];
+        
+        let currentPath = 0;
+        const tryNextPath = () => {
+          if (currentPath >= fallbackPaths.length) {
+            console.error('❌ [Notifications] All fallback paths failed');
+            return;
+          }
+          
+          const path = fallbackPaths[currentPath];
+          console.log(`🔍 [Notifications] Trying path: ${path}`);
+          const testAudio = new Audio(path);
+          testAudio.volume = 0.8;
+          testAudio.play().then(() => {
+            console.log(`✅ [Notifications] Fallback path successful: ${path}`);
+          }).catch(() => {
+            currentPath++;
+            tryNextPath();
+          });
+        };
+        
+        tryNextPath();
+      });
+    };
+    
     return () => {
       // eslint-disable-next-line no-underscore-dangle
       delete window._testNotifSound;
+      // eslint-disable-next-line no-underscore-dangle
+      delete window._testNotifSoundFile;
     };
   }, [preferences.soundEnabled]);
 
@@ -500,6 +561,31 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  // Functions to update unread count when notifications are marked as read
+  const decrementUnreadCount = () => {
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const resetUnreadCount = () => {
+    setUnreadCount(0);
+  };
+
+  const refreshUnreadCount = async () => {
+    try {
+      const { getCurrentUserId } = await import('../utils/userUtils');
+      const api = await import('../services/api');
+      const userId = getCurrentUserId();
+      if (!userId) return;
+      
+      const response = await api.default.getUnreadNotificationCount(userId);
+      if (response.success && response.data) {
+        setUnreadCount(response.data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error refreshing unread count:', error);
+    }
+  };
+
   const value = useMemo(() => ({
     connectionStatus,
     activeToasts,
@@ -510,6 +596,9 @@ export const NotificationProvider = ({ children }) => {
     addNotification,
     dismiss,
     clearAll,
+    decrementUnreadCount,
+    resetUnreadCount,
+    refreshUnreadCount,
   }), [connectionStatus, activeToasts, queue, unreadCount, preferences]);
 
   return (
@@ -523,10 +612,25 @@ export const NotificationProvider = ({ children }) => {
         style={{ display: 'none' }}
         onCanPlay={() => console.debug('[Notifications] notification.mp3 ready')}
         onError={(e) => {
-          console.warn('[Notifications] Failed to load notification.mp3', e);
-          // Try fallback path
-          if (e.target.src.includes('/sounds/')) {
-            e.target.src = '/notification.mp3';
+          console.warn('[Notifications] Failed to load notification.mp3 from:', e.target.src);
+          
+          // Prevent infinite loop by checking if we've already tried this path
+          if (!e.target.dataset.retryAttempt) {
+            e.target.dataset.retryAttempt = '1';
+            
+            // For Vercel deployment, try the correct path structure
+            if (e.target.src.includes('/student/classroom/')) {
+              console.log('[Notifications] Trying Vercel-compatible path: /sounds/notification.mp3');
+              e.target.src = '/sounds/notification.mp3';
+            } else if (e.target.src.includes('/sounds/')) {
+              console.log('[Notifications] Trying root path: /notification.mp3');
+              e.target.src = '/notification.mp3';
+            } else {
+              console.log('[Notifications] Trying relative path: notification.mp3');
+              e.target.src = 'notification.mp3';
+            }
+          } else {
+            console.warn('[Notifications] All audio paths failed, will use fallback beep sound');
           }
         }}
       />

@@ -80,11 +80,16 @@ const ResetPassword = () => {
       // Call the reset password API
       const response = await ApiService.resetPassword(token, newPassword);
       
-      if (response && response.status === "success") {
+      const responseMessage = response?.message || "";
+      const isSuccess =
+        (response && (response.status === "success" || response.success === true)) ||
+        /password has been reset|reset successful/i.test(responseMessage);
+
+      if (isSuccess) {
         setSuccess(true);
-        setMessage(response.message || "Password has been reset successfully. You can now login with your new password.");
+        setMessage(responseMessage || "Password has been reset successfully. You can now login with your new password.");
       } else {
-        setError(response?.message || "Failed to reset password. Please try again.");
+        setError(responseMessage || "Failed to reset password. Please try again.");
       }
     } catch (error) {
       console.error("Reset password error:", error);
@@ -150,10 +155,10 @@ const ResetPassword = () => {
           {success ? (
             // Success state
             <div className="text-center">
-              <Alert color="success" className="mb-3">
+              <div className="alert alert-success mb-3" role="alert" style={{ backgroundColor: '#62bf45', borderColor: '#62bf45', color: '#fff' }}>
                 <i className="ni ni-check-bold mr-2"></i>
                 {message}
-              </Alert>
+              </div>
               <div className="mb-3">
                 <i className="ni ni-check-bold text-success" style={{ fontSize: "3rem" }}></i>
               </div>
@@ -183,7 +188,7 @@ const ResetPassword = () => {
                       <i className="ni ni-lock-circle-open" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <div className="position-relative">
+                  <div className="position-relative" style={{ width: '100%' }}>
                     <Input
                       placeholder="New Password"
                       type={passwordVisible.newPassword ? "text" : "password"}
@@ -237,7 +242,7 @@ const ResetPassword = () => {
                       <i className="ni ni-lock-circle-open" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <div className="position-relative">
+                  <div className="position-relative" style={{ width: '100%' }}>
                     <Input
                       placeholder="Confirm New Password"
                       type={passwordVisible.confirmPassword ? "text" : "password"}

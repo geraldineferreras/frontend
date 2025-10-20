@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Validation Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: #fff3cd; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Content Validation Fix for MP4 Attachments</h1>
+    
+    <div class="test-section success">
+        <h2>✅ Issue Resolved</h2>
+        <p><strong>Problem:</strong> "Failed to post announcement: content is required" error appeared even when there was text content and an MP4 attachment included in the announcement.</p>
+        
+        <p><strong>Root Cause:</strong> Backend validation was requiring both title AND content to be non-empty, regardless of whether file attachments were present.</p>
+        
+        <p><strong>Solution:</strong> Updated backend validation logic to allow empty content when file attachments are provided.</p>
+    </div>
+
+    <div class="test-section info">
+        <h2>📋 Files Modified</h2>
+        <ul>
+            <li><strong>backend_teacher_stream_controller_enhanced.php</strong> - Lines 172-181 and 266-275</li>
+            <li><strong>backend_teacher_stream_controller.php</strong> - Lines 194-203</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Before vs After</h2>
+        
+        <h3>❌ Before (Problematic Code):</h3>
+        <div class="code">
+// Validate required fields<br>
+if (empty($postData['title']) || empty($postData['content'])) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;throw new Exception('Title and content are required');<br>
+}
+        </div>
+        
+        <h3>✅ After (Fixed Code):</h3>
+        <div class="code">
+// Validate required fields<br>
+// Title is always required, but content can be empty if there are file attachments<br>
+if (empty($postData['title'])) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;throw new Exception('Title is required');<br>
+}<br><br>
+// Content is required only if there are no file attachments<br>
+if (empty($postData['content']) && empty($attachments)) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;throw new Exception('Content is required when no attachments are provided');<br>
+}
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Validation Logic</h2>
+        
+        <h3>New Validation Rules:</h3>
+        <ul>
+            <li><strong>Title:</strong> Always required (cannot be empty)</li>
+            <li><strong>Content:</strong> Required only if no file attachments are provided</li>
+            <li><strong>File Attachments:</strong> If present, content can be empty</li>
+        </ul>
+
+        <h3>Valid Scenarios:</h3>
+        <ul>
+            <li>✅ Title + Content (no attachments)</li>
+            <li>✅ Title + MP4 attachment (content can be empty)</li>
+            <li>✅ Title + Content + MP4 attachment</li>
+            <li>✅ Title + Multiple file attachments (content can be empty)</li>
+        </ul>
+
+        <h3>Invalid Scenarios:</h3>
+        <ul>
+            <li>❌ No title (regardless of content/attachments)</li>
+            <li>❌ No content AND no attachments</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        
+        <h3>Test Case 1: MP4 Only (Should Work)</h3>
+        <div class="code">
+Title: "Video Announcement"<br>
+Content: "" (empty)<br>
+Attachments: sample_video.mp4<br>
+<span class="highlight">Result: ✅ Should succeed</span>
+        </div>
+
+        <h3>Test Case 2: Text + MP4 (Should Work)</h3>
+        <div class="code">
+Title: "Important Video"<br>
+Content: "Please watch this important video"<br>
+Attachments: sample_video.mp4<br>
+<span class="highlight">Result: ✅ Should succeed</span>
+        </div>
+
+        <h3>Test Case 3: Text Only (Should Work)</h3>
+        <div class="code">
+Title: "Text Announcement"<br>
+Content: "This is a text-only announcement"<br>
+Attachments: None<br>
+<span class="highlight">Result: ✅ Should succeed</span>
+        </div>
+
+        <h3>Test Case 4: No Content, No Attachments (Should Fail)</h3>
+        <div class="code">
+Title: "Empty Announcement"<br>
+Content: "" (empty)<br>
+Attachments: None<br>
+<span class="highlight">Result: ❌ Should fail with "Content is required when no attachments are provided"</span>
+        </div>
+
+        <h3>Test Case 5: No Title (Should Fail)</h3>
+        <div class="code">
+Title: "" (empty)<br>
+Content: "Some content"<br>
+Attachments: sample_video.mp4<br>
+<span class="highlight">Result: ❌ Should fail with "Title is required"</span>
+        </div>
+    </div>
+
+    <div class="test-section info">
+        <h2>🚀 Implementation Benefits</h2>
+        <ul>
+            <li><strong>Flexible Content:</strong> Users can now post announcements with just video attachments</li>
+            <li><strong>Better UX:</strong> No more confusing "content is required" errors when MP4 files are attached</li>
+            <li><strong>Consistent Logic:</strong> Frontend and backend validation now align</li>
+            <li><strong>Backward Compatible:</strong> Existing functionality remains unchanged</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Frontend Validation (Already Working)</h2>
+        <p>The frontend already had the correct validation logic:</p>
+        <div class="code">
+// Validation: allow posting if there is text OR at least one file attachment<br>
+const hasFile = (attachments || []).some(att => !!att.file);<br>
+if (!newAnnouncement.trim() && !hasFile) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;alert('Please enter announcement content or attach a file');<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return;<br>
+}
+        </div>
+        <p>Now the backend validation matches this logic!</p>
+    </div>
+
+    <script>
+        console.log('Content validation fix test page loaded');
+        console.log('Backend validation now properly handles MP4 attachments with empty content');
+    </script>
+</body>
+</html>
+

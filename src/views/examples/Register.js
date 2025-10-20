@@ -25,9 +25,11 @@ import {
   Alert,
 } from "reactstrap";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import Select from 'react-select';
 import GoogleOAuthButton from "../../components/GoogleOAuthButton";
 import apiService from "../../services/api";
+import "../../assets/css/react-select-mobile-fix.css";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -39,7 +41,9 @@ const Register = () => {
     program: "",
     section_id: "",
     contact_num: "",
-    address: "",
+    cityMunicipality: "",
+    barangay: "",
+    province: "",
     password: "",
     confirmPassword: ""
   });
@@ -52,6 +56,91 @@ const Register = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [autoDetectedRole, setAutoDetectedRole] = useState("");
+  const contactInputRef = useRef(null);
+  // Options for react-select place selectors
+
+  // Pampanga data
+  const pampangaData = {
+    "province": "Pampanga",
+    "LGUs": {
+      "Angeles City": {
+        "barangays": ["Agapito del Rosario","Amsic","Anunas","Balibago","Capaya","Claro M. Recto","Cuayan","Cutcut","Cutud","Lourdes North West","Lourdes Sur","Lourdes Sur East","Malabañas","Margot","Mining","Ninoy Aquino (Marisol)","Pampang","Pandan","Pulung Cacutud","Pulung Maragul","Pulungbulu","Salapungan","San Jose","San Nicolas","Santa Teresita","Santa Trinidad","Santo Cristo","Santo Domingo","Santo Rosario (Poblacion)","Sapalibutad","Sapangbato","Tabun","Virgen Delos Remedios"]
+      },
+      "Apalit": {
+        "barangays": ["Balucuc","Calantipe","Cansinala","Capalangan","Colgante","Paligui","Sampaloc","San Juan (Poblacion)","San Vicente","Sucad","Sulipan","Tabuyuc"]
+      },
+      "Arayat": {
+        "barangays": ["Arenas","Baliti","Batasan","Buensuceso","Candating","Gatiawin","Guemasan","La Paz (Turu)","Lacmit","Lacquios","Mangga-Cacutud","Mapalad","Palinlang","Paralaya","Plazang Luma","Poblacion","San Agustin Norte","San Agustin Sur","San Antonio","San Jose Mesulo","San Juan Baño","San Mateo","San Nicolas","San Roque Bitas","Cupang (Santa Lucia)","Matamo (Santa Lucia)","Santo Niño Tabuan","Suclayin","Telapayong","Kaledian (Camba)"]
+      },
+      "Bacolor": {
+        "barangays": ["Balas","Cabalantian","Calambangan","Cabetican","Calibutbut","Concepcion","Dolores","Duat","Macabacle","Magliman","Maliwalu","Mesalipit","Parulog","Potrero","San Antonio","San Isidro","San Vicente","Santa Barbara","Santa Ines","Talba","Tinajero"]
+      },
+      "Candaba": {
+        "barangays": ["Bahay Pare","Bambang","Barangca","Barit","Buas (Poblacion)","Cuayang Bugtong","Dalayap","Dulong Ilog","Gulap","Lanang","Lourdes","Magumbali","Mandasig","Mandili","Mangga","Mapaniqui","Paligui","Pangclara","Pansinao","Paralaya (Poblacion)","Pasig","Pescadores (Poblacion)","Pulong Gubat","Pulong Palazan","Salapungan","San Agustin (Poblacion)","Santo Rosario","Tagulod","Talang","Tenejero","Vizal San Pablo","Vizal Santo Cristo","Vizal Santo Niño"]
+      },
+      "Floridablanca": {
+        "barangays": ["Anon","Apalit","Basa Air Base","Benedicto","Bodega","Cabangcalan","Calantas","Carmencita","Consuelo","Culubasa","Dampe","Del Carmen","Fortuna","Gutad","Mabical","Maligaya","Mawaque","Nabuclod","Pabanlag","Paguiruan","Palmayo","Pandaguirig","Poblacion","San Antonio","San Isidro","San Jose","San Nicolas","San Pedro","San Ramon","San Roque","Santa Monica","Solib","Santo Rosario","Valdez"]
+      },
+      "Guagua": {
+        "barangays": ["Ascomo","Bancal","Betis","Bulaon","Jose Abad Santos (Siran)","Lambac","Magsaysay","Maquiapo","Natividad","Plaza Burgos","Pulungmasle","Rizal","San Agustin","San Juan Bautista","San Juan Nepomuceno","San Miguel","San Nicolas 1st","San Nicolas 2nd","Santa Ines","Santa Ursula","San Pablo","San Matias","San Isidro","San Antonio"]
+      },
+      "Lubao": {
+        "barangays": ["Bancal Pugad","Bancal Sinubli","Baruya","Calangain","Concepcion","Del Carmen","Don Ignacio Dimson","Prado Siongco","Remedios","San Agustin","San Antonio","San Francisco","San Isidro","San Jose Apunan","San Juan (Poblacion)","San Matias","San Miguel","San Nicolas 1st","San Nicolas 2nd","San Pedro Palcarangan","Santa Barbara","Santa Catalina","Santa Cruz","Santa Lucia (Poblacion)","Santa Maria","Santa Monica","Santa Rita","Santa Teresa 1st","Santa Teresa 2nd","Santo Cristo","Santo Domingo","Santo Rosario (Poblacion)","Santo Tomas (Poblacion)","Sapang Balas","Sapang Maisac"]
+      },
+      "Mabalacat": {
+        "barangays": ["Atlu-Bola","Bical","Bundagul","Cacutud","Calumpang","Camachiles","Dapdap","Dau","Dolores","Duquit","Lakandula","Mabiga","Macapagal Village","Mamatitang","Mangalit","Marcos Village","Mawaque","Paralayunan","Poblacion","San Francisco","San Joaquin","Santa Ines","Santa Maria","Santo Rosario","Sapang Balen","Sapang Biabas","Tabun"]
+      },
+      "Macabebe": {
+        "barangays": ["Caduang Tete","Candelaria","Castuli","Consuelo","Culo","Dalayap","Duala","San Gabriel","San Isidro","San Jose","San Juan","San Rafael","San Vicente","Santa Maria","Santo Niño","Saplad","Tacasan","Telacsan"]
+      },
+      "Magalang": {
+        "barangays": ["Ayala","Bucanan","Camias","Dolores","Escaler","La Paz","Navaling","San Agustin","San Antonio","San Francisco","San Ildefonso","San Isidro","San Jose","San Miguel","San Nicolas I","San Nicolas II (Concepcion)","San Pablo","San Pedro I","San Pedro II","San Roque","San Vicente","Santa Cruz","Santa Lucia","Santa Maria","Santo Niño","Santo Rosario","Turu"]
+      },
+      "Masantol": {
+        "barangays": ["Alauli","Bagang","Balibago","Bebe Anac","Bebe Matua","Bulacus","Cambasi","Malauli","Nigui","Palimpe","Puti","Sagrada (Tibagin)","San Agustin (Caingin)","San Isidro Anac","San Isidro Matua (Poblacion)","San Nicolas (Poblacion)","San Pedro","Santa Cruz","Santa Lucia Anac (Poblacion)","Santa Lucia Matua","Santa Lucia Paguiba","Santa Lucia Wakas","Santa Monica (Caingin)","Santo Niño","Sapang Kawayan","Sua"]
+      },
+      "Mexico": {
+        "barangays": ["Acli","Anao","Balas","Buenavista","Camuning","Cawayan","Concepcion","Culubasa","Divisoria","Dolores (Piring)","Eden","Gandus","Lagundi","Laput","Laug","Masamat","Masangsang (Santo Cristo)","Nueva Victoria","Pandacaqui","Pangatlan","Panipuan","Parian (Poblacion)","Sabanilla","San Antonio","San Carlos","San Jose Malino","San Jose Matulid","San Juan","San Lorenzo","San Miguel","San Nicolas","San Pablo","San Patricio","San Rafael","San Roque","San Vicente","Santa Cruz","Santa Maria","Santo Domingo","Santo Rosario","Sapang Maisac","Suclaban","Tangle"]
+      },
+      "Minalin": {
+        "barangays": ["Bulac","Dawe","Maniango","Saplad","San Francisco de Asisi (San Francisco Uno)","San Francisco Javier (San Francisco Dos)","Santa Catalina","San Nicolas (Poblacion)","Santo Rosario","San Pedro","Santa Rita","Santo Domingo","Santa Maria","Lourdes","San Isidro"]
+      },
+      "Porac": {
+        "barangays": ["Babo Pangulo","Babo Sacan (Guanson)","Balubad","Calzadang Bayu","Camias","Cangatba","Diaz","Dolores (Hacienda Dolores)","Inararo (Aetas)","Jalung","Mancatian","Manibaug Libutad","Manibaug Paralaya","Manibaug Pasig","Manuali","Mitla Proper","Palat","Pias","Pio","Planas","Poblacion","Pulung Santol","Salu","San Jose Mitla","Santa Cruz","Sapang Uwak (Aetas)","Sepung Bulaun (Baidbid)","Siñura (Seniora)","Villa Maria (Aetas)"]
+      },
+      "San Fernando City": {
+        "barangays": ["Alasas","Baliti","Bulaon","Calulut","Del Carmen","Del Pilar","Del Rosario","Dela Paz Norte","Dela Paz Sur","Dolores","Juliana","Lara","Lourdes","Magliman","Maimpis","Malino","Malpitic","Pandaras","Panipuan","Pulung Bulo","Quebiawan","Saguin","San Agustin","San Felipe","San Isidro","San Jose","San Nicolas","San Pedro","San Juan","Santa Lucia","Santa Teresita","Santo Niño","Santo Rosario","Sindalan","Telabastagan"]
+      },
+      "San Luis": {
+        "barangays": ["San Agustín","San Carlos","San Isidro","San José","San Juan","San Nicolás","San Roque","San Sebastián","Santa Catalina","Santa Cruz Pambilog","Santa Cruz Población","Santa Lucia","Santa Mónica","Santa Rita","Santo Niño","Santo Rosario","Santo Tomás"]
+      },
+      "San Simon": {
+        "barangays": ["Concepcion","De La Paz","San Juan (Poblacion)","San Agustin","San Isidro","San Jose","San Miguel","San Nicolas","San Pablo Libutad","San Pablo Proper","San Pedro","Santa Cruz","Santa Monica","Santo Niño"]
+      },
+      "Santa Ana": {
+        "barangays": ["San Agustin (Sumpung)","San Bartolome (Patayum)","San Isidro (Quenabuan)","San Joaquin (Poblacion, Canukil)","San Jose (Catmun)","San Juan (Tinajeru)","San Nicolas (Sepung Ilug)","San Pablo (Darabulbul)","San Pedro (Calumpang)","San Roque (Tuclung)","Santa Lucia (Calinan)","Santa Maria (Balen Bayu)","Santiago (Barrio Libutad)","Santo Rosario (Pagbatuan)"]
+      },
+      "Santa Rita": {
+        "barangays": ["Becuran","Dila-dila","San Agustin","San Basilio","San Isidro","San Jose (Poblacion)","San Juan","San Matias (Poblacion)","Santa Monica","San Vicente (Poblacion)"]
+      },
+      "Santo Tomas": {
+        "barangays": ["Moras De La Paz","Poblacion","San Bartolome","San Matias","San Vicente","Santo Rosario (Pau)","Sapa (Santo Niño)"]
+      },
+      "Sasmuan": {
+        "barangays": ["Batang 1st","Batang 2nd","Mabuanbuan","Malusac","Sabitanan","San Antonio","San Nicolas 1st","San Nicolas 2nd","San Pedro","Santa Lucia (Poblacion)","Santa Monica","Santo Tomas"]
+      }
+    }
+  };
+
+  // Get cities for dropdown
+  const cities = Object.keys(pampangaData.LGUs);
+  const cityOptions = (cities || []).map(c => ({ value: c, label: c }));
+  
+  // Get barangays for selected city
+  const getBarangays = (city) => {
+    return city ? pampangaData.LGUs[city]?.barangays || [] : [];
+  };
+  const barangayOptions = getBarangays(formData.cityMunicipality).map(b => ({ value: b, label: b }));
 
   // Function to detect role from email
   const detectRoleFromEmail = (email) => {
@@ -183,6 +272,42 @@ const Register = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Special handling for contact number with +63 prefix
+    if (name === 'contact_num') {
+      let digits = (value || '').replace(/\D/g, '');
+      // Remove country code if user typed it
+      if (digits.startsWith('63')) {
+        digits = digits.slice(2);
+      }
+      // Only last 10 digits
+      if (digits.length > 10) {
+        digits = digits.slice(-10);
+      }
+      setFormData(prev => ({ ...prev, contact_num: digits }));
+      return;
+    }
+
+    // Special handling for province changes - clear city and barangay when province changes
+    if (name === 'province') {
+      setFormData(prev => ({
+        ...prev,
+        province: value,
+        cityMunicipality: '', // Clear city when province changes
+        barangay: '' // Clear barangay when province changes
+      }));
+      return;
+    }
+
+    // Special handling for city changes - clear barangay when city changes
+    if (name === 'cityMunicipality') {
+      setFormData(prev => ({
+        ...prev,
+        cityMunicipality: value,
+        barangay: '' // Clear barangay when city changes
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -255,9 +380,14 @@ const Register = () => {
       setError("Contact number is required");
       return false;
     }
+    // Must be exactly 10 digits after +63
+    if (!/^\d{10}$/.test(formData.contact_num)) {
+      setError("Contact number must be 10 digits after +63");
+      return false;
+    }
     
-    if (!formData.address.trim()) {
-      setError("Address is required");
+    if (!formData.cityMunicipality.trim() || !formData.barangay.trim() || !formData.province.trim()) {
+      setError("All address fields are required");
       return false;
     }
     
@@ -297,8 +427,8 @@ const Register = () => {
         role: formData.role,
         full_name: formData.full_name,
         email: formData.email,
-        contact_num: formData.contact_num,
-        address: formData.address,
+        contact_num: `+63${formData.contact_num}`,
+        address: `${formData.barangay}, ${formData.cityMunicipality}, ${formData.province}`.trim(),
         password: formData.password
       };
 
@@ -331,6 +461,67 @@ const Register = () => {
     }
   };
 
+  // Contact number handling helpers
+  const CONTACT_PREFIX = '+63';
+  const placeCursorAfterPrefix = () => {
+    const input = contactInputRef.current;
+    if (!input) return;
+    const pos = CONTACT_PREFIX.length;
+    input.setSelectionRange(pos, pos);
+  };
+
+  const handleContactFocus = () => {
+    // Ensure caret is after the +63 prefix
+    requestAnimationFrame(placeCursorAfterPrefix);
+  };
+
+  const handleContactKeyDown = (e) => {
+    const input = e.currentTarget;
+    const caretPos = input.selectionStart || 0;
+    const selectionLen = (input.selectionEnd || caretPos) - caretPos;
+    const digitsLen = formData.contact_num.length;
+    // Prevent deleting the prefix
+    if ((e.key === 'Backspace' && caretPos <= CONTACT_PREFIX.length) ||
+        (e.key === 'Delete' && caretPos < CONTACT_PREFIX.length)) {
+      e.preventDefault();
+      placeCursorAfterPrefix();
+      return;
+    }
+    // Allow control keys, block non-digits
+    const allowed = ['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Home','End'];
+    if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    // If already at 10 digits and inserting at end with no selection, block extra digits
+    const atEnd = caretPos >= input.value.length;
+    if (/^\d$/.test(e.key) && digitsLen >= 10 && atEnd && selectionLen === 0) {
+      e.preventDefault();
+    }
+  };
+
+  const handleContactPaste = (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    let digits = (text || '').replace(/\D/g, '');
+    if (digits.startsWith('63')) {
+      digits = digits.slice(2);
+    }
+    if (digits.length > 10) {
+      digits = digits.slice(-10);
+    }
+    setFormData(prev => ({ ...prev, contact_num: digits }));
+    requestAnimationFrame(placeCursorAfterPrefix);
+  };
+
+  const handleContactClick = () => {
+    const input = contactInputRef.current;
+    if (!input) return;
+    if ((input.selectionStart || 0) < CONTACT_PREFIX.length) {
+      placeCursorAfterPrefix();
+    }
+  };
+
   const renderRoleSpecificFields = () => {
     if (formData.role === "student") {
       return (
@@ -343,14 +534,17 @@ const Register = () => {
                 </InputGroupText>
               </InputGroupAddon>
               <Input
-                placeholder="Student Number (e.g., 2021304995)"
+                placeholder="Enter 10-digit student number"
                 type="text"
                 name="student_num"
                 value={formData.student_num}
                 onChange={handleInputChange}
+                onInput={e => e.target.value = e.target.value.replace(/[^\d]/g, '')}
                 required
-                pattern="\d{10}"
-                title="Student number must be exactly 10 digits"
+                inputMode="numeric"
+                pattern="^\d{10}$"
+                maxLength={10}
+                title="Student number (exact 10 digits)"
               />
             </InputGroup>
             <small className="text-muted">Enter your 10-digit student number</small>
@@ -412,7 +606,6 @@ const Register = () => {
               required
             >
               <option value="">Select Department/Program</option>
-              <option value="Computer Studies Department">Computer Studies Department</option>
               <option value="Information Technology">Information Technology</option>
               <option value="Computer Science">Computer Science</option>
               <option value="Information Systems">Information Systems</option>
@@ -438,8 +631,7 @@ const Register = () => {
               required
             >
               <option value="">Select Department/Program</option>
-              <option value="Administration">Administration</option>
-              <option value="Computer Studies Department">Computer Studies Department</option>
+              <option value="Program Chairperson">Program Chairperson</option>
               <option value="Information Technology">Information Technology</option>
               <option value="Computer Science">Computer Science</option>
               <option value="Information Systems">Information Systems</option>
@@ -499,7 +691,6 @@ const Register = () => {
                     required
                   >
                     <option value="">Select Role</option>
-                    <option value="admin">Admin</option>
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
                   </Input>
@@ -564,32 +755,118 @@ const Register = () => {
                       <i className="ni ni-mobile-button" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <Input
-                    placeholder="Contact Number"
+                  {/* Keep Bootstrap styling while enforcing +63 prefix and 10 digits */}
+                  <input
+                    ref={contactInputRef}
+                    className="form-control"
                     type="tel"
                     name="contact_num"
-                    value={formData.contact_num}
+                    value={`${CONTACT_PREFIX}${formData.contact_num}`}
+                    onChange={handleInputChange}
+                    onFocus={handleContactFocus}
+                    onKeyDown={handleContactKeyDown}
+                    onClick={handleContactClick}
+                    onPaste={handleContactPaste}
+                    inputMode="numeric"
+                    aria-label="Contact Number"
+                    required
+                  />
+                </InputGroup>
+                <small className="text-muted">Starts with +63 and 10 digits (e.g., +639123456789)</small>
+              </FormGroup>
+
+
+              {/* Province */}
+              <FormGroup>
+                <InputGroup className="input-group-alternative mb-2" style={{display: 'flex', alignItems: 'stretch'}}>
+                  <InputGroupAddon addonType="prepend" style={{display: 'flex', alignItems: 'stretch', height: '48px'}}>
+                    <InputGroupText style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%'}}>
+                      <i className="ni ni-square-pin" />
+                    </InputGroupText>
+                  </InputGroupAddon>
+                  <Input
+                    type="select"
+                    name="province"
+                    value={formData.province}
                     onChange={handleInputChange}
                     required
+                  >
+                    <option value="">Select Province</option>
+                    <option value="Pampanga">Pampanga</option>
+                  </Input>
+                </InputGroup>
+              </FormGroup>
+
+              {/* City/Municipality */}
+              <FormGroup>
+                <InputGroup className="input-group-alternative mb-2" style={{display: 'flex', alignItems: 'stretch'}}>
+                  <InputGroupAddon addonType="prepend" style={{display: 'flex', alignItems: 'stretch', height: '48px'}}>
+                    <InputGroupText style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%'}}>
+                      <i className="ni ni-building" />
+                    </InputGroupText>
+                  </InputGroupAddon>
+                  <Select
+                    classNamePrefix="react-select"
+                    inputId="register_city"
+                    options={formData.province ? cityOptions : []}
+                    value={formData.cityMunicipality ? { value: formData.cityMunicipality, label: formData.cityMunicipality } : null}
+                    onChange={opt => handleInputChange({ target: { name: 'cityMunicipality', value: opt ? opt.value : '' } })}
+                    isDisabled={!formData.province}
+                    isSearchable
+                    placeholder={formData.province ? "Select City/Municipality" : "Select Province first to continue"}
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        width: '100%',
+                        minWidth: '100%',
+                        maxWidth: '100%',
+                        height: '48px',
+                        minHeight: '48px'
+                      }),
+                      container: (base) => ({
+                        ...base,
+                        width: '100%',
+                        minWidth: '100%',
+                        maxWidth: '100%'
+                      })
+                    }}
                   />
                 </InputGroup>
               </FormGroup>
 
-              {/* Address */}
+              {/* Barangay */}
               <FormGroup>
-                <InputGroup className="input-group-alternative mb-2">
-                  <InputGroupAddon addonType="prepend">
-                    <InputGroupText>
-                      <i className="ni ni-pin-3" />
+                <InputGroup className="input-group-alternative mb-2" style={{display: 'flex', alignItems: 'stretch'}}>
+                  <InputGroupAddon addonType="prepend" style={{display: 'flex', alignItems: 'stretch', height: '48px'}}>
+                    <InputGroupText style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%'}}>
+                      <i className="ni ni-map-big" />
                     </InputGroupText>
                   </InputGroupAddon>
-                  <Input
-                    placeholder="Address"
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    required
+                  <Select
+                    classNamePrefix="react-select"
+                    inputId="register_barangay"
+                    options={formData.cityMunicipality ? barangayOptions : []}
+                    value={formData.barangay ? { value: formData.barangay, label: formData.barangay } : null}
+                    onChange={opt => handleInputChange({ target: { name: 'barangay', value: opt ? opt.value : '' } })}
+                    isDisabled={!formData.cityMunicipality}
+                    isSearchable
+                    placeholder={formData.cityMunicipality ? "Select Barangay" : "Select City/Municipality first"}
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        width: '100%',
+                        minWidth: '100%',
+                        maxWidth: '100%',
+                        height: '48px',
+                        minHeight: '48px'
+                      }),
+                      container: (base) => ({
+                        ...base,
+                        width: '100%',
+                        minWidth: '100%',
+                        maxWidth: '100%'
+                      })
+                    }}
                   />
                 </InputGroup>
               </FormGroup>

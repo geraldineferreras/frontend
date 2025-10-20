@@ -28,13 +28,14 @@
     }
 
     .navbar-collapse {
+        // Mobile stacking fix: use fixed positioning so it overlays content
         width: calc(100% - 1.4rem);
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        z-index: 1050;
-        margin: .7rem;
+        z-index: 2000;
+        margin: 0;
         overflow-y: auto;
         height: auto !important;
         opacity: 0;
@@ -86,6 +87,7 @@
 
     .navbar-collapse.collapsing,
     .navbar-collapse.show {
+        z-index: 2000;
         padding: 1.5rem;
         border-radius: $border-radius;
         background: #FFF;

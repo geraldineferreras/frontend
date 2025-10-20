@@ -65,9 +65,13 @@ class NotificationService {
   // Check for new notifications
   async checkForNewNotifications() {
     try {
-      const response = await api.get('/api/notifications/recent');
-      if (response.success && response.data && response.data.notifications) {
-        const notifications = response.data.notifications;
+      const userId = getCurrentUserId();
+      if (!userId) return;
+      
+      const response = await api.getRecentNotifications(userId, 10);
+      if (response.success && response.data) {
+        // The new backend returns data directly as an array
+        const notifications = Array.isArray(response.data) ? response.data : [];
         
         // Check for new notifications
         if (this.lastNotificationId && notifications.length > 0) {
@@ -158,9 +162,13 @@ class NotificationService {
   // Get all notifications
   async getNotifications() {
     try {
-      const response = await api.get('/api/notifications');
+      const userId = getCurrentUserId();
+      if (!userId) return [];
+      
+      const response = await api.getNotifications(userId);
       if (response.success && response.data) {
-        return response.data.notifications || [];
+        // The new backend returns data directly as an array
+        return Array.isArray(response.data) ? response.data : [];
       }
       return [];
     } catch (error) {
@@ -172,9 +180,13 @@ class NotificationService {
   // Get recent notifications
   async getRecentNotifications(limit = 10) {
     try {
-      const response = await api.get('/api/notifications/recent');
+      const userId = getCurrentUserId();
+      if (!userId) return [];
+      
+      const response = await api.getRecentNotifications(userId, limit);
       if (response.success && response.data) {
-        return response.data.notifications || [];
+        // The new backend returns data directly as an array
+        return Array.isArray(response.data) ? response.data : [];
       }
       return [];
     } catch (error) {
@@ -186,7 +198,10 @@ class NotificationService {
   // Get unread count
   async getUnreadCount() {
     try {
-      const response = await api.get('/api/notifications/unread-count');
+      const userId = getCurrentUserId();
+      if (!userId) return 0;
+      
+      const response = await api.getUnreadNotificationCount(userId);
       if (response.success && response.data) {
         return response.data.count || 0;
       }
@@ -200,8 +215,8 @@ class NotificationService {
   // Mark notification as read
   async markAsRead(notificationId) {
     try {
-      const response = await api.put(`/api/notifications/${notificationId}/read`);
-      return response.success;
+      const response = await api.markNotificationAsRead(notificationId);
+      return response.success || false;
     } catch (error) {
       console.error('Error marking notification as read:', error);
       return false;
@@ -211,8 +226,11 @@ class NotificationService {
   // Mark all notifications as read
   async markAllAsRead() {
     try {
-      const response = await api.put('/api/notifications/mark-all-read');
-      return response.success;
+      const userId = getCurrentUserId();
+      if (!userId) return false;
+      
+      const response = await api.markAllNotificationsAsRead(userId);
+      return response.success || false;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
       return false;

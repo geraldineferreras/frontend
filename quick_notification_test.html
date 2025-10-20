@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Notification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Quick Notification Test</h1>
+        <p>This will help us figure out why you can't see notifications even though they exist in your database.</p>
+        
+        <div class="form-group">
+            <label>JWT Token:</label>
+            <input type="text" id="jwtToken" placeholder="Enter your JWT token">
+        </div>
+        <div class="form-group">
+            <label>User ID:</label>
+            <input type="text" id="userId" placeholder="Enter user ID (e.g., STU68B7D2257B1C3819)">
+        </div>
+        
+        <button onclick="runQuickTest()">🚀 Run Quick Test</button>
+        <button onclick="getFromLocalStorage()">📱 Get from LocalStorage</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://scms-backend.up.railway.app';
+
+        function showResult(message, type = 'info') {
+            const element = document.getElementById('result');
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function getFromLocalStorage() {
+            try {
+                const user = localStorage.getItem('user');
+                const token = localStorage.getItem('token');
+                
+                let message = '📱 LocalStorage Data:\n\n';
+                
+                if (user) {
+                    const userObj = JSON.parse(user);
+                    message += `User Object: ${JSON.stringify(userObj, null, 2)}\n\n`;
+                    message += `User ID: ${userObj.user_id || userObj.id || 'NOT FOUND'}\n\n`;
+                } else {
+                    message += '❌ No user data found in localStorage\n\n';
+                }
+                
+                if (token) {
+                    message += `Token: ${token.substring(0, 50)}...\n\n`;
+                } else {
+                    message += '❌ No token found in localStorage\n\n';
+                }
+                
+                // Auto-fill the form
+                if (user && token) {
+                    const userObj = JSON.parse(user);
+                    const userId = userObj.user_id || userObj.id;
+                    document.getElementById('jwtToken').value = token;
+                    document.getElementById('userId').value = userId || '';
+                }
+                
+                showResult(message, user && token ? 'success' : 'error');
+            } catch (error) {
+                showResult(`❌ Error reading localStorage: ${error.message}`, 'error');
+            }
+        }
+
+        async function runQuickTest() {
+            const token = document.getElementById('jwtToken').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            
+            if (!token || !userId) {
+                showResult('❌ Please enter both JWT token and User ID', 'error');
+                return;
+            }
+            
+            showResult('🔄 Running quick test...', 'info');
+            
+            let results = [];
+            
+            try {
+                // Test 1: Check if backend is reachable
+                results.push('1. Testing backend connection...');
+                const testResponse = await fetch(`${API_BASE}/api/auth/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (testResponse.ok) {
+                    results.push('   ✅ Backend connection: OK');
+                } else {
+                    results.push(`   ❌ Backend connection: FAILED (${testResponse.status})`);
+                }
+                
+                // Test 2: Try to get notifications
+                results.push('\n2. Testing notifications API...');
+                const notificationsResponse = await fetch(`${API_BASE}/api/notifications?userId=${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                results.push(`   Status: ${notificationsResponse.status}`);
+                
+                if (notificationsResponse.ok) {
+                    const data = await notificationsResponse.json();
+                    results.push(`   Response: ${JSON.stringify(data, null, 2)}`);
+                    
+                    if (data.success && data.data) {
+                        const notifications = Array.isArray(data.data) ? data.data : [];
+                        results.push(`   ✅ Found ${notifications.length} notifications`);
+                        
+                        if (notifications.length > 0) {
+                            results.push('\n   📋 Notifications:');
+                            notifications.forEach((n, i) => {
+                                results.push(`   ${i+1}. [${n.is_read ? 'READ' : 'UNREAD'}] ${n.title}`);
+                                results.push(`      Message: ${n.message}`);
+                                results.push(`      Type: ${n.type}`);
+                                results.push(`      Created: ${n.created_at}`);
+                            });
+                        } else {
+                            results.push('   ⚠️  No notifications found in response');
+                        }
+                    } else {
+                        results.push('   ❌ API returned success: false or no data');
+                    }
+                } else {
+                    const errorData = await notificationsResponse.text();
+                    results.push(`   ❌ API Error: ${errorData}`);
+                }
+                
+                // Test 3: Try unread count
+                results.push('\n3. Testing unread count API...');
+                const unreadResponse = await fetch(`${API_BASE}/api/notifications/unread-count?userId=${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (unreadResponse.ok) {
+                    const unreadData = await unreadResponse.json();
+                    results.push(`   ✅ Unread count: ${unreadData.data?.count || 0}`);
+                } else {
+                    results.push(`   ❌ Unread count failed: ${unreadResponse.status}`);
+                }
+                
+                // Summary
+                results.push('\n🎯 SUMMARY:');
+                if (notificationsResponse.ok) {
+                    const data = await notificationsResponse.json();
+                    if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                        results.push('✅ Your backend API is working and has notifications!');
+                        results.push('❌ The issue is in your frontend - it\'s not calling the API correctly.');
+                        results.push('\n🔧 NEXT STEPS:');
+                        results.push('1. Check browser console for JavaScript errors');
+                        results.push('2. Verify your frontend is using the correct API methods');
+                        results.push('3. Check if getCurrentUserId() is returning the right user ID');
+                    } else {
+                        results.push('❌ Backend API works but returns no notifications');
+                        results.push('🔧 Check if your user ID matches the notifications in database');
+                    }
+                } else {
+                    results.push('❌ Backend API is not working properly');
+                    results.push('🔧 Check your JWT token and user ID format');
+                }
+                
+                showResult(results.join('\n'), 'info');
+                
+            } catch (error) {
+                results.push(`❌ Network Error: ${error.message}`);
+                showResult(results.join('\n'), 'error');
+            }
+        }
+    </script>
+</body>
+</html>
+

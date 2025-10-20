@@ -66,7 +66,7 @@ class Notifications extends CI_Controller {
             'message' => 'SSE connection established',
             'userId' => $userId,
             'role' => $role,
-            'timestamp' => date('c')
+            'timestamp' => date('Y-m-d H:i:s')
         ]);
         
         // Keep connection alive and send notifications
@@ -94,7 +94,7 @@ class Notifications extends CI_Controller {
             // Send heartbeat every 30 seconds
             if (time() % 30 === 0) {
                 $this->sendEvent('heartbeat', [
-                    'timestamp' => date('c')
+                    'timestamp' => date('Y-m-d H:i:s')
                 ]);
             }
             
@@ -128,7 +128,7 @@ class Notifications extends CI_Controller {
                 'type' => 'info',
                 'title' => 'Welcome!',
                 'message' => 'SSE connection established successfully',
-                'timestamp' => date('c'),
+                'timestamp' => date('Y-m-d H:i:s'),
                 'duration' => 5000
             ]
         ];
@@ -156,7 +156,7 @@ class Notifications extends CI_Controller {
         $this->sendEvent('error', [
             'message' => $message,
             'code' => $code,
-            'timestamp' => date('c')
+            'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
 }

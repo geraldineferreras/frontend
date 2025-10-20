@@ -6,6 +6,7 @@ import { FaCheck, FaTimes, FaEye, FaSearch, FaFileImage, FaUser, FaCheckCircle }
 import LottieLoader from "components/LottieLoader";
 import useMinDelay from "utils/useMinDelay";
 import { getProfilePictureUrl, getUserInitials, getAvatarColor } from "../../utils/profilePictureUtils";
+import { formatUserName } from "../../utils/nameUtils";
 import apiService from "../../services/api";
 
 const ExcuseManagement = () => {
@@ -602,7 +603,7 @@ const ExcuseManagement = () => {
                               )}
                             </div>
                             <div className="media-body" style={{ minWidth: 0, overflow: 'hidden' }}>
-                              <span className="font-weight-bold text-dark d-block" style={{ lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.student_name}</span>
+                              <span className="font-weight-bold text-dark d-block" style={{ lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatUserName({ full_name: e.student_name, name: e.student_name })}</span>
                               <div className="text-muted small">ID: {e.student_id}</div>
                               <div className="text-muted small">Section: {e.section_name}</div>
                               {/* Mobile-only info */}
@@ -668,7 +669,7 @@ const ExcuseManagement = () => {
             {detailModal.excuse && (
               <>
                 <Row className="mb-2">
-                  <Col md={6}><b>Name:</b> {detailModal.excuse.student_name}</Col>
+                  <Col md={6}><b>Name:</b> {formatUserName({ full_name: detailModal.excuse.student_name, name: detailModal.excuse.student_name })}</Col>
                   <Col md={6}><b>ID:</b> {detailModal.excuse.student_id}</Col>
                 </Row>
                                  <Row className="mb-2">

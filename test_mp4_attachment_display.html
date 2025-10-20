@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MP4 Attachment Display</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .attachment-test {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .file-icon {
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        .file-info {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>MP4 Attachment Display Test</h1>
+    
+    <div class="test-container">
+        <h2>Test MP4 File Type Detection</h2>
+        <p>This test verifies that MP4 files are properly identified and displayed with the correct icon and styling.</p>
+        
+        <div class="attachment-test">
+            <h3>Test Case 1: MP4 File with Extension</h3>
+            <div id="test1">
+                <div class="file-icon" id="icon1"></div>
+                <div class="file-info">
+                    <strong>sample_video.mp4</strong><br>
+                    <small>Video file attachment</small>
+                </div>
+            </div>
+            <div class="test-result" id="result1"></div>
+        </div>
+
+        <div class="attachment-test">
+            <h3>Test Case 2: MP4 File with MIME Type</h3>
+            <div id="test2">
+                <div class="file-icon" id="icon2"></div>
+                <div class="file-info">
+                    <strong>presentation.mp4</strong><br>
+                    <small>MIME: video/mp4</small>
+                </div>
+            </div>
+            <div class="test-result" id="result2"></div>
+        </div>
+
+        <div class="attachment-test">
+            <h3>Test Case 3: PDF File (for comparison)</h3>
+            <div id="test3">
+                <div class="file-icon" id="icon3"></div>
+                <div class="file-info">
+                    <strong>document.pdf</strong><br>
+                    <small>PDF file attachment</small>
+                </div>
+            </div>
+            <div class="test-result" id="result3"></div>
+        </div>
+
+        <button onclick="runTests()">Run Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Frontend Integration Test</h2>
+        <p>This section tests the actual frontend attachment processing logic.</p>
+        
+        <div class="attachment-test">
+            <h3>Simulated API Response</h3>
+            <pre id="apiResponse"></pre>
+            <button onclick="testFrontendProcessing()">Test Frontend Processing</button>
+            <div class="test-result" id="frontendResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // Simulate the getFileTypeIconOrPreview function from ClassroomDetail.js
+        function getFileTypeIconOrPreview(att) {
+            if (!att) {
+                return { preview: 'FILE', type: 'FILE', color: '#90A4AE' };
+            }
+
+            const fileName = att.name;
+            if (!fileName || typeof fileName !== 'string') {
+                return { preview: 'FILE', type: 'FILE', color: '#90A4AE' };
+            }
+
+            const ext = fileName.split('.').pop().toLowerCase();
+            const mimeType = att.mime_type || '';
+            
+            // Video files (including MP4)
+            if (mimeType.startsWith('video/') || ext === 'mp4' || ext === 'avi' || ext === 'mov' || ext === 'wmv' || ext === 'flv' || ext === 'webm') {
+                return { preview: 'VIDEO', type: 'MP4', color: '#8e24aa' };
+            }
+            
+            // Audio files (including MP3)
+            if (mimeType.startsWith('audio/') || ext === 'mp3' || ext === 'wav' || ext === 'ogg' || ext === 'aac') {
+                return { preview: 'AUDIO', type: 'MP3', color: '#43a047' };
+            }
+            
+            // PDF files
+            if (mimeType === 'application/pdf' || ext === 'pdf') {
+                return { preview: 'PDF', type: 'PDF', color: '#F44336' };
+            }
+
+            return { preview: 'FILE', type: ext.toUpperCase(), color: '#90A4AE' };
+        }
+
+        function runTests() {
+            // Test Case 1: MP4 with extension
+            const test1 = getFileTypeIconOrPreview({ name: 'sample_video.mp4' });
+            document.getElementById('icon1').textContent = test1.preview;
+            document.getElementById('icon1').style.color = test1.color;
+            document.getElementById('result1').innerHTML = 
+                `<div class="success">✓ MP4 detected correctly: Type=${test1.type}, Color=${test1.color}</div>`;
+
+            // Test Case 2: MP4 with MIME type
+            const test2 = getFileTypeIconOrPreview({ 
+                name: 'presentation.mp4', 
+                mime_type: 'video/mp4' 
+            });
+            document.getElementById('icon2').textContent = test2.preview;
+            document.getElementById('icon2').style.color = test2.color;
+            document.getElementById('result2').innerHTML = 
+                `<div class="success">✓ MP4 with MIME type detected correctly: Type=${test2.type}, Color=${test2.color}</div>`;
+
+            // Test Case 3: PDF for comparison
+            const test3 = getFileTypeIconOrPreview({ name: 'document.pdf' });
+            document.getElementById('icon3').textContent = test3.preview;
+            document.getElementById('icon3').style.color = test3.color;
+            document.getElementById('result3').innerHTML = 
+                `<div class="success">✓ PDF detected correctly: Type=${test3.type}, Color=${test3.color}</div>`;
+        }
+
+        function testFrontendProcessing() {
+            // Simulate API response with MP4 attachment
+            const mockApiResponse = {
+                id: 1,
+                title: "Test Post with MP4",
+                content: "This post contains an MP4 video attachment",
+                attachments: [
+                    {
+                        id: 1,
+                        type: 'file',
+                        url: 'uploads/stream_attachments/sample_video_1234567890.mp4',
+                        file_name: 'sample_video_1234567890.mp4',
+                        original_name: 'sample_video.mp4',
+                        file_size: 1024000,
+                        mime_type: 'video/mp4'
+                    }
+                ]
+            };
+
+            document.getElementById('apiResponse').textContent = JSON.stringify(mockApiResponse, null, 2);
+
+            // Simulate frontend processing
+            const processedAttachment = mockApiResponse.attachments[0];
+            const fileTypeInfo = getFileTypeIconOrPreview({
+                name: processedAttachment.original_name,
+                mime_type: processedAttachment.mime_type
+            });
+
+            const result = {
+                originalName: processedAttachment.original_name,
+                mimeType: processedAttachment.mime_type,
+                detectedType: fileTypeInfo.type,
+                detectedColor: fileTypeInfo.color,
+                hasCorrectIcon: fileTypeInfo.preview === 'VIDEO'
+            };
+
+            const success = result.detectedType === 'MP4' && result.hasCorrectIcon;
+            const resultClass = success ? 'success' : 'error';
+            const resultText = success ? '✓' : '✗';
+
+            document.getElementById('frontendResult').innerHTML = 
+                `<div class="${resultClass}">${resultText} Frontend processing result:<br>
+                Original Name: ${result.originalName}<br>
+                MIME Type: ${result.mimeType}<br>
+                Detected Type: ${result.detectedType}<br>
+                Detected Color: ${result.detectedColor}<br>
+                Has Correct Icon: ${result.hasCorrectIcon}</div>`;
+        }
+
+        function clearResults() {
+            document.querySelectorAll('.test-result').forEach(el => {
+                el.innerHTML = '';
+            });
+            document.querySelectorAll('.file-icon').forEach(el => {
+                el.textContent = '';
+                el.style.color = '';
+            });
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            console.log('MP4 Attachment Display Test loaded');
+            console.log('Test function available: getFileTypeIconOrPreview()');
+        };
+    </script>
+</body>
+</html>
+

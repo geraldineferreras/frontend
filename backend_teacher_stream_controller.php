@@ -87,8 +87,8 @@ try {
     if (strpos($contentType, 'multipart/form-data') !== false) {
         // Handle multipart/form-data (files + form fields)
         $postData = [
-            'title' => $_POST['title'] ?? '',
-            'content' => $_POST['content'] ?? '',
+            'title' => trim($_POST['title'] ?? ''),
+            'content' => trim($_POST['content'] ?? ''),
             'is_draft' => $_POST['is_draft'] ?? 0,
             'is_scheduled' => $_POST['is_scheduled'] ?? 0,
             'scheduled_at' => $_POST['scheduled_at'] ?? '',
@@ -191,9 +191,24 @@ try {
         }
     }
     
+    // Debug logging to help troubleshoot content issues
+    error_log("DEBUG - POST data received: " . json_encode($postData));
+    error_log("DEBUG - Raw content value: '" . ($postData['content'] ?? 'NOT_SET') . "'");
+    error_log("DEBUG - Content length: " . strlen($postData['content']));
+    error_log("DEBUG - Attachments count: " . count($attachments));
+    
     // Validate required fields
-    if (empty($postData['title']) || empty($postData['content'])) {
-        throw new Exception('Title and content are required');
+    // Title is always required, but content can be empty if there are file attachments
+    error_log("DEBUG - Validation check - Title: '" . $postData['title'] . "' (empty: " . (empty($postData['title']) ? 'YES' : 'NO') . ")");
+    error_log("DEBUG - Validation check - Content: '" . $postData['content'] . "' (empty: " . (empty($postData['content']) ? 'YES' : 'NO') . ")");
+    
+    if (empty($postData['title'])) {
+        throw new Exception('Title is required');
+    }
+    
+    // Content is required only if there are no file attachments
+    if (empty($postData['content']) && empty($attachments)) {
+        throw new Exception('Content is required when no attachments are provided');
     }
     
     // Validate and process attachments

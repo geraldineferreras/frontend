@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Buttons Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .notification-card {
+            background: #e3f0ff;
+            border: 1.5px solid #1976d2;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+            padding: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            cursor: default;
+            transition: background 0.2s;
+        }
+        .notification-content {
+            flex: 1;
+        }
+        .notification-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1976d2;
+            margin-bottom: 2px;
+        }
+        .notification-message {
+            font-weight: 600;
+            font-size: 15px;
+            color: #222;
+            margin-bottom: 4px;
+        }
+        .notification-time {
+            font-size: 13px;
+            color: #888;
+        }
+        .mark-read-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            margin-left: 8px;
+            position: relative;
+            z-index: 10;
+            min-width: 90px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .mark-read-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-read-btn:active {
+            background: #0d47a1;
+            transform: translateY(0);
+        }
+        .mark-all-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+            min-width: 120px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+        }
+        .mark-all-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-all-btn:active {
+            background: #0d47a1;
+            transform: translateY(0);
+        }
+        .mark-all-btn:disabled {
+            background: #bbb;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .badge {
+            background: #f44336;
+            color: #fff;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 2px 10px;
+            margin-left: 8px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Notification Buttons Test</h1>
+        <p>This page tests the exact button styling and behavior used in the Teacher and Student notifications pages.</p>
+
+        <div class="test-section">
+            <h3>🎯 Teacher Notifications Test</h3>
+            
+            <div class="header">
+                <div>
+                    <h2>
+                        <span>🔔</span> Teacher Notifications
+                        <span class="badge" id="teacherBadge">5</span>
+                    </h2>
+                    <div style="color: #666; font-size: 14px; margin-top: 2px;">
+                        Stay updated on student submissions, excuse letters, attendance alerts, and classroom updates.
+                    </div>
+                </div>
+                <button class="mark-all-btn" id="teacherMarkAllBtn" onclick="testTeacherMarkAll()">
+                    Mark all as read
+                </button>
+            </div>
+            
+            <div class="notification-card">
+                <div style="font-size: 28px; color: #1976d2; flex-shrink: 0;">📢</div>
+                <div class="notification-content">
+                    <div class="notification-title">Notification</div>
+                    <div class="notification-message">Hello Jordan Salenga, you have been assigned to teach Capstone3 (Cap3) for Section BSIT 2A (1ST Semester, 2023-2024).</div>
+                    <div class="notification-time">39 minutes ago</div>
+                </div>
+                <button class="mark-read-btn" onclick="testTeacherMarkRead(1)">
+                    Mark as read
+                </button>
+            </div>
+            
+            <div class="notification-card">
+                <div style="font-size: 28px; color: #4caf50; flex-shrink: 0;">👨‍🎓</div>
+                <div class="notification-content">
+                    <div class="notification-title" style="color: #4caf50;">Student Enrollment</div>
+                    <div class="notification-message">Alyssa Batumbakal has enrolled in Object Oriented Programming for Section BSIT 4K.</div>
+                    <div class="notification-time">20 hours ago</div>
+                </div>
+                <button class="mark-read-btn" onclick="testTeacherMarkRead(2)">
+                    Mark as read
+                </button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎓 Student Notifications Test</h3>
+            
+            <div class="header">
+                <div>
+                    <h2>
+                        <span>🔔</span> Notifications
+                        <span class="badge" id="studentBadge">3</span>
+                    </h2>
+                    <div style="color: #666; font-size: 14px; margin-top: 2px;">
+                        Stay updated on new announcements, grades, and class updates.
+                    </div>
+                </div>
+                <button class="mark-all-btn" id="studentMarkAllBtn" onclick="testStudentMarkAll()">
+                    Mark all as read
+                </button>
+            </div>
+            
+            <div class="notification-card">
+                <div style="font-size: 28px; color: #ff9800; flex-shrink: 0;">📝</div>
+                <div class="notification-content">
+                    <div class="notification-title" style="color: #ff9800;">Grade Update</div>
+                    <div class="notification-message">Your grade for Assignment 3 has been posted. Check your grades section.</div>
+                    <div class="notification-time">2 hours ago</div>
+                </div>
+                <button class="mark-read-btn" onclick="testStudentMarkRead(1)">
+                    Mark as read
+                </button>
+            </div>
+            
+            <div class="notification-card">
+                <div style="font-size: 28px; color: #9c27b0; flex-shrink: 0;">📢</div>
+                <div class="notification-content">
+                    <div class="notification-title" style="color: #9c27b0;">Announcement</div>
+                    <div class="notification-message">Class will be cancelled tomorrow due to a holiday. Check for makeup session details.</div>
+                    <div class="notification-time">1 day ago</div>
+                </div>
+                <button class="mark-read-btn" onclick="testStudentMarkRead(2)">
+                    Mark as read
+                </button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Click Log</h3>
+            <div id="log" class="log">Ready to test button clicks...\n</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Troubleshooting Guide</h3>
+            <div class="status info">
+                <strong>ℹ️ If buttons work here but not in the app:</strong>
+                <ul>
+                    <li>Check for JavaScript errors in browser console</li>
+                    <li>Verify API endpoints are accessible</li>
+                    <li>Check if NotificationContext is properly initialized</li>
+                    <li>Look for CSS conflicts or overlapping elements</li>
+                </ul>
+            </div>
+            <div class="status success">
+                <strong>✅ Expected behavior:</strong>
+                <ul>
+                    <li>Individual "Mark as read" buttons should decrease the badge count by 1</li>
+                    <li>"Mark all as read" should set the badge count to 0</li>
+                    <li>Buttons should have hover effects and be clearly clickable</li>
+                    <li>Console should show detailed logging for each action</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let teacherUnreadCount = 5;
+        let studentUnreadCount = 3;
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateBadges() {
+            document.getElementById('teacherBadge').textContent = teacherUnreadCount;
+            document.getElementById('studentBadge').textContent = studentUnreadCount;
+            
+            // Disable mark all buttons when count is 0
+            document.getElementById('teacherMarkAllBtn').disabled = teacherUnreadCount === 0;
+            document.getElementById('studentMarkAllBtn').disabled = studentUnreadCount === 0;
+        }
+
+        function testTeacherMarkAll() {
+            log('🔘 [TeacherNotifications] Mark all as read button clicked');
+            log('🔘 [TeacherNotifications] Unread count: ' + teacherUnreadCount);
+            log('🔄 [TeacherNotifications] Marking all notifications as read');
+            log('📡 [TeacherNotifications] API call - markAllNotificationsAsRead: STU68B7D2257B1C3819');
+            log('📡 [TeacherNotifications] API response: { success: true, message: "All notifications marked as read", affectedRows: ' + teacherUnreadCount + ' }');
+            
+            teacherUnreadCount = 0;
+            updateBadges();
+            
+            log('✅ [TeacherNotifications] All notifications marked as read successfully');
+            log('✅ Teacher notification count updated to: ' + teacherUnreadCount);
+        }
+
+        function testTeacherMarkRead(id) {
+            log('🔘 [TeacherNotifications] Mark as read button clicked for notification: ' + id);
+            log('🔄 [TeacherNotifications] Marking notification as read: ' + id);
+            log('📡 [TeacherNotifications] API call - markNotificationAsRead: ' + id);
+            log('📡 [TeacherNotifications] API response: { success: true, message: "Notification marked as read" }');
+            
+            if (teacherUnreadCount > 0) {
+                teacherUnreadCount--;
+                updateBadges();
+                log('✅ [TeacherNotifications] Notification marked as read successfully');
+                log('✅ Teacher notification count decreased to: ' + teacherUnreadCount);
+            }
+        }
+
+        function testStudentMarkAll() {
+            log('🔘 [StudentNotifications] Mark all as read button clicked');
+            log('🔘 [StudentNotifications] Unread count: ' + studentUnreadCount);
+            log('🔄 [StudentNotifications] Marking all notifications as read');
+            log('📡 [StudentNotifications] API call - markAllNotificationsAsRead: STU68B7D2257B1C3819');
+            log('📡 [StudentNotifications] API response: { success: true, message: "All notifications marked as read", affectedRows: ' + studentUnreadCount + ' }');
+            
+            studentUnreadCount = 0;
+            updateBadges();
+            
+            log('✅ [StudentNotifications] All notifications marked as read successfully');
+            log('✅ Student notification count updated to: ' + studentUnreadCount);
+        }
+
+        function testStudentMarkRead(id) {
+            log('🔘 [StudentNotifications] Mark as read button clicked for notification: ' + id);
+            log('🔄 [StudentNotifications] Marking notification as read: ' + id);
+            log('📡 [StudentNotifications] API call - markNotificationAsRead: ' + id);
+            log('📡 [StudentNotifications] API response: { success: true, message: "Notification marked as read" }');
+            
+            if (studentUnreadCount > 0) {
+                studentUnreadCount--;
+                updateBadges();
+                log('✅ [StudentNotifications] Notification marked as read successfully');
+                log('✅ Student notification count decreased to: ' + studentUnreadCount);
+            }
+        }
+
+        // Initialize badges on page load
+        window.addEventListener('load', () => {
+            updateBadges();
+            log('📊 Test page loaded with Teacher: ' + teacherUnreadCount + ', Student: ' + studentUnreadCount + ' unread notifications');
+        });
+    </script>
+</body>
+</html>
+

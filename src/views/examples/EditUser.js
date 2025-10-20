@@ -22,6 +22,7 @@ import {
 import LottieLoader from "components/LottieLoader";
 import useMinDelay from "utils/useMinDelay";
 import Header from "components/Headers/Header.js";
+import Select from 'react-select';
 import { FaCamera, FaTrash } from "react-icons/fa";
 import userDefault from "../../assets/img/theme/user-default.svg";
 import Cropper from 'react-easy-crop';
@@ -48,8 +49,10 @@ const EditUser = () => {
   // Form state
   const [formRole, setFormRole] = useState("");
   const [fullName, setFullName] = useState("");
-  const [address, setAddress] = useState("");
-  const [contactNumber, setContactNumber] = useState("");
+  const [cityMunicipality, setCityMunicipality] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [province, setProvince] = useState("");
+  const [contactNumber, setContactNumber] = useState("+63");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState("");
@@ -93,11 +96,106 @@ const EditUser = () => {
   const [success, setSuccess] = useState("");
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  // Build react-select options
 
   // Validation states
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [studentNumberError, setStudentNumberError] = useState("");
+
+  // Pampanga data
+  const pampangaData = {
+    "province": "Pampanga",
+    "LGUs": {
+      "Angeles City": {
+        "barangays": ["Agapito del Rosario","Amsic","Anunas","Balibago","Capaya","Claro M. Recto","Cuayan","Cutcut","Cutud","Lourdes North West","Lourdes Sur","Lourdes Sur East","Malabañas","Margot","Mining","Ninoy Aquino (Marisol)","Pampang","Pandan","Pulung Cacutud","Pulung Maragul","Pulungbulu","Salapungan","San Jose","San Nicolas","Santa Teresita","Santa Trinidad","Santo Cristo","Santo Domingo","Santo Rosario (Poblacion)","Sapalibutad","Sapangbato","Tabun","Virgen Delos Remedios"]
+      },
+      "Apalit": {
+        "barangays": ["Balucuc","Calantipe","Cansinala","Capalangan","Colgante","Paligui","Sampaloc","San Juan (Poblacion)","San Vicente","Sucad","Sulipan","Tabuyuc"]
+      },
+      "Arayat": {
+        "barangays": ["Arenas","Baliti","Batasan","Buensuceso","Candating","Gatiawin","Guemasan","La Paz (Turu)","Lacmit","Lacquios","Mangga-Cacutud","Mapalad","Palinlang","Paralaya","Plazang Luma","Poblacion","San Agustin Norte","San Agustin Sur","San Antonio","San Jose Mesulo","San Juan Baño","San Mateo","San Nicolas","San Roque Bitas","Cupang (Santa Lucia)","Matamo (Santa Lucia)","Santo Niño Tabuan","Suclayin","Telapayong","Kaledian (Camba)"]
+      },
+      "Bacolor": {
+        "barangays": ["Balas","Cabalantian","Calambangan","Cabetican","Calibutbut","Concepcion","Dolores","Duat","Macabacle","Magliman","Maliwalu","Mesalipit","Parulog","Potrero","San Antonio","San Isidro","San Vicente","Santa Barbara","Santa Ines","Talba","Tinajero"]
+      },
+      "Candaba": {
+        "barangays": ["Bahay Pare","Bambang","Barangca","Barit","Buas (Poblacion)","Cuayang Bugtong","Dalayap","Dulong Ilog","Gulap","Lanang","Lourdes","Magumbali","Mandasig","Mandili","Mangga","Mapaniqui","Paligui","Pangclara","Pansinao","Paralaya (Poblacion)","Pasig","Pescadores (Poblacion)","Pulong Gubat","Pulong Palazan","Salapungan","San Agustin (Poblacion)","Santo Rosario","Tagulod","Talang","Tenejero","Vizal San Pablo","Vizal Santo Cristo","Vizal Santo Niño"]
+      },
+      "Floridablanca": {
+        "barangays": ["Anon","Apalit","Basa Air Base","Benedicto","Bodega","Cabangcalan","Calantas","Carmencita","Consuelo","Culubasa","Dampe","Del Carmen","Fortuna","Gutad","Mabical","Maligaya","Mawaque","Nabuclod","Pabanlag","Paguiruan","Palmayo","Pandaguirig","Poblacion","San Antonio","San Isidro","San Jose","San Nicolas","San Pedro","San Ramon","San Roque","Santa Monica","Solib","Santo Rosario","Valdez"]
+      },
+      "Guagua": {
+        "barangays": ["Ascomo","Bancal","Betis","Bulaon","Jose Abad Santos (Siran)","Lambac","Magsaysay","Maquiapo","Natividad","Plaza Burgos","Pulungmasle","Rizal","San Agustin","San Juan Bautista","San Juan Nepomuceno","San Miguel","San Nicolas 1st","San Nicolas 2nd","Santa Ines","Santa Ursula","San Pablo","San Matias","San Isidro","San Antonio"]
+      },
+      "Lubao": {
+        "barangays": ["Bancal Pugad","Bancal Sinubli","Baruya","Calangain","Concepcion","Del Carmen","Don Ignacio Dimson","Prado Siongco","Remedios","San Agustin","San Antonio","San Francisco","San Isidro","San Jose Apunan","San Juan (Poblacion)","San Matias","San Miguel","San Nicolas 1st","San Nicolas 2nd","San Pedro Palcarangan","Santa Barbara","Santa Catalina","Santa Cruz","Santa Lucia (Poblacion)","Santa Maria","Santa Monica","Santa Rita","Santa Teresa 1st","Santa Teresa 2nd","Santo Cristo","Santo Domingo","Santo Rosario (Poblacion)","Santo Tomas (Poblacion)","Sapang Balas","Sapang Maisac"]
+      },
+      "Mabalacat": {
+        "barangays": ["Atlu-Bola","Bical","Bundagul","Cacutud","Calumpang","Camachiles","Dapdap","Dau","Dolores","Duquit","Lakandula","Mabiga","Macapagal Village","Mamatitang","Mangalit","Marcos Village","Mawaque","Paralayunan","Poblacion","San Francisco","San Joaquin","Santa Ines","Santa Maria","Santo Rosario","Sapang Balen","Sapang Biabas","Tabun"]
+      },
+      "Macabebe": {
+        "barangays": ["Caduang Tete","Candelaria","Castuli","Consuelo","Culo","Dalayap","Duala","San Gabriel","San Isidro","San Jose","San Juan","San Rafael","San Vicente","Santa Maria","Santo Niño","Saplad","Tacasan","Telacsan"]
+      },
+      "Magalang": {
+        "barangays": ["Ayala","Bucanan","Camias","Dolores","Escaler","La Paz","Navaling","San Agustin","San Antonio","San Francisco","San Ildefonso","San Isidro","San Jose","San Miguel","San Nicolas I","San Nicolas II (Concepcion)","San Pablo","San Pedro I","San Pedro II","San Roque","San Vicente","Santa Cruz","Santa Lucia","Santa Maria","Santo Niño","Santo Rosario","Turu"]
+      },
+      "Masantol": {
+        "barangays": ["Alauli","Bagang","Balibago","Bebe Anac","Bebe Matua","Bulacus","Cambasi","Malauli","Nigui","Palimpe","Puti","Sagrada (Tibagin)","San Agustin (Caingin)","San Isidro Anac","San Isidro Matua (Poblacion)","San Nicolas (Poblacion)","San Pedro","Santa Cruz","Santa Lucia Anac (Poblacion)","Santa Lucia Matua","Santa Lucia Paguiba","Santa Lucia Wakas","Santa Monica (Caingin)","Santo Niño","Sapang Kawayan","Sua"]
+      },
+      "Mexico": {
+        "barangays": ["Acli","Anao","Balas","Buenavista","Camuning","Cawayan","Concepcion","Culubasa","Divisoria","Dolores (Piring)","Eden","Gandus","Lagundi","Laput","Laug","Masamat","Masangsang (Santo Cristo)","Nueva Victoria","Pandacaqui","Pangatlan","Panipuan","Parian (Poblacion)","Sabanilla","San Antonio","San Carlos","San Jose Malino","San Jose Matulid","San Juan","San Lorenzo","San Miguel","San Nicolas","San Pablo","San Patricio","San Rafael","San Roque","San Vicente","Santa Cruz","Santa Maria","Santo Domingo","Santo Rosario","Sapang Maisac","Suclaban","Tangle"]
+      },
+      "Minalin": {
+        "barangays": ["Bulac","Dawe","Maniango","Saplad","San Francisco de Asisi (San Francisco Uno)","San Francisco Javier (San Francisco Dos)","Santa Catalina","San Nicolas (Poblacion)","Santo Rosario","San Pedro","Santa Rita","Santo Domingo","Santa Maria","Lourdes","San Isidro"]
+      },
+      "Porac": {
+        "barangays": ["Babo Pangulo","Babo Sacan (Guanson)","Balubad","Calzadang Bayu","Camias","Cangatba","Diaz","Dolores (Hacienda Dolores)","Inararo (Aetas)","Jalung","Mancatian","Manibaug Libutad","Manibaug Paralaya","Manibaug Pasig","Manuali","Mitla Proper","Palat","Pias","Pio","Planas","Poblacion","Pulung Santol","Salu","San Jose Mitla","Santa Cruz","Sapang Uwak (Aetas)","Sepung Bulaun (Baidbid)","Siñura (Seniora)","Villa Maria (Aetas)"]
+      },
+      "San Fernando City": {
+        "barangays": ["Alasas","Baliti","Bulaon","Calulut","Del Carmen","Del Pilar","Del Rosario","Dela Paz Norte","Dela Paz Sur","Dolores","Juliana","Lara","Lourdes","Magliman","Maimpis","Malino","Malpitic","Pandaras","Panipuan","Pulung Bulo","Quebiawan","Saguin","San Agustin","San Felipe","San Isidro","San Jose","San Nicolas","San Pedro","San Juan","Santa Lucia","Santa Teresita","Santo Niño","Santo Rosario","Sindalan","Telabastagan"]
+      },
+      "San Luis": {
+        "barangays": ["San Agustín","San Carlos","San Isidro","San José","San Juan","San Nicolás","San Roque","San Sebastián","Santa Catalina","Santa Cruz Pambilog","Santa Cruz Población","Santa Lucia","Santa Mónica","Santa Rita","Santo Niño","Santo Rosario","Santo Tomás"]
+      },
+      "San Simon": {
+        "barangays": ["Concepcion","De La Paz","San Juan (Poblacion)","San Agustin","San Isidro","San Jose","San Miguel","San Nicolas","San Pablo Libutad","San Pablo Proper","San Pedro","Santa Cruz","Santa Monica","Santo Niño"]
+      },
+      "Santa Ana": {
+        "barangays": ["San Agustin (Sumpung)","San Bartolome (Patayum)","San Isidro (Quenabuan)","San Joaquin (Poblacion, Canukil)","San Jose (Catmun)","San Juan (Tinajeru)","San Nicolas (Sepung Ilug)","San Pablo (Darabulbul)","San Pedro (Calumpang)","San Roque (Tuclung)","Santa Lucia (Calinan)","Santa Maria (Balen Bayu)","Santiago (Barrio Libutad)","Santo Rosario (Pagbatuan)"]
+      },
+      "Santa Rita": {
+        "barangays": ["Becuran","Dila-dila","San Agustin","San Basilio","San Isidro","San Jose (Poblacion)","San Juan","San Matias (Poblacion)","Santa Monica","San Vicente (Poblacion)"]
+      },
+      "Santo Tomas": {
+        "barangays": ["Moras De La Paz","Poblacion","San Bartolome","San Matias","San Vicente","Santo Rosario (Pau)","Sapa (Santo Niño)"]
+      },
+      "Sasmuan": {
+        "barangays": ["Batang 1st","Batang 2nd","Mabuanbuan","Malusac","Sabitanan","San Antonio","San Nicolas 1st","San Nicolas 2nd","San Pedro","Santa Lucia (Poblacion)","Santa Monica","Santo Tomas"]
+      }
+    }
+  };
+
+  // Get cities for dropdown
+  const cities = Object.keys(pampangaData.LGUs);
+  
+  // Get barangays for selected city
+  const getBarangays = (city) => {
+    return city ? pampangaData.LGUs[city]?.barangays || [] : [];
+  };
+
+  // Handle province change - clear city and barangay when province changes
+  const handleProvinceChange = (e) => {
+    setProvince(e.target.value);
+    setCityMunicipality(''); // Clear city when province changes
+    setBarangay(''); // Clear barangay when province changes
+  };
+
+  // Handle city change - clear barangay when city changes
+  const handleCityChange = (e) => {
+    setCityMunicipality(e.target.value);
+    setBarangay(''); // Clear barangay when city changes
+  };
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -149,8 +247,13 @@ const EditUser = () => {
         // Pre-fill form with user data
         setFormRole(user.role || role);
         setFullName(user.full_name || user.name || "");
-        setAddress(user.address || "");
-        setContactNumber(user.contact_num || user.contactNumber || "");
+        
+        // Parse address into atomic fields (assuming format: "barangay, city, province")
+        const addressParts = (user.address || "").split(',').map(part => part.trim());
+        setBarangay(addressParts[0] || "");
+        setCityMunicipality(addressParts[1] || "");
+        setProvince(addressParts[2] || "");
+        setContactNumber(user.contact_num || user.contactNumber || "+63");
         setEmail(user.email || "");
         setPassword(""); // Don't prefill password for security
         setDepartment(user.program || user.department || "");
@@ -696,8 +799,8 @@ const EditUser = () => {
     
     // Role-specific validation
     if (formRole === 'admin') {
-      if (!address.trim()) {
-        setError("Address is required for admins.");
+      if (!cityMunicipality.trim() || !barangay.trim() || !province.trim()) {
+        setError("All address fields are required for admins.");
         return;
       }
       if (!contactNumber.trim()) {
@@ -707,8 +810,8 @@ const EditUser = () => {
     }
     
     if (formRole === 'teacher') {
-      if (!address.trim()) {
-        setError("Address is required for teachers.");
+      if (!cityMunicipality.trim() || !barangay.trim() || !province.trim()) {
+        setError("All address fields are required for teachers.");
         return;
       }
       if (!contactNumber.trim()) {
@@ -730,8 +833,8 @@ const EditUser = () => {
         setError("Please select a course for the student.");
         return;
       }
-      if (!address.trim()) {
-        setError("Address is required for students.");
+      if (!cityMunicipality.trim() || !barangay.trim() || !province.trim()) {
+        setError("All address fields are required for students.");
         return;
       }
       if (!contactNumber.trim()) {
@@ -872,7 +975,9 @@ const EditUser = () => {
         }
         
         formData.append('contact_num', contactNumber);
-        formData.append('address', address);
+        // Combine atomic address fields into single address field for backend
+        const combinedAddress = `${barangay}, ${cityMunicipality}, ${province}`.trim();
+        formData.append('address', combinedAddress);
         formData.append('status', status);
         
         // Add role-specific fields
@@ -1298,7 +1403,7 @@ const EditUser = () => {
                             required
                           >
                             <option value="">Select Role</option>
-                            <option value="admin">Admin</option>
+                            <option value="admin">Program Chairperson</option>
                             <option value="teacher">Teacher</option>
                             <option value="student">Student</option>
                           </Input>
@@ -1359,23 +1464,61 @@ const EditUser = () => {
                         </FormGroup>
                       </Col>
                     </Row>
-                    {/* Address and Contact Number for Admin - positioned below email/password */}
+                    {/* Address and Contact Number for Program Chairperson - positioned below email/password */}
                     {formRole === 'admin' && (
-                      <Row>
-                        <Col lg="6">
-                          <FormGroup>
-                            <label className="form-control-label" htmlFor="address">Address *</label>
-                            <Input 
-                              className="form-control-alternative" 
-                              type="text" 
-                              id="address" 
-                              value={address} 
-                              onChange={e => setAddress(e.target.value)} 
-                              required
-                              placeholder="Enter admin's address"
-                            />
-                          </FormGroup>
-                        </Col>
+                      <>
+                        <Row>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="province">Province *</label>
+                              <Input 
+                                className="form-control-alternative" 
+                                type="select" 
+                                id="province" 
+                                value={province} 
+                                onChange={handleProvinceChange}
+                                required
+                              >
+                                <option value="">Select Province</option>
+                                <option value="Pampanga">Pampanga</option>
+                              </Input>
+                            </FormGroup>
+                          </Col>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="cityMunicipality">City/Municipality *</label>
+                              <Select
+                                classNamePrefix="react-select"
+                                inputId="edit_city"
+                                options={province ? cities.map(c => ({ value: c, label: c })) : []}
+                                value={cityMunicipality ? { value: cityMunicipality, label: cityMunicipality } : null}
+                                onChange={opt => {
+                                  setCityMunicipality(opt ? opt.value : '');
+                                  setBarangay('');
+                                }}
+                                isDisabled={!province}
+                                isSearchable
+                                placeholder={province ? "Select City/Municipality" : "Select Province first"}
+                              />
+                            </FormGroup>
+                          </Col>
+                        </Row>
+                        <Row>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="barangay">Barangay *</label>
+                              <Select
+                                classNamePrefix="react-select"
+                                inputId="edit_barangay"
+                                options={cityMunicipality ? (getBarangays(cityMunicipality)).map(b => ({ value: b, label: b })) : []}
+                                value={barangay ? { value: barangay, label: barangay } : null}
+                                onChange={opt => setBarangay(opt ? opt.value : '')}
+                                isDisabled={!cityMunicipality}
+                                isSearchable
+                                placeholder={cityMunicipality ? "Select Barangay" : "Select City first"}
+                              />
+                            </FormGroup>
+                          </Col>
                         <Col lg="6">
                           <FormGroup>
                             <label className="form-control-label" htmlFor="contactNumber">Contact Number *</label>
@@ -1390,7 +1533,8 @@ const EditUser = () => {
                             />
                           </FormGroup>
                         </Col>
-                      </Row>
+                        </Row>
+                      </>
                     )}
                   </div>
                   <hr className="my-4" />
@@ -1412,7 +1556,7 @@ const EditUser = () => {
                   {formRole === 'admin' && (
                     <>
                       <hr className="my-4" />
-                      <h6 className="heading-small text-muted mb-4">Admin Information</h6>
+                      <h6 className="heading-small text-muted mb-4">Program Chairperson Information</h6>
                       <div className="pl-lg-4">
                         <Row>
                           <Col lg="12">
@@ -1422,7 +1566,7 @@ const EditUser = () => {
                                 className="form-control-alternative"
                                 type="text"
                                 id="department"
-                                value="Administration"
+                                value="Program Chairperson"
                                 readOnly
                                 disabled
                               />
@@ -1438,17 +1582,54 @@ const EditUser = () => {
                       <h6 className="heading-small text-muted mb-4">Teacher Information</h6>
                       <div className="pl-lg-4">
                         <Row>
-                          <Col lg="12">
+                          <Col lg="6">
                             <FormGroup>
-                              <label className="form-control-label" htmlFor="address">Address *</label>
+                              <label className="form-control-label" htmlFor="province">Province *</label>
                               <Input 
                                 className="form-control-alternative" 
-                                type="text" 
-                                id="address" 
-                                value={address} 
-                                onChange={e => setAddress(e.target.value)} 
+                                type="select" 
+                                id="province" 
+                                value={province} 
+                                onChange={handleProvinceChange}
                                 required
-                                placeholder="Enter teacher's address"
+                              >
+                                <option value="">Select Province</option>
+                                <option value="Pampanga">Pampanga</option>
+                              </Input>
+                            </FormGroup>
+                          </Col>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="cityMunicipality">City/Municipality *</label>
+                              <Select
+                                classNamePrefix="react-select"
+                                inputId="edit_city2"
+                                options={province ? cities.map(c => ({ value: c, label: c })) : []}
+                                value={cityMunicipality ? { value: cityMunicipality, label: cityMunicipality } : null}
+                                onChange={opt => {
+                                  setCityMunicipality(opt ? opt.value : '');
+                                  setBarangay('');
+                                }}
+                                isDisabled={!province}
+                                isSearchable
+                                placeholder={province ? "Select City/Municipality" : "Select Province first"}
+                              />
+                            </FormGroup>
+                          </Col>
+                        </Row>
+                        <Row>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="barangay">Barangay *</label>
+                              <Select
+                                classNamePrefix="react-select"
+                                inputId="edit_barangay2"
+                                options={cityMunicipality ? (getBarangays(cityMunicipality)).map(b => ({ value: b, label: b })) : []}
+                                value={barangay ? { value: barangay, label: barangay } : null}
+                                onChange={opt => setBarangay(opt ? opt.value : '')}
+                                isDisabled={!cityMunicipality}
+                                isSearchable
+                                placeholder={cityMunicipality ? "Select Barangay" : "Select City first"}
                               />
                             </FormGroup>
                           </Col>
@@ -1459,13 +1640,39 @@ const EditUser = () => {
                               <label className="form-control-label" htmlFor="contactNumber">Contact Number *</label>
                               <Input 
                                 className="form-control-alternative" 
-                                type="text" 
+                                type="tel" 
                                 id="contactNumber" 
                                 value={contactNumber} 
-                                onChange={e => setContactNumber(e.target.value)} 
+                                onChange={e => {
+                                  let value = e.target.value.replace(/[^+\d]/g, '');
+                                  if (!value.startsWith('+63')) {
+                                    value = '+63' + value.replace(/^\+63/, '');
+                                  }
+                                  // Ensure minimum length is +63
+                                  if (value.length < 3) {
+                                    value = '+63';
+                                  }
+                                  setContactNumber(value);
+                                }}
+                                onInput={e => {
+                                  let value = e.target.value.replace(/[^+\d]/g, '');
+                                  if (!value.startsWith('+63')) {
+                                    value = '+63' + value.replace(/^\+63/, '');
+                                  }
+                                  // Ensure minimum length is +63
+                                  if (value.length < 3) {
+                                    value = '+63';
+                                  }
+                                  e.target.value = value;
+                                }} 
                                 required
-                                placeholder="Enter contact number"
+                                placeholder="e.g., +639123456789"
+                                inputMode="numeric"
+                                pattern="^\+63\d{10}$"
+                                maxLength={13}
+                                title="Format: +639XXXXXXXXX"
                               />
+                              <small className="text-muted">Starts with +63 and 10 digits (e.g., +639123456789)</small>
                             </FormGroup>
                           </Col>
                           <Col lg="6">
@@ -1473,13 +1680,18 @@ const EditUser = () => {
                               <label className="form-control-label" htmlFor="department">Department *</label>
                               <Input 
                                 className="form-control-alternative" 
-                                type="text" 
+                                type="select" 
                                 id="department" 
                                 value={department} 
                                 onChange={e => setDepartment(e.target.value)} 
                                 required
-                                placeholder="Enter department"
-                              />
+                              >
+                                <option value="">Select Department</option>
+                                <option value="Information Technology">Information Technology</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Information System">Information System</option>
+                                <option value="Computer Technology">Computer Technology</option>
+                              </Input>
                             </FormGroup>
                           </Col>
                         </Row>
@@ -1492,18 +1704,64 @@ const EditUser = () => {
                       <h6 className="heading-small text-muted mb-4">Student Information</h6>
                       <div className="pl-lg-4">
                         <Row>
-                          <Col lg="12">
+                          <Col lg="6">
                             <FormGroup>
-                              <label className="form-control-label" htmlFor="address">Address *</label>
+                              <label className="form-control-label" htmlFor="province">Province *</label>
                               <Input 
                                 className="form-control-alternative" 
-                                type="text" 
-                                id="address" 
-                                value={address} 
-                                onChange={e => setAddress(e.target.value)} 
+                                type="select" 
+                                id="province" 
+                                value={province} 
+                                onChange={handleProvinceChange}
                                 required
-                                placeholder="Enter student's address"
-                              />
+                              >
+                                <option value="">Select Province</option>
+                                <option value="Pampanga">Pampanga</option>
+                              </Input>
+                            </FormGroup>
+                          </Col>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="cityMunicipality">City/Municipality *</label>
+                              <Input 
+                                className="form-control-alternative" 
+                                type="select" 
+                                id="cityMunicipality" 
+                                value={cityMunicipality} 
+                                onChange={handleCityChange}
+                                required
+                                disabled={!province}
+                              >
+                                <option value="">
+                                  {province ? "Select City/Municipality" : "Select Province first"}
+                                </option>
+                                {province === "Pampanga" && cities.map(city => (
+                                  <option key={city} value={city}>{city}</option>
+                                ))}
+                              </Input>
+                            </FormGroup>
+                          </Col>
+                        </Row>
+                        <Row>
+                          <Col lg="6">
+                            <FormGroup>
+                              <label className="form-control-label" htmlFor="barangay">Barangay *</label>
+                              <Input 
+                                className="form-control-alternative" 
+                                type="select" 
+                                id="barangay" 
+                                value={barangay} 
+                                onChange={e => setBarangay(e.target.value)} 
+                                required
+                                disabled={!cityMunicipality}
+                              >
+                                <option value="">
+                                  {cityMunicipality ? "Select Barangay" : "Select City first"}
+                                </option>
+                                {getBarangays(cityMunicipality).map(barangay => (
+                                  <option key={barangay} value={barangay}>{barangay}</option>
+                                ))}
+                              </Input>
                             </FormGroup>
                           </Col>
                         </Row>
@@ -1513,13 +1771,39 @@ const EditUser = () => {
                               <label className="form-control-label" htmlFor="contactNumber">Contact Number *</label>
                               <Input 
                                 className="form-control-alternative" 
-                                type="text" 
+                                type="tel" 
                                 id="contactNumber" 
                                 value={contactNumber} 
-                                onChange={e => setContactNumber(e.target.value)} 
+                                onChange={e => {
+                                  let value = e.target.value.replace(/[^+\d]/g, '');
+                                  if (!value.startsWith('+63')) {
+                                    value = '+63' + value.replace(/^\+63/, '');
+                                  }
+                                  // Ensure minimum length is +63
+                                  if (value.length < 3) {
+                                    value = '+63';
+                                  }
+                                  setContactNumber(value);
+                                }}
+                                onInput={e => {
+                                  let value = e.target.value.replace(/[^+\d]/g, '');
+                                  if (!value.startsWith('+63')) {
+                                    value = '+63' + value.replace(/^\+63/, '');
+                                  }
+                                  // Ensure minimum length is +63
+                                  if (value.length < 3) {
+                                    value = '+63';
+                                  }
+                                  e.target.value = value;
+                                }} 
                                 required
-                                placeholder="Enter contact number"
+                                placeholder="e.g., +639123456789"
+                                inputMode="numeric"
+                                pattern="^\+63\d{10}$"
+                                maxLength={13}
+                                title="Format: +639XXXXXXXXX"
                               />
+                              <small className="text-muted">Starts with +63 and 10 digits (e.g., +639123456789)</small>
                             </FormGroup>
                           </Col>
                           <Col lg="6">

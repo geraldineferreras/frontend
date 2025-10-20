@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .notification-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .notification-item.unread {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .notification-item.read {
+            background-color: #f5f5f5;
+            opacity: 0.7;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Notification Integration Test</h1>
+        <p>This page tests the notification API integration with the new backend endpoints.</p>
+        
+        <div class="test-section">
+            <h3>🔐 Authentication Setup</h3>
+            <div class="form-group">
+                <label>JWT Token:</label>
+                <input type="text" id="jwtToken" placeholder="Enter your JWT token" style="width: 400px;">
+            </div>
+            <div class="form-group">
+                <label>User ID:</label>
+                <input type="text" id="userId" placeholder="Enter user ID (e.g., STU68B7D2257B1C3819)" style="width: 300px;">
+            </div>
+            <button onclick="setAuth()">Set Authentication</button>
+            <div id="authResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test All Notifications</h3>
+            <button onclick="testGetAllNotifications()">Get All Notifications</button>
+            <div id="allNotificationsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🕒 Test Recent Notifications</h3>
+            <div class="form-group">
+                <label>Limit:</label>
+                <select id="recentLimit">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <button onclick="testGetRecentNotifications()">Get Recent Notifications</button>
+            <div id="recentNotificationsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔢 Test Unread Count</h3>
+            <button onclick="testGetUnreadCount()">Get Unread Count</button>
+            <div id="unreadCountResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>✏️ Test Mark as Read</h3>
+            <div class="form-group">
+                <label>Notification ID:</label>
+                <input type="number" id="markReadId" placeholder="Enter notification ID">
+            </div>
+            <button onclick="testMarkAsRead()">Mark as Read</button>
+            <div id="markReadResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Test Mark All as Read</h3>
+            <button onclick="testMarkAllAsRead()">Mark All as Read</button>
+            <div id="markAllReadResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Create Notification</h3>
+            <div class="form-group">
+                <label>Recipient ID:</label>
+                <input type="text" id="createRecipientId" placeholder="Recipient user ID">
+            </div>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="createTitle" placeholder="Notification title" value="Test Notification">
+            </div>
+            <div class="form-group">
+                <label>Message:</label>
+                <input type="text" id="createMessage" placeholder="Notification message" value="This is a test notification">
+            </div>
+            <div class="form-group">
+                <label>Type:</label>
+                <select id="createType">
+                    <option value="announcement">Announcement</option>
+                    <option value="task">Task</option>
+                    <option value="submission">Submission</option>
+                    <option value="excuse_letter">Excuse Letter</option>
+                    <option value="grade">Grade</option>
+                    <option value="enrollment">Enrollment</option>
+                    <option value="system">System</option>
+                </select>
+            </div>
+            <button onclick="testCreateNotification()">Create Notification</button>
+            <div id="createNotificationResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Run All Tests</h3>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <div id="allTestsResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://scms-backend.up.railway.app';
+        let authToken = '';
+        let currentUserId = '';
+
+        function setAuth() {
+            authToken = document.getElementById('jwtToken').value.trim();
+            currentUserId = document.getElementById('userId').value.trim();
+            
+            if (!authToken || !currentUserId) {
+                showResult('authResult', 'Please enter both JWT token and User ID', 'error');
+                return;
+            }
+            
+            showResult('authResult', `Authentication set successfully!\nToken: ${authToken.substring(0, 20)}...\nUser ID: ${currentUserId}`, 'success');
+        }
+
+        async function makeRequest(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const config = {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                }
+            };
+            
+            if (options.body) {
+                config.body = JSON.stringify(options.body);
+            }
+            
+            try {
+                const response = await fetch(url, config);
+                const data = await response.json();
+                return { status: response.status, data };
+            } catch (error) {
+                return { status: 0, error: error.message };
+            }
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        async function testGetAllNotifications() {
+            if (!authToken || !currentUserId) {
+                showResult('allNotificationsResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('allNotificationsResult', 'Fetching all notifications...', 'info');
+            
+            const result = await makeRequest(`/api/notifications?userId=${currentUserId}`);
+            
+            if (result.status === 200 && result.data.success) {
+                const notifications = result.data.data || [];
+                let displayText = `✅ Success! Found ${notifications.length} notifications:\n\n`;
+                
+                notifications.forEach((notification, index) => {
+                    displayText += `${index + 1}. [${notification.is_read ? 'READ' : 'UNREAD'}] ${notification.title}\n`;
+                    displayText += `   Type: ${notification.type}\n`;
+                    displayText += `   Message: ${notification.message}\n`;
+                    displayText += `   Created: ${notification.created_at}\n`;
+                    displayText += `   ID: ${notification.id}\n\n`;
+                });
+                
+                showResult('allNotificationsResult', displayText, 'success');
+            } else {
+                showResult('allNotificationsResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        async function testGetRecentNotifications() {
+            if (!authToken || !currentUserId) {
+                showResult('recentNotificationsResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            const limit = document.getElementById('recentLimit').value;
+            showResult('recentNotificationsResult', `Fetching recent ${limit} notifications...`, 'info');
+            
+            const result = await makeRequest(`/api/notifications/recent?userId=${currentUserId}&limit=${limit}`);
+            
+            if (result.status === 200 && result.data.success) {
+                const notifications = result.data.data || [];
+                let displayText = `✅ Success! Found ${notifications.length} recent notifications:\n\n`;
+                
+                notifications.forEach((notification, index) => {
+                    displayText += `${index + 1}. [${notification.is_read ? 'READ' : 'UNREAD'}] ${notification.title}\n`;
+                    displayText += `   Type: ${notification.type}\n`;
+                    displayText += `   Message: ${notification.message}\n`;
+                    displayText += `   Created: ${notification.created_at}\n\n`;
+                });
+                
+                showResult('recentNotificationsResult', displayText, 'success');
+            } else {
+                showResult('recentNotificationsResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        async function testGetUnreadCount() {
+            if (!authToken || !currentUserId) {
+                showResult('unreadCountResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('unreadCountResult', 'Fetching unread count...', 'info');
+            
+            const result = await makeRequest(`/api/notifications/unread-count?userId=${currentUserId}`);
+            
+            if (result.status === 200 && result.data.success) {
+                const count = result.data.data?.count || 0;
+                showResult('unreadCountResult', `✅ Success! Unread notifications: ${count}`, 'success');
+            } else {
+                showResult('unreadCountResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        async function testMarkAsRead() {
+            if (!authToken || !currentUserId) {
+                showResult('markReadResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            const notificationId = document.getElementById('markReadId').value.trim();
+            if (!notificationId) {
+                showResult('markReadResult', 'Please enter a notification ID', 'error');
+                return;
+            }
+
+            showResult('markReadResult', `Marking notification ${notificationId} as read...`, 'info');
+            
+            const result = await makeRequest(`/api/notifications/${notificationId}/read`, {
+                method: 'PUT'
+            });
+            
+            if (result.status === 200 && result.data.success) {
+                showResult('markReadResult', `✅ Success! Notification ${notificationId} marked as read`, 'success');
+            } else {
+                showResult('markReadResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        async function testMarkAllAsRead() {
+            if (!authToken || !currentUserId) {
+                showResult('markAllReadResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('markAllReadResult', 'Marking all notifications as read...', 'info');
+            
+            const result = await makeRequest(`/api/notifications/mark-all-read?userId=${currentUserId}`, {
+                method: 'PUT'
+            });
+            
+            if (result.status === 200 && result.data.success) {
+                showResult('markAllReadResult', '✅ Success! All notifications marked as read', 'success');
+            } else {
+                showResult('markAllReadResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        async function testCreateNotification() {
+            if (!authToken || !currentUserId) {
+                showResult('createNotificationResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            const recipientId = document.getElementById('createRecipientId').value.trim() || currentUserId;
+            const title = document.getElementById('createTitle').value.trim();
+            const message = document.getElementById('createMessage').value.trim();
+            const type = document.getElementById('createType').value;
+
+            if (!title || !message) {
+                showResult('createNotificationResult', 'Please enter title and message', 'error');
+                return;
+            }
+
+            showResult('createNotificationResult', 'Creating notification...', 'info');
+            
+            const notificationData = {
+                recipient_id: recipientId,
+                title: title,
+                message: message,
+                type: type,
+                related_id: Math.floor(Math.random() * 1000),
+                related_type: 'test',
+                class_code: 'TEST101',
+                is_urgent: false
+            };
+            
+            const result = await makeRequest('/api/notifications', {
+                method: 'POST',
+                body: notificationData
+            });
+            
+            if (result.status === 200 && result.data.success) {
+                showResult('createNotificationResult', `✅ Success! Notification created with ID: ${result.data.data?.id || 'Unknown'}`, 'success');
+            } else {
+                showResult('createNotificationResult', `❌ Error: ${result.data?.error || result.error || 'Unknown error'}`, 'error');
+            }
+
+        }
+
+        async function runAllTests() {
+            if (!authToken || !currentUserId) {
+                showResult('allTestsResult', 'Please set authentication first', 'error');
+                return;
+            }
+
+            showResult('allTestsResult', 'Running all tests...', 'info');
+            let results = [];
+            
+            // Test 1: Get all notifications
+            const allResult = await makeRequest(`/api/notifications?userId=${currentUserId}`);
+            results.push(`1. Get All Notifications: ${allResult.status === 200 && allResult.data.success ? '✅ PASS' : '❌ FAIL'}`);
+            
+            // Test 2: Get recent notifications
+            const recentResult = await makeRequest(`/api/notifications/recent?userId=${currentUserId}&limit=5`);
+            results.push(`2. Get Recent Notifications: ${recentResult.status === 200 && recentResult.data.success ? '✅ PASS' : '❌ FAIL'}`);
+            
+            // Test 3: Get unread count
+            const unreadResult = await makeRequest(`/api/notifications/unread-count?userId=${currentUserId}`);
+            results.push(`3. Get Unread Count: ${unreadResult.status === 200 && unreadResult.data.success ? '✅ PASS' : '❌ FAIL'}`);
+            
+            // Test 4: Create notification
+            const createResult = await makeRequest('/api/notifications', {
+                method: 'POST',
+                body: {
+                    recipient_id: currentUserId,
+                    title: 'Test Notification',
+                    message: 'This is a test notification from the integration test',
+                    type: 'system',
+                    related_id: 999,
+                    related_type: 'test',
+                    class_code: 'TEST101',
+                    is_urgent: false
+                }
+            });
+            results.push(`4. Create Notification: ${createResult.status === 200 && createResult.data.success ? '✅ PASS' : '❌ FAIL'}`);
+            
+            const summary = results.join('\n');
+            const passedTests = results.filter(r => r.includes('✅ PASS')).length;
+            const totalTests = results.length;
+            
+            showResult('allTestsResult', `Test Results Summary:\n\n${summary}\n\nOverall: ${passedTests}/${totalTests} tests passed`, 
+                      passedTests === totalTests ? 'success' : 'error');
+        }
+    </script>
+</body>
+</html>
+
+

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .notification-card {
+            background: #e3f0ff;
+            border: 1.5px solid #1976d2;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+            padding: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            cursor: default;
+            transition: background 0.2s;
+        }
+        .notification-card.read {
+            background: #fff;
+            box-shadow: none;
+        }
+        .notification-content {
+            flex: 1;
+        }
+        .notification-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1976d2;
+            margin-bottom: 2px;
+        }
+        .notification-message {
+            font-weight: 600;
+            font-size: 15px;
+            color: #222;
+            margin-bottom: 4px;
+        }
+        .notification-time {
+            font-size: 13px;
+            color: #888;
+        }
+        .notification-debug {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
+            font-family: monospace;
+        }
+        .mark-read-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            margin-left: 8px;
+            position: relative;
+            z-index: 10;
+            min-width: 90px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .mark-read-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-read-btn.force {
+            background: #666;
+        }
+        .mark-all-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+            min-width: 120px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+        }
+        .mark-all-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-all-btn:disabled {
+            background: #bbb;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .badge {
+            background: #f44336;
+            color: #fff;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 2px 10px;
+            margin-left: 8px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+        }
+        .api-test {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .api-test input, .api-test button {
+            margin: 5px;
+            padding: 8px 12px;
+        }
+        .api-test input {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .api-test button {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Notification Diagnostic Tool</h1>
+        <p>This tool helps diagnose notification button issues by testing different scenarios.</p>
+
+        <div class="test-section">
+            <h3>🧪 Test Scenarios</h3>
+            
+            <div class="api-test">
+                <h4>API Configuration</h4>
+                <label>API Base URL:</label>
+                <input type="text" id="apiBaseUrl" value="http://localhost:4000" placeholder="http://localhost:4000">
+                <br>
+                <small style="color: #666;">Note: Make sure the notification server is running on port 4000</small>
+                <br>
+                <label>User ID:</label>
+                <input type="text" id="userId" placeholder="Enter user ID" value="STU68B7D2257B1C3819">
+                <br>
+                <button onclick="loadFromLocalStorage()">Load from localStorage</button>
+                <button onclick="testApiConnection()">Test API Connection</button>
+            </div>
+
+            <div class="api-test">
+                <h4>Notification Data Test</h4>
+                <button onclick="testNotificationData()">Test Notification Data</button>
+                <button onclick="simulateNotifications()">Simulate Notifications</button>
+                <button onclick="clearLog()">Clear Log</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Simulated Teacher Notifications</h3>
+            
+            <div class="header">
+                <div>
+                    <h2>
+                        <span>🔔</span> Teacher Notifications
+                        <span class="badge" id="teacherBadge">5</span>
+                    </h2>
+                    <div style="color: #666; font-size: 14px; margin-top: 2px;">
+                        Stay updated on student submissions, excuse letters, attendance alerts, and classroom updates.
+                    </div>
+                </div>
+                <button class="mark-all-btn" id="teacherMarkAllBtn" onclick="testTeacherMarkAll()">
+                    Mark all as read
+                </button>
+            </div>
+            
+            <div id="teacherNotifications">
+                <!-- Notifications will be generated here -->
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Diagnostic Log</h3>
+            <div id="log" class="log">Ready to run diagnostics...\n</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Common Issues & Solutions</h3>
+            <div class="status info">
+                <strong>ℹ️ Issue: Buttons not visible</strong>
+                <ul>
+                    <li><strong>Cause:</strong> Notifications have <code>is_read: true</code></li>
+                    <li><strong>Solution:</strong> Check API data, ensure notifications are marked as unread</li>
+                </ul>
+            </div>
+            <div class="status error">
+                <strong>❌ Issue: Buttons visible but not clickable</strong>
+                <ul>
+                    <li><strong>Cause:</strong> CSS conflicts, overlapping elements, or JavaScript errors</li>
+                    <li><strong>Solution:</strong> Check console for errors, verify z-index and positioning</li>
+                </ul>
+            </div>
+            <div class="status success">
+                <strong>✅ Issue: Count not updating</strong>
+                <ul>
+                    <li><strong>Cause:</strong> API calls failing or context not updating</li>
+                    <li><strong>Solution:</strong> Verify backend endpoints, check NotificationContext</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let teacherNotifications = [];
+        let teacherUnreadCount = 5;
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        }
+
+        function loadFromLocalStorage() {
+            const user = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    document.getElementById('userId').value = userData.user_id || userData.id || '';
+                    log('✅ Loaded user ID from localStorage');
+                } catch (e) {
+                    log('❌ Failed to parse user data from localStorage');
+                }
+            }
+            
+            if (token) {
+                document.getElementById('jwtToken').value = token;
+                log('✅ Loaded JWT token from localStorage');
+            }
+        }
+
+        function simulateNotifications() {
+            log('🎭 Simulating notification data...');
+            
+            teacherNotifications = [
+                {
+                    id: '1',
+                    type: 'general',
+                    message: 'Hello Jordan Salenga, you have been assigned to teach Capstone3 (Cap3) for Section BSIT 2A (1ST Semester, 2023-2024).',
+                    is_read: false,
+                    created_at: new Date(Date.now() - 39 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '2',
+                    type: 'general',
+                    message: 'Alyssa Batumbakal has enrolled in Object Oriented Programming for Section BSIT 4K (1st Semester Semester, 2024-2025).',
+                    is_read: false,
+                    created_at: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '3',
+                    type: 'general',
+                    message: 'You have been assigned to teach Cloud Computing (CLDCOMP) for Section ACT 1E (2ND Semester, 2024-2025).',
+                    is_read: false,
+                    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '4',
+                    type: 'general',
+                    message: 'Geraldine P. Ferreras has enrolled in Object Oriented Programming for Section BSIT 4K.',
+                    is_read: false,
+                    created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '5',
+                    type: 'general',
+                    message: 'San po',
+                    is_read: false,
+                    created_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString()
+                }
+            ];
+            
+            teacherUnreadCount = teacherNotifications.filter(n => !n.is_read).length;
+            renderTeacherNotifications();
+            updateBadges();
+            
+            log(`✅ Simulated ${teacherNotifications.length} notifications with ${teacherUnreadCount} unread`);
+            log('🔍 Notification data:', JSON.stringify(teacherNotifications, null, 2));
+        }
+
+        function renderTeacherNotifications() {
+            const container = document.getElementById('teacherNotifications');
+            container.innerHTML = '';
+            
+            teacherNotifications.forEach(notification => {
+                const isRead = notification.is_read;
+                const card = document.createElement('div');
+                card.className = `notification-card ${isRead ? 'read' : ''}`;
+                
+                card.innerHTML = `
+                    <div style="font-size: 28px; color: #1976d2; flex-shrink: 0;">📢</div>
+                    <div class="notification-content">
+                        <div class="notification-title">Notification</div>
+                        <div class="notification-message">${notification.message}</div>
+                        <div class="notification-time">${timeAgo(notification.created_at)}</div>
+                        <div class="notification-debug">
+                            Status: ${isRead ? 'READ' : 'UNREAD'} | ID: ${notification.id} | Type: ${typeof isRead}
+                        </div>
+                    </div>
+                    ${!isRead ? `
+                        <button class="mark-read-btn" onclick="markAsRead('${notification.id}')">
+                            Mark as read
+                        </button>
+                    ` : `
+                        <button class="mark-read-btn force" onclick="forceMarkAsRead('${notification.id}')">
+                            Force Mark
+                        </button>
+                    `}
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function markAsRead(id) {
+            log(`🔘 Mark as read button clicked for notification: ${id}`);
+            
+            const notification = teacherNotifications.find(n => n.id === id);
+            if (notification && !notification.is_read) {
+                notification.is_read = true;
+                teacherUnreadCount--;
+                renderTeacherNotifications();
+                updateBadges();
+                log(`✅ Notification ${id} marked as read. Unread count: ${teacherUnreadCount}`);
+            }
+        }
+
+        function forceMarkAsRead(id) {
+            log(`🔘 Force mark as read button clicked for notification: ${id}`);
+            
+            const notification = teacherNotifications.find(n => n.id === id);
+            if (notification) {
+                if (!notification.is_read) {
+                    notification.is_read = true;
+                    teacherUnreadCount--;
+                }
+                renderTeacherNotifications();
+                updateBadges();
+                log(`✅ Notification ${id} force marked as read. Unread count: ${teacherUnreadCount}`);
+            }
+        }
+
+        function testTeacherMarkAll() {
+            log('🔘 Mark all as read button clicked');
+            log('🔄 Marking all notifications as read');
+            
+            let markedCount = 0;
+            teacherNotifications.forEach(notification => {
+                if (!notification.is_read) {
+                    notification.is_read = true;
+                    markedCount++;
+                }
+            });
+            
+            teacherUnreadCount = 0;
+            renderTeacherNotifications();
+            updateBadges();
+            
+            log(`✅ All notifications marked as read. Marked ${markedCount} notifications. Unread count: ${teacherUnreadCount}`);
+        }
+
+        function updateBadges() {
+            document.getElementById('teacherBadge').textContent = teacherUnreadCount;
+            document.getElementById('teacherMarkAllBtn').disabled = teacherUnreadCount === 0;
+        }
+
+        function timeAgo(dateString) {
+            const now = new Date();
+            const date = new Date(dateString);
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 60) return `${diffMins} minutes ago`;
+            if (diffHours < 24) return `${diffHours} hours ago`;
+            return `${diffDays} days ago`;
+        }
+
+        async function testApiConnection() {
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                log('❌ Please enter a user ID');
+                return;
+            }
+            
+            try {
+                log(`🔗 Testing API connection to: ${baseUrl}`);
+                const response = await fetch(`${baseUrl}/health`);
+                const data = await response.json();
+                log(`✅ API connection successful: ${JSON.stringify(data)}`);
+            } catch (error) {
+                log(`❌ API connection failed: ${error.message}`);
+            }
+        }
+
+        async function testNotificationData() {
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                log('❌ Please enter a user ID');
+                return;
+            }
+            
+            try {
+                log(`📡 Testing notification data for user: ${userId}`);
+                const response = await fetch(`${baseUrl}/api/notifications?userId=${userId}`);
+                const data = await response.json();
+                log(`📊 API response: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data && Array.isArray(data)) {
+                    const unreadCount = data.filter(n => !n.is_read).length;
+                    log(`🔍 Found ${data.length} notifications, ${unreadCount} unread`);
+                    
+                    data.forEach((notification, index) => {
+                        log(`Notification ${index}: ID=${notification.id}, is_read=${notification.is_read} (${typeof notification.is_read})`);
+                    });
+                }
+            } catch (error) {
+                log(`❌ Failed to fetch notification data: ${error.message}`);
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            loadFromLocalStorage();
+            simulateNotifications();
+            log('🚀 Diagnostic tool loaded. Click "Simulate Notifications" to test button functionality.');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .notification-card {
+            background: #e3f0ff;
+            border: 1.5px solid #1976d2;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+            padding: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .notification-content {
+            flex: 1;
+        }
+        .notification-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1976d2;
+            margin-bottom: 2px;
+        }
+        .notification-message {
+            font-weight: 600;
+            font-size: 15px;
+            color: #222;
+            margin-bottom: 4px;
+        }
+        .notification-time {
+            font-size: 13px;
+            color: #888;
+        }
+        .mark-read-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            margin-left: 8px;
+            min-width: 90px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .mark-read-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-read-btn.clicked {
+            background: #28a745;
+        }
+        .mark-all-btn {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 120px;
+            min-height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+        }
+        .mark-all-btn:hover {
+            background: #1565c0;
+            transform: translateY(-1px);
+        }
+        .mark-all-btn.clicked {
+            background: #28a745;
+        }
+        .badge {
+            background: #f44336;
+            color: #fff;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 2px 10px;
+            margin-left: 8px;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔘 Quick Button Test</h1>
+        <p>This simulates the fixed notification buttons. Try clicking them!</p>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <h2 style="display: flex; align-items: center; margin: 0;">
+                <span>🔔</span> Notifications
+                <span class="badge" id="badge">3</span>
+            </h2>
+            <button class="mark-all-btn" id="markAllBtn" onclick="markAllAsRead()">
+                Mark all as read
+            </button>
+        </div>
+
+        <div class="notification-card">
+            <div style="font-size: 28px; color: #1976d2; flex-shrink: 0;">📢</div>
+            <div class="notification-content">
+                <div class="notification-title">Notification</div>
+                <div class="notification-message">Hello Jordan Salenga, you have been assigned to teach Capstone3 (Cap3) for Section BSIT 2A.</div>
+                <div class="notification-time">39 minutes ago</div>
+            </div>
+            <button class="mark-read-btn" onclick="markAsRead(this, 1)">Mark as read</button>
+        </div>
+
+        <div class="notification-card">
+            <div style="font-size: 28px; color: #4caf50; flex-shrink: 0;">👨‍🎓</div>
+            <div class="notification-content">
+                <div class="notification-title" style="color: #4caf50;">Student Enrollment</div>
+                <div class="notification-message">Alyssa Batumbakal has enrolled in Object Oriented Programming for Section BSIT 4K.</div>
+                <div class="notification-time">20 hours ago</div>
+            </div>
+            <button class="mark-read-btn" onclick="markAsRead(this, 2)">Mark as read</button>
+        </div>
+
+        <div class="notification-card">
+            <div style="font-size: 28px; color: #ff9800; flex-shrink: 0;">📝</div>
+            <div class="notification-content">
+                <div class="notification-title" style="color: #ff9800;">Grade Update</div>
+                <div class="notification-message">Your grade for Assignment 3 has been posted. Check your grades section.</div>
+                <div class="notification-time">2 hours ago</div>
+            </div>
+            <button class="mark-read-btn" onclick="markAsRead(this, 3)">Mark as read</button>
+        </div>
+
+        <div id="log" class="log">Ready to test buttons...\n</div>
+    </div>
+
+    <script>
+        let unreadCount = 3;
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateBadge() {
+            document.getElementById('badge').textContent = unreadCount;
+            if (unreadCount === 0) {
+                document.getElementById('markAllBtn').textContent = 'All Read';
+                document.getElementById('markAllBtn').style.background = '#28a745';
+            }
+        }
+
+        function markAsRead(button, id) {
+            if (button.classList.contains('clicked')) {
+                log(`Notification ${id} already marked as read`);
+                return;
+            }
+
+            button.classList.add('clicked');
+            button.textContent = 'Marked as read';
+            button.style.background = '#28a745';
+            
+            unreadCount--;
+            updateBadge();
+            
+            log(`✅ Notification ${id} marked as read. Unread count: ${unreadCount}`);
+        }
+
+        function markAllAsRead() {
+            const buttons = document.querySelectorAll('.mark-read-btn');
+            let markedCount = 0;
+            
+            buttons.forEach((button, index) => {
+                if (!button.classList.contains('clicked')) {
+                    markAsRead(button, index + 1);
+                    markedCount++;
+                }
+            });
+            
+            if (markedCount === 0) {
+                log('All notifications already marked as read');
+            } else {
+                log(`✅ Marked ${markedCount} notifications as read`);
+            }
+        }
+
+        log('Button test loaded. Try clicking the buttons!');
+    </script>
+</body>
+</html>
+

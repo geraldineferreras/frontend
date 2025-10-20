@@ -263,7 +263,7 @@ const AdminSettings = () => {
     <div className="px-4 py-5">
       <div className="row">
         <div className="col-12">
-          <h1 className="h3 mb-4">Admin Settings</h1>
+          <h1 className="h3 mb-4">Program Chairperson Settings</h1>
           
           {message.text && (
             <Alert color={message.type} className="mb-4">
@@ -479,7 +479,7 @@ const AdminSettings = () => {
                                 }}
                               />
                               <small className="form-text text-muted">
-                                Admin role cannot be changed
+                                Program Chairperson role cannot be changed
                               </small>
                             </div>
                           </Col>

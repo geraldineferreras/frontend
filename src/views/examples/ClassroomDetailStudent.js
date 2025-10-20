@@ -1674,14 +1674,15 @@ const ClassroomDetailStudent = () => {
 
 
       {/* Tabs */}
-      <div style={{ maxWidth: 1100, margin: '0 auto', marginTop: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px 0 rgba(44,62,80,.06)', padding: '0 24px', height: 56 }}>
+      <div className="student-classroom-header-scroll" style={{ maxWidth: 1100, margin: '0 auto', marginTop: 24 }}>
+        <div className="student-classroom-header-inner" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-around', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px 0 rgba(44,62,80,.06)', padding: '0 24px', height: 'auto' }}>
           {tabList.map(tab => (
             <div
+              className="student-tab-item"
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 fontWeight: 600,
                 fontSize: 15,

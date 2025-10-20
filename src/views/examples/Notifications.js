@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../services/api";
+import { getCurrentUserId } from "../../utils/userUtils";
+import { timeAgo } from "../../utils/timeUtils";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 // Notification type mapping
 const typeMap = {
@@ -14,17 +17,6 @@ const typeMap = {
   stream_post: { icon: "💬", color: "#00bcd4", title: "Stream Post" },
 };
 
-// Time formatting helper
-function timeAgo(dateStr) {
-  const now = new Date();
-  const date = new Date(dateStr.replace(/-/g, "/"));
-  const diff = (now - date) / 1000;
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-  if (diff < 172800) return "Yesterday";
-  return date.toLocaleDateString();
-}
 
 function NotificationCard({ notification, onMarkRead, onClick }) {
   const { type, message, is_read, created_at } = notification;
@@ -54,49 +46,99 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
         </div>
         <div style={{ fontWeight: is_read ? 400 : 600, fontSize: 15, color: is_read ? "#444" : "#222" }}>{message}</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{timeAgo(created_at)}</div>
+        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+          Status: {is_read ? 'READ' : 'UNREAD'} | ID: {notification.id} | Type: {typeof is_read}
+        </div>
       </div>
-      {!is_read && (
-        <button
-          onClick={e => { e.stopPropagation(); onMarkRead(notification.id); }}
-          style={{ background: meta.color, color: "#fff", border: "none", borderRadius: 8, padding: "4px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginLeft: 8 }}
-        >
-          Mark as read
-        </button>
-      )}
+      {/* Always show button - temporary fix for deployed version */}
+      <button
+        onClick={e => { 
+          console.log('🔘 [Notifications] Mark as read button clicked for notification:', notification.id);
+          e.stopPropagation(); 
+          e.preventDefault();
+          onMarkRead(notification.id); 
+        }}
+        onMouseDown={e => console.log('🔘 [Notifications] Button mousedown event')}
+        onMouseUp={e => console.log('🔘 [Notifications] Button mouseup event')}
+        style={{ 
+          background: is_read ? "#666" : meta.color, 
+          color: "#fff", 
+          border: "none", 
+          borderRadius: 8, 
+          padding: "6px 12px", 
+          fontWeight: 600, 
+          fontSize: 13, 
+          cursor: "pointer", 
+          marginLeft: 8,
+          position: "relative",
+          zIndex: 10,
+          minWidth: "90px",
+          minHeight: "36px",
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        {is_read ? 'Mark Again' : 'Mark as read'}
+      </button>
     </div>
   );
 }
 
-// Real API calls for notifications
+// Real API calls for notifications using the new API methods
 const fetchNotifications = async () => {
   try {
-    const response = await api.get('/api/notifications');
-    if (response.success && response.data) {
-      return response.data.notifications || [];
+    const userId = getCurrentUserId();
+    console.log('🔍 [Notifications] getCurrentUserId returned:', userId);
+    
+    if (!userId) {
+      console.log('❌ [Notifications] No user ID found, returning empty array');
+      return [];
     }
+    
+    console.log('📡 [Notifications] Making API call to getNotifications with userId:', userId);
+    const response = await api.getNotifications(userId);
+    console.log('📡 [Notifications] API response:', response);
+    
+    if (response.success && response.data) {
+      // The new backend returns data directly as an array, not wrapped in notifications
+      const notifications = Array.isArray(response.data) ? response.data : [];
+      console.log('✅ [Notifications] Successfully fetched notifications:', notifications.length, 'notifications');
+      return notifications;
+    }
+    console.log('❌ [Notifications] API call failed or returned no data');
     return [];
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    console.error('❌ [Notifications] Error fetching notifications:', error);
     return [];
   }
 };
 
 const markAsRead = async (notificationId) => {
   try {
-    await api.put(`/api/notifications/${notificationId}/read`);
-    return true;
+    console.log('📡 [Notifications] API call - markNotificationAsRead:', notificationId);
+    const response = await api.markNotificationAsRead(notificationId);
+    console.log('📡 [Notifications] API response:', response);
+    return response.success || false;
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    console.error('❌ [Notifications] Error marking notification as read:', error);
     return false;
   }
 };
 
 const markAllAsRead = async () => {
   try {
-    await api.put('/api/notifications/mark-all-read');
-    return true;
+    const userId = getCurrentUserId();
+    if (!userId) {
+      console.warn('⚠️ [Notifications] No user ID found for markAllAsRead');
+      return false;
+    }
+    
+    console.log('📡 [Notifications] API call - markAllNotificationsAsRead:', userId);
+    const response = await api.markAllNotificationsAsRead(userId);
+    console.log('📡 [Notifications] API response:', response);
+    return response.success || false;
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    console.error('❌ [Notifications] Error marking all notifications as read:', error);
     return false;
   }
 };
@@ -117,12 +159,15 @@ const Notifications = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, unread, read
+  const { decrementUnreadCount, resetUnreadCount } = useNotifications();
 
   const loadNotifications = useCallback(async () => {
     try {
+      console.log('🔄 [Notifications] loadNotifications called');
       setRefreshing(true);
       setError(null);
       const data = await fetchNotifications();
+      console.log('📊 [Notifications] fetchNotifications returned:', data);
       
       // Sort: unread first, then by creation date (newest first)
       data.sort((a, b) => {
@@ -132,9 +177,10 @@ const Notifications = () => {
         return new Date(b.created_at) - new Date(a.created_at);
       });
       
+      console.log('📊 [Notifications] Setting notifications state with:', data.length, 'notifications');
       setNotifications(data);
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      console.error('❌ [Notifications] Failed to load notifications:', error);
       setError('Failed to load notifications. Please try again.');
     } finally {
       setLoading(false);
@@ -150,27 +196,43 @@ const Notifications = () => {
 
   const handleMarkRead = async (id) => {
     try {
+      console.log('🔄 [Notifications] Marking notification as read:', id);
       const success = await markAsRead(id);
+      console.log('📊 [Notifications] Mark as read result:', success);
+      
       if (success) {
         setNotifications(notifications => 
           notifications.map(n => n.id === id ? { ...n, is_read: true } : n)
         );
+        // Update the global notification count
+        decrementUnreadCount();
+        console.log('✅ [Notifications] Notification marked as read successfully');
+      } else {
+        console.warn('⚠️ [Notifications] Failed to mark notification as read - API returned false');
       }
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.error('❌ [Notifications] Failed to mark notification as read:', error);
     }
   };
 
   const handleMarkAllRead = async () => {
     try {
+      console.log('🔄 [Notifications] Marking all notifications as read');
       const success = await markAllAsRead();
+      console.log('📊 [Notifications] Mark all as read result:', success);
+      
       if (success) {
         setNotifications(notifications => 
           notifications.map(n => ({ ...n, is_read: true }))
         );
+        // Reset the global notification count to 0
+        resetUnreadCount();
+        console.log('✅ [Notifications] All notifications marked as read successfully');
+      } else {
+        console.warn('⚠️ [Notifications] Failed to mark all notifications as read - API returned false');
       }
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.error('❌ [Notifications] Failed to mark all notifications as read:', error);
     }
   };
 
@@ -223,8 +285,17 @@ const Notifications = () => {
             <option value="read">Read ({notifications.length - unreadCount})</option>
           </select>
           <button
-            onClick={handleMarkAllRead}
-            disabled={unreadCount === 0 || refreshing}
+            onClick={(e) => {
+              console.log('🔘 [Notifications] Mark all as read button clicked');
+              console.log('🔘 [Notifications] Unread count:', unreadCount);
+              console.log('🔘 [Notifications] Refreshing:', refreshing);
+              e.preventDefault();
+              e.stopPropagation();
+              handleMarkAllRead();
+            }}
+            onMouseDown={e => console.log('🔘 [Notifications] Mark all button mousedown')}
+            onMouseUp={e => console.log('🔘 [Notifications] Mark all button mouseup')}
+            disabled={false}
             style={{ 
               background: unreadCount === 0 || refreshing ? '#bbb' : '#1976d2', 
               color: '#fff', 
@@ -234,7 +305,11 @@ const Notifications = () => {
               fontWeight: 600, 
               fontSize: 14, 
               cursor: unreadCount === 0 || refreshing ? 'not-allowed' : 'pointer', 
-              transition: 'background 0.2s' 
+              transition: 'background 0.2s',
+              position: 'relative',
+              zIndex: 10,
+              minWidth: '120px',
+              minHeight: '36px'
             }}
           >
             {refreshing ? 'Updating...' : 'Mark all as read'}

@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../services/api";
+import { getCurrentUserId } from "../../utils/userUtils";
+import { timeAgo } from "../../utils/timeUtils";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 // Notification type mapping
 const typeMap = {
@@ -13,17 +16,6 @@ const typeMap = {
   attendance: { icon: "✅", color: "#4caf50", title: "Attendance Update" },
 };
 
-// Time formatting helper
-function timeAgo(dateStr) {
-  const now = new Date();
-  const date = new Date(dateStr.replace(/-/g, "/"));
-  const diff = (now - date) / 1000;
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-  if (diff < 172800) return "Yesterday";
-  return date.toLocaleDateString();
-}
 
 function NotificationCard({ notification, onMarkRead, onClick }) {
   const { type, message, is_read, created_at } = notification;
@@ -52,25 +44,54 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
         </div>
         <div style={{ fontWeight: is_read ? 400 : 600, fontSize: 15, color: is_read ? "#444" : "#222" }}>{message}</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{timeAgo(created_at)}</div>
+        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+          Status: {is_read ? 'READ' : 'UNREAD'} | ID: {notification.id} | Type: {typeof is_read}
+        </div>
       </div>
-      {!is_read && (
-        <button
-          onClick={e => { e.stopPropagation(); onMarkRead(notification.id); }}
-          style={{ background: meta.color, color: "#fff", border: "none", borderRadius: 8, padding: "4px 10px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginLeft: 8 }}
-        >
-          Mark as read
-        </button>
-      )}
+      {/* Always show button - temporary fix for deployed version */}
+      <button
+        onClick={e => { 
+          console.log('🔘 [StudentNotifications] Mark as read button clicked for notification:', notification.id);
+          e.stopPropagation(); 
+          e.preventDefault();
+          onMarkRead(notification.id); 
+        }}
+        style={{ 
+          background: is_read ? "#666" : meta.color, 
+          color: "#fff", 
+          border: "none", 
+          borderRadius: 8, 
+          padding: "6px 12px", 
+          fontWeight: 600, 
+          fontSize: 13, 
+          cursor: "pointer", 
+          marginLeft: 8,
+          position: "relative",
+          zIndex: 10,
+          minWidth: "90px",
+          minHeight: "36px",
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        {is_read ? 'Mark Again' : 'Mark as read'}
+      </button>
     </div>
   );
 }
 
-// Real API calls for student notifications
+// Real API calls for student notifications using new API methods
 const fetchNotifications = async () => {
   try {
-    const response = await api.get('/api/notifications');
+    const userId = getCurrentUserId();
+    if (!userId) {
+      return [];
+    }
+    
+    const response = await api.getNotifications(userId);
     if (response.success && response.data) {
-      return response.data.notifications || [];
+      // The new backend returns data directly as an array, not wrapped in notifications
+      return Array.isArray(response.data) ? response.data : [];
     }
     return [];
   } catch (error) {
@@ -81,20 +102,30 @@ const fetchNotifications = async () => {
 
 const markAsRead = async (notificationId) => {
   try {
-    await api.put(`/api/notifications/${notificationId}/read`);
-    return true;
+    console.log('📡 [StudentNotifications] API call - markNotificationAsRead:', notificationId);
+    const response = await api.markNotificationAsRead(notificationId);
+    console.log('📡 [StudentNotifications] API response:', response);
+    return response.success || false;
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    console.error('❌ [StudentNotifications] Error marking notification as read:', error);
     return false;
   }
 };
 
 const markAllAsRead = async () => {
   try {
-    await api.put('/api/notifications/mark-all-read');
-    return true;
+    const userId = getCurrentUserId();
+    if (!userId) {
+      console.warn('⚠️ [StudentNotifications] No user ID found for markAllAsRead');
+      return false;
+    }
+    
+    console.log('📡 [StudentNotifications] API call - markAllNotificationsAsRead:', userId);
+    const response = await api.markAllNotificationsAsRead(userId);
+    console.log('📡 [StudentNotifications] API response:', response);
+    return response.success || false;
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    console.error('❌ [StudentNotifications] Error marking all notifications as read:', error);
     return false;
   }
 };
@@ -104,6 +135,7 @@ const StudentNotifications = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const { decrementUnreadCount, resetUnreadCount } = useNotifications();
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -135,29 +167,71 @@ const StudentNotifications = () => {
     return () => clearInterval(interval);
   }, [loadNotifications]);
 
+  // Mark all notifications as read when component mounts (user opened notifications page)
+  useEffect(() => {
+    const markAllAsReadOnOpen = async () => {
+      const unreadNotifications = notifications.filter(n => !n.is_read);
+      if (unreadNotifications.length > 0) {
+        console.log('🔔 [StudentNotifications] Auto-marking all notifications as read on page open');
+        try {
+          const success = await markAllAsRead();
+          if (success) {
+            setNotifications(notifications => 
+              notifications.map(n => ({ ...n, is_read: true }))
+            );
+            resetUnreadCount();
+            console.log('✅ [StudentNotifications] All notifications auto-marked as read');
+          }
+        } catch (error) {
+          console.error('❌ [StudentNotifications] Failed to auto-mark notifications as read:', error);
+        }
+      }
+    };
+
+    if (notifications.length > 0) {
+      markAllAsReadOnOpen();
+    }
+  }, [notifications.length]); // Only run when notifications are loaded
+
   const handleMarkRead = async (id) => {
     try {
+      console.log('🔄 [StudentNotifications] Marking notification as read:', id);
       const success = await markAsRead(id);
+      console.log('📊 [StudentNotifications] Mark as read result:', success);
+      
       if (success) {
         setNotifications(notifications => 
           notifications.map(n => n.id === id ? { ...n, is_read: true } : n)
         );
+        // Update the global notification count
+        decrementUnreadCount();
+        console.log('✅ [StudentNotifications] Notification marked as read successfully');
+      } else {
+        console.warn('⚠️ [StudentNotifications] Failed to mark notification as read - API returned false');
       }
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.error('❌ [StudentNotifications] Failed to mark notification as read:', error);
     }
   };
 
   const handleMarkAllRead = async () => {
     try {
+      console.log('🔄 [StudentNotifications] Marking all notifications as read');
       const success = await markAllAsRead();
+      console.log('📊 [StudentNotifications] Mark all as read result:', success);
+      
       if (success) {
         setNotifications(notifications => 
           notifications.map(n => ({ ...n, is_read: true }))
         );
+        // Reset the global notification count to 0
+        resetUnreadCount();
+        console.log('✅ [StudentNotifications] All notifications marked as read successfully');
+      } else {
+        console.warn('⚠️ [StudentNotifications] Failed to mark all notifications as read - API returned false');
       }
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.error('❌ [StudentNotifications] Failed to mark all notifications as read:', error);
     }
   };
 
@@ -175,8 +249,21 @@ const StudentNotifications = () => {
           <div style={{ color: '#666', fontSize: 14, marginTop: 2 }}>Stay updated on new announcements, grades, and class updates.</div>
         </div>
         <button
-          onClick={handleMarkAllRead}
-          disabled={unreadCount === 0 || refreshing}
+          onClick={(e) => {
+            console.log('🔘 [StudentNotifications] Mark all as read button clicked');
+            console.log('🔘 [StudentNotifications] Unread count:', unreadCount);
+            console.log('🔘 [StudentNotifications] Refreshing state:', refreshing);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Add a small delay to ensure the click is registered
+            setTimeout(() => {
+              handleMarkAllRead();
+            }, 10);
+          }}
+          onMouseDown={e => console.log('🔘 [StudentNotifications] Mark all button mousedown')}
+          onMouseUp={e => console.log('🔘 [StudentNotifications] Mark all button mouseup')}
+          disabled={false}
           style={{ 
             background: unreadCount === 0 || refreshing ? '#bbb' : '#1976d2', 
             color: '#fff', 
@@ -186,7 +273,12 @@ const StudentNotifications = () => {
             fontWeight: 700, 
             fontSize: 14, 
             cursor: unreadCount === 0 || refreshing ? 'not-allowed' : 'pointer', 
-            transition: 'background 0.2s' 
+            transition: 'background 0.2s',
+            position: 'relative',
+            zIndex: 10,
+            minWidth: '120px',
+            minHeight: '36px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         >
           {refreshing ? 'Updating...' : 'Mark all as read'}

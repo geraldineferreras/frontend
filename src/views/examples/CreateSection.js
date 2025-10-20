@@ -786,8 +786,16 @@ const CreateSection = () => {
                                   }
                                 }}
                                 isClearable
-                                isSearchable={false}
-                                placeholder="Select Adviser..."
+                                isSearchable
+                                filterOption={(option, rawInput) => {
+                                  const input = (rawInput || "").toLowerCase();
+                                  const { name = "", email = "" } = option.data || {};
+                                  return (
+                                    name.toLowerCase().includes(input) ||
+                                    email.toLowerCase().includes(input)
+                                  );
+                                }}
+                                placeholder="Search Adviser..."
                                 styles={{
                                   control: (base, state) => ({
                                     ...base,

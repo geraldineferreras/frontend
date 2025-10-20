@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Notifications Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍🏫 Teacher Notifications Test</h1>
+        <p>This specifically tests teacher notifications to see why they're not showing.</p>
+        
+        <div class="form-group">
+            <label>JWT Token:</label>
+            <input type="text" id="jwtToken" placeholder="Enter your JWT token">
+        </div>
+        <div class="form-group">
+            <label>Teacher ID:</label>
+            <input type="text" id="teacherId" placeholder="Enter teacher user ID">
+        </div>
+        
+        <button onclick="getFromLocalStorage()">📱 Get from LocalStorage</button>
+        <button onclick="testTeacherNotifications()">👨‍🏫 Test Teacher Notifications</button>
+        <button onclick="createTeacherNotification()">📝 Create Test Notification</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://scms-backend.up.railway.app';
+
+        function showResult(message, type = 'info') {
+            const element = document.getElementById('result');
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function getFromLocalStorage() {
+            try {
+                const user = localStorage.getItem('user');
+                const token = localStorage.getItem('token');
+                
+                let message = '📱 LocalStorage Data:\n\n';
+                
+                if (user) {
+                    const userObj = JSON.parse(user);
+                    message += `User Object: ${JSON.stringify(userObj, null, 2)}\n\n`;
+                    message += `User ID: ${userObj.user_id || userObj.id || 'NOT FOUND'}\n\n`;
+                    message += `User Role: ${userObj.role || 'NOT SPECIFIED'}\n\n`;
+                } else {
+                    message += '❌ No user data found in localStorage\n\n';
+                }
+                
+                if (token) {
+                    message += `Token: ${token.substring(0, 50)}...\n\n`;
+                } else {
+                    message += '❌ No token found in localStorage\n\n';
+                }
+                
+                // Auto-fill the form
+                if (user && token) {
+                    const userObj = JSON.parse(user);
+                    const userId = userObj.user_id || userObj.id;
+                    document.getElementById('jwtToken').value = token;
+                    document.getElementById('teacherId').value = userId || '';
+                }
+                
+                showResult(message, user && token ? 'success' : 'error');
+            } catch (error) {
+                showResult(`❌ Error reading localStorage: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTeacherNotifications() {
+            const token = document.getElementById('jwtToken').value.trim();
+            const teacherId = document.getElementById('teacherId').value.trim();
+            
+            if (!token || !teacherId) {
+                showResult('❌ Please enter both JWT token and Teacher ID', 'error');
+                return;
+            }
+            
+            showResult('🔄 Testing teacher notifications...', 'info');
+            
+            let results = [];
+            
+            try {
+                // Test 1: Check authentication
+                results.push('1. Testing authentication...');
+                const authResponse = await fetch(`${API_BASE}/api/auth/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (authResponse.ok) {
+                    results.push('   ✅ Authentication: OK');
+                } else {
+                    results.push(`   ❌ Authentication: FAILED (${authResponse.status})`);
+                }
+                
+                // Test 2: Get teacher notifications
+                results.push('\n2. Testing teacher notifications API...');
+                const notificationsResponse = await fetch(`${API_BASE}/api/notifications?userId=${teacherId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                results.push(`   Status: ${notificationsResponse.status}`);
+                
+                if (notificationsResponse.ok) {
+                    const data = await notificationsResponse.json();
+                    results.push(`   Response: ${JSON.stringify(data, null, 2)}`);
+                    
+                    if (data.success && data.data) {
+                        const notifications = Array.isArray(data.data) ? data.data : [];
+                        results.push(`   ✅ Found ${notifications.length} notifications for teacher`);
+                        
+                        if (notifications.length > 0) {
+                            results.push('\n   📋 Teacher Notifications:');
+                            notifications.forEach((n, i) => {
+                                results.push(`   ${i+1}. [${n.is_read ? 'READ' : 'UNREAD'}] ${n.title}`);
+                                results.push(`      Message: ${n.message}`);
+                                results.push(`      Type: ${n.type}`);
+                                results.push(`      Created: ${n.created_at}`);
+                                results.push(`      Recipient: ${n.user_id || 'Unknown'}`);
+                            });
+                            
+                            results.push('\n🎯 CONCLUSION: Teacher notifications exist in backend!');
+                            results.push('🔧 The issue is in your frontend - check browser console for errors.');
+                        } else {
+                            results.push('   ⚠️  No notifications found for this teacher');
+                            results.push('   🔧 Try creating a test notification or check user ID format');
+                        }
+                    } else {
+                        results.push('   ❌ API returned success: false or no data');
+                    }
+                } else {
+                    const errorData = await notificationsResponse.text();
+                    results.push(`   ❌ API Error: ${errorData}`);
+                }
+                
+                // Test 3: Check unread count
+                results.push('\n3. Testing unread count...');
+                const unreadResponse = await fetch(`${API_BASE}/api/notifications/unread-count?userId=${teacherId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (unreadResponse.ok) {
+                    const unreadData = await unreadResponse.json();
+                    results.push(`   ✅ Unread count: ${unreadData.data?.count || 0}`);
+                } else {
+                    results.push(`   ❌ Unread count failed: ${unreadResponse.status}`);
+                }
+                
+                showResult(results.join('\n'), 'info');
+                
+            } catch (error) {
+                results.push(`❌ Network Error: ${error.message}`);
+                showResult(results.join('\n'), 'error');
+            }
+        }
+
+        async function createTeacherNotification() {
+            const token = document.getElementById('jwtToken').value.trim();
+            const teacherId = document.getElementById('teacherId').value.trim();
+            
+            if (!token || !teacherId) {
+                showResult('❌ Please enter both JWT token and Teacher ID', 'error');
+                return;
+            }
+            
+            showResult('🔄 Creating test notification for teacher...', 'info');
+            
+            try {
+                const notificationData = {
+                    recipient_id: teacherId,
+                    title: 'Test Teacher Notification',
+                    message: 'This is a test notification created specifically for the teacher to verify the system is working.',
+                    type: 'announcement',
+                    related_id: Math.floor(Math.random() * 1000),
+                    related_type: 'test',
+                    class_code: 'TEST101',
+                    is_urgent: false
+                };
+                
+                const response = await fetch(`${API_BASE}/api/notifications`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(notificationData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Test notification created successfully!\n\nNotification ID: ${data.data?.id || 'Unknown'}\n\nNow refresh your teacher notifications page to see it.`, 'success');
+                } else {
+                    const errorData = await response.text();
+                    showResult(`❌ Failed to create test notification.\nStatus: ${response.status}\nError: ${errorData}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Error creating notification: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
