@@ -121,7 +121,7 @@ const mockAssignments = [
   }
 ];
 
-// Mock data for People tab
+// Mock data for Participants tab
 const teachers = [
   { name: "Christian S. Mallari", avatar: "https://randomuser.me/api/portraits/men/75.jpg" }
 ];
@@ -129,13 +129,13 @@ const teachers = [
 // Classroom members will be fetched from API
 
 const tabList = [
-  { key: "stream", label: "Stream", icon: "ni ni-chat-round" },
-  { key: "classwork", label: "Classwork", icon: "ni ni-briefcase-24" },
-  { key: "people", label: "People", icon: "ni ni-single-02" },
-  { key: "grades", label: "Grades", icon: "ni ni-chart-bar-32" }
+  { key: "stream", label: "Class Feed", icon: "ni ni-chat-round" },
+  { key: "classwork", label: "Class Tasks", icon: "ni ni-tag" },
+  { key: "people", label: "Participants", icon: "ni ni-single-02" },
+  { key: "grades", label: "Records", icon: "ni ni-chart-bar-32" }
 ];
 
-const gradeFilters = ["All", "Assigned", "Returned", "Missing"];
+const gradeFilters = ["All", "Pending", "Turned in", "Graded", "Missing"];
 
 // Add mock announcements for student stream tab (similar to teacher)
 // const mockAnnouncements = [ ... ];
@@ -280,6 +280,7 @@ const ClassroomDetailStudent = () => {
   const showClassLoader = useMinDelay(loadingClass, 1600);
   const [studentAnnouncement, setStudentAnnouncement] = useState("");
   const [studentAnnouncements, setStudentAnnouncements] = useState([]);
+  const [isPosting, setIsPosting] = useState(false);
   const [formExpanded, setFormExpanded] = useState(false);
 
   const [announcementTitle, setAnnouncementTitle] = useState("");
@@ -296,6 +297,7 @@ const ClassroomDetailStudent = () => {
   
   // Add current user profile state for conditional menu rendering
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const notifyUnderDevelopment = () => {
     try {
@@ -525,15 +527,42 @@ const ClassroomDetailStudent = () => {
     setOpenMenuId(null);
   }
 
-  function handleEditSave(announcement) {
-    // Update in studentAnnouncements if it's a student post, else in mockAnnouncements
-    if (studentAnnouncements.some(a => a.id === announcement.id)) {
-      setStudentAnnouncements(prev => prev.map(a => a.id === announcement.id ? { ...a, title: editAnnouncementTitle, content: editAnnouncementContent } : a));
+  async function handleEditSave(announcement) {
+    if (!announcement) return;
+    if (!window.confirm('Do you want to update this announcement?')) return;
+    const postId = announcement.id;
+    const prevStudent = studentAnnouncements;
+    const prevApi = apiAnnouncements;
+
+    // Optimistic UI update
+    if (studentAnnouncements.some(a => a.id === postId)) {
+      setStudentAnnouncements(prev => prev.map(a => a.id === postId ? { ...a, title: editAnnouncementTitle, content: editAnnouncementContent } : a));
     } else {
-      announcement.title = editAnnouncementTitle;
-      announcement.content = editAnnouncementContent;
+      setApiAnnouncements(prev => prev.map(a => a.id === postId ? { ...a, title: editAnnouncementTitle, content: editAnnouncementContent } : a));
     }
-    setEditingAnnouncementId(null);
+
+    setIsSavingEdit(true);
+    try {
+      const payload = {
+        title: editAnnouncementTitle,
+        content: editAnnouncementContent,
+        allow_comments: true,
+      };
+      await apiService.makeRequest(`/api/student/classroom/${code}/stream/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+        requireAuth: true,
+      });
+      setEditingAnnouncementId(null);
+    } catch (err) {
+      // Revert on failure
+      setStudentAnnouncements(prevStudent);
+      setApiAnnouncements(prevApi);
+      console.error('Failed to update post:', err?.message || err);
+      alert('Update failed. Please try again.');
+    } finally {
+      setIsSavingEdit(false);
+    }
   }
 
   function handleEditCancel() {
@@ -679,16 +708,44 @@ const ClassroomDetailStudent = () => {
     if (!studentAnnouncement.trim()) return;
 
     try {
-      // Prepare post data
+      setIsPosting(true);
+
+      // Snapshot current values to use for optimistic UI and API payload
+      const currentTitle = announcementTitle;
+      const currentContent = studentAnnouncement;
+      const currentAttachments = attachments;
+      const tempId = `temp-${Date.now()}`;
+
+      // Optimistic announcement placeholder
+      const optimisticAnn = {
+        id: tempId,
+        title: currentTitle,
+        content: currentContent,
+        author: loggedInName,
+        date: new Date().toISOString(),
+        isPinned: false,
+        reactions: { like: 0, likedBy: [] },
+        comments: [],
+        attachments: currentAttachments,
+        isPending: true,
+      };
+      setStudentAnnouncements(prev => [optimisticAnn, ...prev]);
+
+      // Clear form immediately but keep it visible so spinner can be seen
+      setStudentAnnouncement("");
+      setAnnouncementTitle("");
+
+      // Prepare post data from snapshot
+      // Separate file attachments from link attachments
+      const fileAttachments = currentAttachments.filter(att => att && att.file);
+      const linkAttachments = currentAttachments.filter(att => att && att.url && (att.type === 'Link' || att.type === 'YouTube' || att.type === 'Google Drive'));
+      
       const postData = {
-        title: announcementTitle,
-        content: studentAnnouncement,
+        title: currentTitle,
+        content: currentContent,
         is_draft: 0,
         is_scheduled: 0,
         scheduled_at: "",
-
-        attachment_type: attachments.length > 0 ? "file" : null,
-        attachment_url: attachments.length > 0 ? attachments[0].url : "",
         // Smart notification logic: if selected students are specified, use them
         student_ids: selectedAnnouncementStudents.length > 0 ? selectedAnnouncementStudents : null
       };
@@ -696,48 +753,81 @@ const ClassroomDetailStudent = () => {
       console.log('Posting student announcement with smart notifications:', postData);
       console.log('Selected students:', selectedAnnouncementStudents);
       console.log('Class code:', code);
+      console.log('File attachments:', fileAttachments);
+      console.log('Link attachments:', linkAttachments);
+
+      // Extract File objects from file attachments
+      const files = fileAttachments.map(att => att.file).filter(Boolean);
 
       // Use the new API method with smart notification logic
-      const response = await apiService.createStudentPostWithSmartNotifications(code, postData);
+      const response = await apiService.createStudentPostWithSmartNotifications(code, postData, files, linkAttachments);
 
       console.log('Post response with notifications:', response);
 
       if (response.status) {
-        // Create local announcement object for UI
-        const newAnn = {
+        // Replace optimistic item with server-confirmed one
+        const confirmedAnn = {
           id: response.data.id,
-          title: announcementTitle,
-          content: studentAnnouncement,
-          author: loggedInName,
-          date: response.data.created_at,
+          title: optimisticAnn.title,
+          content: optimisticAnn.content,
+          author: optimisticAnn.author,
+          date: response.data.created_at || optimisticAnn.date,
           isPinned: false,
           reactions: { like: 0, likedBy: [] },
           comments: [],
-
-          attachments: attachments
+          attachments: optimisticAnn.attachments,
         };
 
-        // Add to local state
-        setStudentAnnouncements([newAnn, ...studentAnnouncements]);
+        setStudentAnnouncements(prev => prev.map(a => a.id === tempId ? confirmedAnn : a));
         
         // Show success message with notification info
         const notificationInfo = response.smartNotificationLogic;
         console.log(`Post created successfully! Notifications sent to ${notificationInfo.totalRecipients} recipients (${notificationInfo.teacherNotified ? '1 teacher' : '0 teachers'}, ${notificationInfo.studentsNotified} students)`);
-        
-        // Reset form
-        setStudentAnnouncement("");
-        setAnnouncementTitle("");
 
-        setFormExpanded(false);
+        // Reset attachments and selected students after success
         setAttachments([]);
         setEditingDraftId(null);
         setSelectedAnnouncementStudents([]); // Reset selected students
+        // Inputs already cleared optimistically above; now collapse the form
+        setFormExpanded(false);
       } else {
         console.error('Failed to create post:', response.message);
+        // Remove optimistic item on failure
+        setStudentAnnouncements(prev => prev.filter(a => a.id !== tempId));
       }
     } catch (error) {
       console.error('Error posting announcement:', error);
+      // Remove optimistic item on error
+      setStudentAnnouncements(prev => prev.filter(a => String(a.id).startsWith('temp-')));
       // You could add a toast notification here
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  // Student delete announcement
+  const handleDeleteStudentAnnouncement = async (id) => {
+    if (!id) return;
+    if (!window.confirm('Delete this announcement? This cannot be undone.')) return;
+
+    const prevStudent = studentAnnouncements;
+    const prevApi = apiAnnouncements;
+    setStudentAnnouncements(prev => prev.filter(a => a.id === undefined ? true : a.id !== id));
+    setApiAnnouncements(prev => prev.filter(a => a.id === undefined ? true : a.id !== id));
+
+    try {
+      const endpoint = `/api/student/classroom/${code}/stream/${id}`;
+      await apiService.makeRequest(endpoint, { method: 'DELETE', requireAuth: true });
+    } catch (err) {
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('404')) {
+        alert('Post not found or already deleted.');
+      } else {
+        setStudentAnnouncements(prevStudent);
+        setApiAnnouncements(prevApi);
+        console.error('Delete failed:', err?.message || err);
+        alert('Delete failed. Please try again.');
+      }
     }
   };
 
@@ -914,7 +1004,7 @@ const ClassroomDetailStudent = () => {
               attachments = item.attachments
                 .map((att) => ({
                   type: att.attachment_type || att.file_type || 'file',
-                  name: att.original_name || att.file_name || (att.file_path || '').split('/').pop(),
+                  name: att.original_name || (att.file_path || '').split('/').pop(),
                   url: att.file_path ? `${base}/${att.file_path.replace(/\\/g, '/')}` : (att.serving_url || ''),
                   fileType: att.file_type,
                   size: att.file_size,
@@ -930,7 +1020,7 @@ const ClassroomDetailStudent = () => {
                 attachments = arr
                   .map((f) => ({
                     type: f.attachment_type || f.file_type || 'file',
-                    name: f.original_name || f.file_name || (f.file_path || '').split('/').pop(),
+                    name: f.original_name || (f.file_path || '').split('/').pop(),
                     url: f.file_path ? `${base}/${f.file_path.replace(/\\/g, '/')}` : (f.serving_url || ''),
                     fileType: f.file_type,
                     size: f.file_size,
@@ -1269,14 +1359,14 @@ const ClassroomDetailStudent = () => {
   const [assignmentsError, setAssignmentsError] = useState(null);
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   
-  // People tab state
+  // Participants tab state
   const [peopleData, setPeopleData] = useState(null);
   // Helper: find class member by name (used for fetching real profile pictures)
   // Note: defined above as well near avatar utilities; keep only the earlier definition to avoid redeclaration.
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [peopleError, setPeopleError] = useState(null);
   
-  // Grades tab state
+  // Records tab state
   const [gradesData, setGradesData] = useState(null);
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [gradesError, setGradesError] = useState(null);
@@ -1433,13 +1523,13 @@ const ClassroomDetailStudent = () => {
     fetchClassroomMembers();
   }, [currentClass]);
 
-  // Fetch real assignments for Classwork tab
+  // Fetch real assignments for Class Tasks tab
   useEffect(() => {
     console.log('useEffect triggered - activeTab:', activeTab, 'code:', code, 'currentClass.code:', currentClass?.code);
     console.log('Current URL:', window.location.href);
     
     if (activeTab === 'classwork') {
-      console.log('Classwork tab is active');
+      console.log('Class Tasks tab is active');
       setLoadingAssignments(true);
       setAssignmentsError(null);
       
@@ -1506,10 +1596,10 @@ const ClassroomDetailStudent = () => {
     }
   }, [activeTab, code, currentClass]);
 
-  // Fetch people data for People tab
+  // Fetch people data for Participants tab
   useEffect(() => {
     if (activeTab === 'people' && currentClass) {
-      console.log('People tab is active, fetching people data for class:', currentClass.code);
+      console.log('Participants tab is active, fetching people data for class:', currentClass.code);
       setLoadingPeople(true);
       setPeopleError(null);
 
@@ -1537,10 +1627,10 @@ const ClassroomDetailStudent = () => {
     }
   }, [activeTab, currentClass]);
 
-  // Fetch grades data for Grades tab
+  // Fetch grades data for Records tab
   useEffect(() => {
     if (activeTab === 'grades' && currentClass) {
-      console.log('Grades tab is active, fetching grades data for class:', currentClass.code);
+      console.log('Records tab is active, fetching grades data for class:', currentClass.code);
       setLoadingGrades(true);
       setGradesError(null);
       
@@ -1701,12 +1791,12 @@ const ClassroomDetailStudent = () => {
           ))}
         </div>
       </div>
-      {/* Stream Section */}
+      {/* Class Feed Section */}
       {activeTab === "stream" && (
         <div style={{ maxWidth: 1100, margin: '24px auto 0', fontSize: '12px' }}>
           <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 8px 32px rgba(50,76,221,0.10)', border: '1.5px solid #e9ecef', padding: 32, marginBottom: 24 }}>
             <div style={{ fontWeight: 800, color: '#324cdd', letterSpacing: 1, marginBottom: 10, display: 'flex', alignItems: 'center', fontSize: '13px' }}>
-              <i className="ni ni-chat-round" style={{ fontSize: 18, marginRight: 6, color: '#2096ff' }} /> Stream
+              <i className="ni ni-chat-round" style={{ fontSize: 18, marginRight: 6, color: '#2096ff' }} /> Class Feed
                       </div>
                       
             
@@ -1919,26 +2009,35 @@ const ClassroomDetailStudent = () => {
                     <button
                       type="submit"
                       style={{
-                        background: studentAnnouncement.trim() ? '#7b8cff' : '#e6e6fa',
+                        background: (studentAnnouncement.trim() && !isPosting) ? '#7b8cff' : '#e6e6fa',
                         border: 'none',
-                        color: studentAnnouncement.trim() ? '#fff' : '#888',
+                        color: (studentAnnouncement.trim() ? '#fff' : '#888'),
                         fontWeight: 600,
                         fontSize: 14,
-                      borderRadius: '8px',
-                      padding: '8px 18px',
-                        cursor: studentAnnouncement.trim() ? 'pointer' : 'not-allowed',
+                        borderRadius: '8px',
+                        padding: '8px 18px',
+                        cursor: (studentAnnouncement.trim() && !isPosting) ? 'pointer' : 'not-allowed',
                         transition: 'background 0.15s',
-                        opacity: studentAnnouncement.trim() ? 1 : 0.6,
+                        opacity: (studentAnnouncement.trim() && !isPosting) ? 1 : 0.6,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6,
-                        minWidth: 90,
-                      height: 32
+                        minWidth: 110,
+                        height: 32
                       }}
-                      disabled={!studentAnnouncement.trim()}
+                      disabled={!studentAnnouncement.trim() || isPosting}
                     >
-                      <i className="ni ni-send" style={{ fontSize: 14, marginRight: 4 }} />
-                      Post
+                      {isPosting ? (
+                        <>
+                          <i className="fa fa-spinner fa-spin" style={{ fontSize: 14, marginRight: 4 }} />
+                          Posting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="ni ni-send" style={{ fontSize: 14, marginRight: 4 }} />
+                          Post
+                        </>
+                      )}
                     </button>
                 </div>
               </form>
@@ -1971,7 +2070,7 @@ const ClassroomDetailStudent = () => {
                           {openMenuId === announcement.id && (
                             <div ref={menuRef} style={{ position: 'absolute', top: 28, right: 0, background: '#fff', borderRadius: 12, boxShadow: '0 4px 24px #324cdd22', padding: '18px 0', minWidth: 160, zIndex: 10 }}>
                               <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleEditClick(announcement)}>Edit</div>
-                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => { setOpenMenuId(null); /* handle delete here */ }}>Delete</div>
+                              <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => { setOpenMenuId(null); handleDeleteStudentAnnouncement(announcement.id); }}>Delete</div>
                               {announcement.isPinned ? (
                                 <div style={{ padding: '8px 20px', cursor: 'pointer', fontWeight: 400, color: '#222', fontSize: 16 }} onClick={() => handleUnpin(announcement)}>Unpin</div>
                               ) : (
@@ -2054,7 +2153,9 @@ const ClassroomDetailStudent = () => {
 
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                             <button onClick={handleEditCancel} style={{ background: '#f7fafd', color: '#222', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-                            <button onClick={() => handleEditSave(announcement)} style={{ background: '#2ecc71', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                            <button onClick={() => handleEditSave(announcement)} style={{ background: '#2ecc71', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 600, cursor: 'pointer', opacity: isSavingEdit ? 0.7 : 1 }} disabled={isSavingEdit}>
+                              {isSavingEdit ? 'Saving…' : 'Save'}
+                            </button>
                           </div>
                         </div>
                       </>
@@ -2405,7 +2506,7 @@ const ClassroomDetailStudent = () => {
                 backdropFilter: 'blur(10px)'
               }}>
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: 24 }}>{loadingAssignments ? '...' : realAssignments.length}</div>
-                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Total Assignments</div>
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Total Tasks</div>
               </div>
               <div style={{ 
                 background: 'rgba(255,255,255,0.15)', 
@@ -2471,7 +2572,7 @@ const ClassroomDetailStudent = () => {
                 alignItems: 'center'
               }}>
                 <i className="ni ni-single-copy-04" style={{ marginRight: '12px', color: '#6c757d' }} />
-                Your Assignments
+                Your Tasks
               </h3>
               <div style={{ display: 'grid', gap: '16px' }}>
                 {realAssignments.map((assignment, index) => {
@@ -2687,7 +2788,7 @@ const ClassroomDetailStudent = () => {
                   </div>
                   <div>
                     <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500, marginBottom: '4px' }}>
-                      Total Class Members
+                      Total Class Participants
                     </div>
                     <div style={{ fontSize: '32px', fontWeight: 700, color: '#212529' }}>
                       {peopleData.statistics?.total_members || 0}
@@ -2890,7 +2991,7 @@ const ClassroomDetailStudent = () => {
                             margin: 0,
                             color: '#212529'
                           }}>
-                            Class Members
+                            Students
                           </h3>
                           <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
                             Enrolled Students
@@ -3071,7 +3172,7 @@ const ClassroomDetailStudent = () => {
                       {(gradesData.summary && gradesData.summary.tasks_total) || 0}
                     </div>
                     <div style={{ fontSize: '14px', color: '#6c757d', fontWeight: 500 }}>
-                      Total Assignments
+                      Total Tasks
                     </div>
                   </div>
                 </div>
@@ -3115,7 +3216,7 @@ const ClassroomDetailStudent = () => {
                       margin: 0,
                       color: '#212529'
                     }}>
-                      Grade Filters
+                      Filters
                     </h3>
                     <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
                       Filter by Status
@@ -3225,7 +3326,7 @@ const ClassroomDetailStudent = () => {
                         margin: 0,
                         color: '#212529'
                       }}>
-                        Assignment Grades
+                        Task Records
                       </h3>
                       <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 500 }}>
                         Your Academic Progress
@@ -3246,7 +3347,33 @@ const ClassroomDetailStudent = () => {
                 </div>
 
                 <div>
-                  {(Array.isArray(gradesData.items) ? gradesData.items : (gradesData.grades || [])).map(a => (
+                  {(() => {
+                    const sourceItems = Array.isArray(gradesData.items) ? gradesData.items : (gradesData.grades || []);
+                    const now = new Date();
+                    const filteredItems = sourceItems.filter(a => {
+                      const normalizedStatus = (a.status || '').toLowerCase().trim();
+                      const isSubmitted = normalizedStatus === 'submitted';
+                      const isGraded = normalizedStatus === 'graded';
+                      const isPending = !isSubmitted && !isGraded; // anything else is pending
+                      const dueDate = a.due_date ? new Date(a.due_date) : null;
+                      const isMissing = isPending && !!dueDate && dueDate < now;
+
+                      switch (gradeFilter) {
+                        case 'All':
+                          return true;
+                        case 'Pending':
+                          return isPending && !isMissing;
+                        case 'Turned in':
+                          return isSubmitted;
+                        case 'Graded':
+                          return isGraded;
+                        case 'Missing':
+                          return isMissing;
+                        default:
+                          return true;
+                      }
+                    });
+                    return filteredItems.map(a => (
                     <div key={a.id}>
                       {expandedGradeId === a.id ? (
                         <div style={{ 
@@ -3294,7 +3421,13 @@ const ClassroomDetailStudent = () => {
                                 if (gradeValue !== undefined && gradeValue !== null) {
                                   return `${gradeValue}/${maxPoints}`;
                                 }
-                                return a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending';
+                                const normalizedStatus = (a.status || '').toLowerCase().trim();
+                                if (normalizedStatus === 'submitted') return 'Turned in';
+                                if (normalizedStatus === 'graded') return 'Graded';
+                                const dueDate = a.due_date ? new Date(a.due_date) : null;
+                                const now = new Date();
+                                const isMissing = !!dueDate && dueDate < now;
+                                return isMissing ? 'Missing' : 'Pending';
                               })()}
                             </div>
                           </div>
@@ -3408,13 +3541,20 @@ const ClassroomDetailStudent = () => {
                               if (gradeValue !== undefined && gradeValue !== null) {
                                 return `${gradeValue}/${maxPoints}`;
                               }
-                              return a.status === 'submitted' ? 'Turned in' : a.status === 'graded' ? 'Graded' : 'Pending';
+                              const normalizedStatus = (a.status || '').toLowerCase().trim();
+                              if (normalizedStatus === 'submitted') return 'Turned in';
+                              if (normalizedStatus === 'graded') return 'Graded';
+                              const dueDate = a.due_date ? new Date(a.due_date) : null;
+                              const now = new Date();
+                              const isMissing = !!dueDate && dueDate < now;
+                              return isMissing ? 'Missing' : 'Pending';
                             })()}
                           </div>
                         </div>
                       )}
                     </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             </Col>
@@ -3488,7 +3628,7 @@ const ClassroomDetailStudent = () => {
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Class Members ({tempSelectedStudents.length})</span>
+                  <span style={{ fontWeight: 600, color: '#222', fontSize: 12 }}>Students ({tempSelectedStudents.length})</span>
                   {(() => {
                     const filtered = classroomMembers.filter(s => (!studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase())));
                     const allSelected = filtered.length > 0 && filtered.every(s => tempSelectedStudents.includes(s.name));
