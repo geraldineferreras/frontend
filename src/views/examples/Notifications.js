@@ -19,17 +19,17 @@ const typeMap = {
 };
 
 
-function NotificationCard({ notification, onMarkRead, onClick, isActive }) {
-  const { type, message, is_read, created_at } = notification;
+function NotificationCard({ notification, onMarkRead, onClick, isActive, isUnread }) {
+  const { type, message, created_at } = notification;
   const meta = typeMap[type] || typeMap.general;
   
   return (
     <div
       style={{
-        background: (!is_read || isActive) ? "#e3f0ff" : "#fff",
+        background: (isUnread || isActive) ? "#e3f0ff" : "#fff",
         border: `1.5px solid ${meta.color}22`,
         borderRadius: 12,
-        boxShadow: (!is_read || isActive) ? `0 2px 8px ${meta.color}22` : "none",
+        boxShadow: (isUnread || isActive) ? `0 2px 8px ${meta.color}22` : "none",
         padding: 18,
         marginBottom: 16,
         display: "flex",
@@ -42,10 +42,10 @@ function NotificationCard({ notification, onMarkRead, onClick, isActive }) {
     >
       <div style={{ fontSize: 28, color: meta.color, flexShrink: 0 }}>{meta.icon}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: (!is_read || isActive) ? 700 : 600, fontSize: 16, color: meta.color, marginBottom: 2 }}>
+        <div style={{ fontWeight: (isUnread || isActive) ? 700 : 600, fontSize: 16, color: meta.color, marginBottom: 2 }}>
           {meta.title}
         </div>
-        <div style={{ fontWeight: (!is_read || isActive) ? 600 : 400, fontSize: 15, color: (!is_read || isActive) ? "#222" : "#444" }}>{message}</div>
+        <div style={{ fontWeight: (isUnread || isActive) ? 600 : 400, fontSize: 15, color: (isUnread || isActive) ? "#222" : "#444" }}>{message}</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{timeAgo(created_at)}</div>
         {/* Internal debug/status line removed for clean UI */}
       </div>
@@ -276,13 +276,22 @@ const Notifications = () => {
     }
   };
 
+  const isReadNormalized = (n) => {
+    const v = n.is_read;
+    if (v === true) return true;
+    if (v === false) return false;
+    if (v === 1 || v === '1' || v === 'true') return true;
+    if (v === 0 || v === '0' || v === 'false' || v == null) return false;
+    return !!v;
+  };
+
   const filteredNotifications = notifications.filter(n => {
-    if (filter === 'unread') return !n.is_read;
-    if (filter === 'read') return n.is_read;
+    if (filter === 'unread') return !isReadNormalized(n);
+    if (filter === 'read') return isReadNormalized(n);
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !isReadNormalized(n)).length;
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
@@ -391,6 +400,7 @@ const Notifications = () => {
               onMarkRead={handleMarkRead}
               onClick={() => handleOpen(n)}
               isActive={activeId === n.id}
+              isUnread={!isReadNormalized(n)}
             />
           ))
         )}
