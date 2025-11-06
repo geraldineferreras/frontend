@@ -3495,7 +3495,7 @@ const ClassroomDetailStudent = () => {
                                     }}
                                   >
                                     <i className="ni ni-single-02" style={{ fontSize: '16px' }} />
-                                    View Assignment Details
+                                    View Task Details
                                   </a>
                                 </div>
                               </div>
