@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { getCurrentUserId } from "../../utils/userUtils";
 import { timeAgo } from "../../utils/timeUtils";
@@ -17,16 +18,16 @@ const typeMap = {
 };
 
 
-function NotificationCard({ notification, onMarkRead, onClick }) {
+function NotificationCard({ notification, onMarkRead, onClick, isActive }) {
   const { type, message, is_read, created_at } = notification;
   const meta = typeMap[type] || typeMap.general;
   return (
     <div
       style={{
-        background: is_read ? "#fff" : "#e3f0ff",
+        background: (!is_read || isActive) ? "#e3f0ff" : "#fff",
         border: `1.5px solid ${meta.color}22`,
         borderRadius: 12,
-        boxShadow: is_read ? "none" : `0 2px 8px ${meta.color}22`,
+        boxShadow: (!is_read || isActive) ? `0 2px 8px ${meta.color}22` : "none",
         padding: 18,
         marginBottom: 16,
         display: "flex",
@@ -39,10 +40,10 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
     >
       <div style={{ fontSize: 28, color: meta.color, flexShrink: 0 }}>{meta.icon}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: is_read ? 600 : 700, fontSize: 16, color: meta.color, marginBottom: 2 }}>
+        <div style={{ fontWeight: (!is_read || isActive) ? 700 : 600, fontSize: 16, color: meta.color, marginBottom: 2 }}>
           {meta.title}
         </div>
-        <div style={{ fontWeight: is_read ? 400 : 600, fontSize: 15, color: is_read ? "#444" : "#222" }}>{message}</div>
+        <div style={{ fontWeight: (!is_read || isActive) ? 600 : 400, fontSize: 15, color: (!is_read || isActive) ? "#222" : "#444" }}>{message}</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{timeAgo(created_at)}</div>
         {/* Internal debug/status line removed for clean UI */}
       </div>
@@ -134,6 +135,8 @@ const StudentNotifications = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const { decrementUnreadCount, resetUnreadCount } = useNotifications();
+  const [activeId, setActiveId] = useState(null);
+  const navigate = useNavigate();
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -209,6 +212,33 @@ const StudentNotifications = () => {
       }
     } catch (error) {
       console.error('❌ [StudentNotifications] Failed to mark notification as read:', error);
+    }
+  };
+
+  const resolveLink = (n) => {
+    return n.link || n.url || n.target_url || null;
+  };
+
+  const handleOpen = async (n) => {
+    try {
+      setActiveId(n.id);
+      const link = resolveLink(n);
+      if (!n.is_read) {
+        await markAsRead(n.id);
+        setNotifications(list => list.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+        decrementUnreadCount();
+      }
+      if (link) {
+        if (link.startsWith('http')) {
+          window.location.href = link;
+        } else {
+          navigate(link);
+        }
+      }
+      // Keep highlight briefly even after marking as read
+      setTimeout(() => setActiveId(null), 3000);
+    } catch (e) {
+      console.error('Failed to open notification', e);
     }
   };
 
@@ -328,7 +358,8 @@ const StudentNotifications = () => {
               key={n.id}
               notification={n}
               onMarkRead={handleMarkRead}
-              onClick={() => { /* Optionally navigate to detail */ }}
+              onClick={() => handleOpen(n)}
+              isActive={activeId === n.id}
             />
           ))
         )}
