@@ -46,9 +46,7 @@ function NotificationCard({ notification, onMarkRead, onClick }) {
         </div>
         <div style={{ fontWeight: is_read ? 400 : 600, fontSize: 15, color: is_read ? "#444" : "#222" }}>{message}</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>{timeAgo(created_at)}</div>
-        <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
-          Status: {is_read ? 'READ' : 'UNREAD'} | ID: {notification.id} | Type: {typeof is_read}
-        </div>
+        {/* Internal debug/status line removed for clean UI */}
       </div>
       {/* Always show button - temporary fix for deployed version */}
       <button
