@@ -3377,10 +3377,10 @@ const ClassroomDetailStudent = () => {
                     <div key={a.id}>
                       {expandedGradeId === a.id ? (
                         <div style={{ 
-                          border: '2px solid #e9ecef', 
+                          border: '1px solid #e9ecef', 
                           borderRadius: '16px', 
                           marginBottom: '16px', 
-                          background: '#f8f9fa',
+                          background: '#ffffff',
                           overflow: 'hidden'
                         }}>
                           <div style={{ 
@@ -3431,10 +3431,10 @@ const ClassroomDetailStudent = () => {
                               })()}
                             </div>
                           </div>
-                          {/* Expanded content for assignments with attachments */}
-                          {a.attachment_url && (
-                            <>
-                              <div style={{ padding: '24px', background: '#ffffff' }}>
+                          {/* Expanded content */}
+                          <div style={{ padding: '24px', background: '#ffffff' }}>
+                            {a.attachment_url && (
+                              <>
                                 <div style={{ 
                                   fontSize: '16px', 
                                   fontWeight: 600, 
@@ -3477,30 +3477,25 @@ const ClassroomDetailStudent = () => {
                                     </div>
                                   </div>
                                 </div>
-                                <div style={{ marginTop: '20px' }}>
-                                  <a
-                                    href="#"
-                                    style={{ 
-                                      color: '#495057', 
-                                      fontWeight: 600, 
-                                      fontSize: '16px', 
-                                      textDecoration: 'none',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '8px'
-                                    }}
-                                    onClick={e => {
-                                      e.preventDefault();
-                                      navigate(`/student/classroom/${currentClass?.code || code}/assignment/${a.task_id || a.id}`);
-                                    }}
-                                  >
-                                    <i className="ni ni-single-02" style={{ fontSize: '16px' }} />
-                                    View Task Details
-                                  </a>
-                                </div>
-                              </div>
-                            </>
-                          )}
+                              </>
+                            )}
+                            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => navigate(`/student/classroom/${currentClass?.code || code}/assignment/${a.task_id || a.id}`)}
+                                style={{
+                                  background: '#324cdd',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  padding: '10px 16px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                View Task Details
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ 
