@@ -3373,9 +3373,12 @@ const ClassroomDetailStudent = () => {
                           return true;
                       }
                     });
-                    return filteredItems.map(a => (
-                    <div key={a.id}>
-                      {expandedGradeId === a.id ? (
+                    return filteredItems.map(a => {
+                      const itemId = a.id || a.task_id || a.assignment_id;
+                      const isExpanded = expandedGradeId === itemId;
+                      return (
+                    <div key={itemId ?? Math.random()}>
+                      {isExpanded ? (
                         <div style={{ 
                           border: '1px solid #e9ecef', 
                           borderRadius: '16px', 
@@ -3433,6 +3436,35 @@ const ClassroomDetailStudent = () => {
                           </div>
                           {/* Expanded content */}
                           <div style={{ padding: '24px', background: '#ffffff' }}>
+                            {a.description && (
+                              <div style={{ marginBottom: '16px', color: '#495057', lineHeight: 1.5 }}>
+                                {a.description}
+                              </div>
+                            )}
+                            {Array.isArray(a.attachments) && a.attachments.length > 0 && (
+                              <div style={{ marginBottom: '16px' }}>
+                                <div style={{ 
+                                  fontSize: '16px', 
+                                  fontWeight: 600, 
+                                  color: '#212529', 
+                                  marginBottom: '12px' 
+                                }}>
+                                  Attachments
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                                  {a.attachments.map((att, idx) => (
+                                    <div key={idx} style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '12px', padding: '12px' }}>
+                                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#212529', marginBottom: '2px' }}>
+                                        {(att.name || att.url || '').toString().split('/').pop()}
+                                      </div>
+                                      <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                        {att.type || 'Attachment'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             {a.attachment_url && (
                               <>
                                 <div style={{ 
@@ -3481,7 +3513,7 @@ const ClassroomDetailStudent = () => {
                             )}
                             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
                               <button
-                                onClick={() => navigate(`/student/classroom/${currentClass?.code || code}/assignment/${a.task_id || a.id}`)}
+                                onClick={() => navigate(`/student/classroom/${currentClass?.code || code}/assignment/${a.task_id || a.id || itemId}`)}
                                 style={{
                                   background: '#324cdd',
                                   color: '#ffffff',
@@ -3506,7 +3538,7 @@ const ClassroomDetailStudent = () => {
                           justifyContent: 'space-between', 
                           cursor: 'pointer',
                           transition: 'all 0.2s ease'
-                        }} onClick={() => setExpandedGradeId(a.id)}>
+                        }} onClick={() => setExpandedGradeId(prev => (prev === itemId ? null : itemId))}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                             <div>
                               <div style={{ fontWeight: 700, fontSize: '16px', color: '#212529', marginBottom: '4px' }}>
@@ -3548,7 +3580,7 @@ const ClassroomDetailStudent = () => {
                         </div>
                       )}
                     </div>
-                    ));
+                    )});
                   })()}
                 </div>
               </div>
